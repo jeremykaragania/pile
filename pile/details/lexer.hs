@@ -95,3 +95,17 @@ module Lexer where
   }
 
   lexer = P.makeTokenParser languageDef
+
+  keyword = P.reserved lexer
+
+  identifier = P.identifier lexer
+
+  floatingConstant = P.float lexer
+
+  integerConstant = P.integer lexer
+
+  characterConstant = P.charLiteral lexer
+
+  stringLiteral = P.stringLiteral lexer
+
+  operator = P.operator lexer
