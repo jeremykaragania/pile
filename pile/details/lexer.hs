@@ -109,3 +109,5 @@ module Lexer where
   stringLiteral = P.stringLiteral lexer
 
   operator = P.operator lexer
+
+  punctuatorConstant = oneOf "*,:=;#"
