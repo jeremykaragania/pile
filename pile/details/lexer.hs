@@ -3,6 +3,14 @@ module Lexer where
   import qualified Text.Parsec.Token as P
   import Text.Parsec.Language
 
+  data Token =
+    Keyword |
+    Identifier |
+    Constant |
+    StringLiteral |
+    Operator |
+    Punctuator
+
   languageDef = emptyDef {
     P.commentStart = "/*",
     P.commentEnd = "*/",
