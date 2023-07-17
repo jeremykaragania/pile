@@ -3,13 +3,15 @@ module Lexer where
   import qualified Text.Parsec.Token as P
   import Text.Parsec.Language
 
-  data Token =
+  data Token value = Token TokenName value deriving (Show)
+
+  data TokenName =
     Keyword |
     Identifier |
     Constant |
     StringLiteral |
     Operator |
-    Punctuator
+    Punctuator deriving (Show)
 
   languageDef = emptyDef {
     P.commentStart = "/*",
@@ -104,18 +106,34 @@ module Lexer where
 
   lexer = P.makeTokenParser languageDef
 
-  keyword = P.reserved lexer
+  keyword = do
+    value <- P.reserved lexer
+    return (Token Keyword value)
 
-  identifier = P.identifier lexer
+  identifier = do
+    value <- P.identifier lexer
+    return (Token Identifier value)
 
-  floatingConstant = P.float lexer
+  floatingConstant = do
+    value <- P.float lexer
+    return (Token Constant value)
 
-  integerConstant = P.integer lexer
+  integerConstant = do
+    value <- P.integer lexer
+    return (Token Constant value)
 
-  characterConstant = P.charLiteral lexer
+  characterConstant = do
+    value <- P.charLiteral lexer
+    return (Token Constant value)
 
-  stringLiteral = P.stringLiteral lexer
+  stringLiteral = do
+    value <- P.stringLiteral lexer
+    return (Token StringLiteral value)
 
-  operator = P.operator lexer
+  operator = do
+    value <- P.operator lexer
+    return (Token Operator value)
 
-  punctuatorConstant = oneOf "*,:=;#"
+  punctuatorConstant = do
+    value <- oneOf "*,:=;#"
+    return (Token Punctuator value)
