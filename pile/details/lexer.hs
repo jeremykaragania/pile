@@ -3,15 +3,15 @@ module Lexer where
   import qualified Text.Parsec.Token as P
   import Text.Parsec.Language
 
-  data Token value = Token TokenName value deriving (Show)
-
-  data TokenName =
-    Keyword |
-    Identifier |
-    Constant |
-    StringLiteral |
-    Operator |
-    Punctuator deriving (Show)
+  data Token =
+    Keyword String |
+    Identifier String |
+    FloatingConstant Double |
+    IntegerConstant Integer|
+    CharacterConstant Char|
+    StringLiteral String |
+    Operator String |
+    Punctuator String deriving (Show)
 
   languageDef = emptyDef {
     P.commentStart = "/*",
@@ -107,33 +107,43 @@ module Lexer where
   lexer = P.makeTokenParser languageDef
 
   keyword = do
-    value <- P.reserved lexer
-    return (Token Keyword value)
+    value <- choice (map (P.symbol lexer) (P.reservedNames languageDef))
+    return (Keyword value)
 
   identifier = do
     value <- P.identifier lexer
-    return (Token Identifier value)
+    return (Identifier value)
 
   floatingConstant = do
     value <- P.float lexer
-    return (Token Constant value)
+    return (FloatingConstant value)
 
   integerConstant = do
     value <- P.integer lexer
-    return (Token Constant value)
+    return (IntegerConstant value)
 
   characterConstant = do
     value <- P.charLiteral lexer
-    return (Token Constant value)
+    return (CharacterConstant value)
 
   stringLiteral = do
     value <- P.stringLiteral lexer
-    return (Token StringLiteral value)
+    return (StringLiteral value)
 
   operator = do
-    value <- P.operator lexer
-    return (Token Operator value)
+    value <- choice (map (P.symbol lexer) (P.reservedOpNames languageDef))
+    return (Operator value)
 
-  punctuatorConstant = do
-    value <- oneOf "*,:=;#"
-    return (Token Punctuator value)
+  punctuator = do
+    value <- choice (map (P.symbol lexer) (["*", ",", ":", "=", ";", "...", "#"]))
+    return (Punctuator value)
+
+  token =
+    keyword <|>
+    identifier <|>
+    floatingConstant <|>
+    integerConstant <|>
+    characterConstant <|>
+    stringLiteral <|>
+    operator <|>
+    punctuator
