@@ -107,7 +107,7 @@ module Lexer where
   lexer = P.makeTokenParser languageDef
 
   keyword = do
-    value <- choice (map (P.symbol lexer) (P.reservedNames languageDef))
+    value <- choice (map try (map (P.symbol lexer) (P.reservedNames languageDef)))
     return (Keyword value)
 
   identifier = do
@@ -131,11 +131,11 @@ module Lexer where
     return (StringLiteral value)
 
   operator = do
-    value <- choice (map (P.symbol lexer) (P.reservedOpNames languageDef))
+    value <- choice (map try (map (P.symbol lexer) (P.reservedOpNames languageDef)))
     return (Operator value)
 
   punctuator = do
-    value <- choice (map (P.symbol lexer) (["*", ",", ":", "=", ";", "...", "#"]))
+    value <- try (choice (map (P.symbol lexer) (["[", "]", "(", ")", "{", "}", "*", ",", ":", "=", ";", "...", "#"])))
     return (Punctuator value)
 
   token =
@@ -147,3 +147,5 @@ module Lexer where
     stringLiteral <|>
     operator <|>
     punctuator
+
+  scan = parse (many (P.whiteSpace lexer >> Lexer.token)) ""
