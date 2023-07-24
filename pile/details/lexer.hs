@@ -141,11 +141,11 @@ module Lexer where
   token =
     keyword <|>
     identifier <|>
+    operator <|>
+    punctuator <|>
     floatingConstant <|>
     integerConstant <|>
     characterConstant <|>
-    stringLiteral <|>
-    operator <|>
-    punctuator
+    stringLiteral
 
   scan = parse (many (P.whiteSpace lexer >> Lexer.token)) ""
