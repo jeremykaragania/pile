@@ -11,7 +11,7 @@ module Lexer where
     CharacterConstant Char|
     StringLiteral String |
     Operator String |
-    Punctuator String deriving (Show)
+    Punctuator String deriving Show
 
   languageDef = emptyDef {
     P.commentStart = "/*",
@@ -111,23 +111,23 @@ module Lexer where
     return (Keyword value)
 
   identifier = do
-    value <- P.identifier lexer
+    value <- try (P.identifier lexer)
     return (Identifier value)
 
   floatingConstant = do
-    value <- P.float lexer
+    value <- try (P.float lexer)
     return (FloatingConstant value)
 
   integerConstant = do
-    value <- P.integer lexer
+    value <- try (P.integer lexer)
     return (IntegerConstant value)
 
   characterConstant = do
-    value <- P.charLiteral lexer
+    value <- try (P.charLiteral lexer)
     return (CharacterConstant value)
 
   stringLiteral = do
-    value <- P.stringLiteral lexer
+    value <- try (P.stringLiteral lexer)
     return (StringLiteral value)
 
   operator = do
