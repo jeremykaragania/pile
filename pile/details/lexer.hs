@@ -3,7 +3,9 @@ module Lexer where
   import qualified Text.Parsec.Token as P
   import Text.Parsec.Language
 
-  data Token =
+  type Token = (SourcePos, TokenValue)
+
+  data TokenValue =
     Keyword String |
     Identifier String |
     FloatingConstant Double |
@@ -107,36 +109,44 @@ module Lexer where
   lexer = P.makeTokenParser languageDef
 
   keyword = do
+    sourcePos <- getPosition
     value <- choice (map try (map (P.symbol lexer) (P.reservedNames languageDef)))
-    return (Keyword value)
+    return (sourcePos, Keyword value)
 
   identifier = do
+    sourcePos <- getPosition
     value <- try (P.identifier lexer)
-    return (Identifier value)
+    return (sourcePos, Identifier value)
 
   floatingConstant = do
+    sourcePos <- getPosition
     value <- try (P.float lexer)
-    return (FloatingConstant value)
+    return (sourcePos, FloatingConstant value)
 
   integerConstant = do
+    sourcePos <- getPosition
     value <- try (P.integer lexer)
-    return (IntegerConstant value)
+    return (sourcePos, IntegerConstant value)
 
   characterConstant = do
+    sourcePos <- getPosition
     value <- try (P.charLiteral lexer)
-    return (CharacterConstant value)
+    return (sourcePos, CharacterConstant value)
 
   stringLiteral = do
+    sourcePos <- getPosition
     value <- try (P.stringLiteral lexer)
-    return (StringLiteral value)
+    return (sourcePos, StringLiteral value)
 
   operator = do
+    sourcePos <- getPosition
     value <- choice (map try (map (P.symbol lexer) (P.reservedOpNames languageDef)))
-    return (Operator value)
+    return (sourcePos, Operator value)
 
   punctuator = do
+    sourcePos <- getPosition
     value <- try (choice (map (P.symbol lexer) (["[", "]", "(", ")", "{", "}", "*", ",", ":", "=", ";", "...", "#"])))
-    return (Punctuator value)
+    return (sourcePos, Punctuator value)
 
   token =
     keyword <|>
