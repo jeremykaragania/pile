@@ -108,54 +108,54 @@ module Lexer where
 
   lexer = P.makeTokenParser languageDef
 
-  keyword = do
+  scanKeyword = do
     sourcePos <- getPosition
     value <- choice (map try (map (P.symbol lexer) (P.reservedNames languageDef)))
     return (sourcePos, Keyword value)
 
-  identifier = do
+  scanIdentifier = do
     sourcePos <- getPosition
     value <- try (P.identifier lexer)
     return (sourcePos, Identifier value)
 
-  floatingConstant = do
+  scanFloatingConstant = do
     sourcePos <- getPosition
     value <- try (P.float lexer)
     return (sourcePos, FloatingConstant value)
 
-  integerConstant = do
+  scanIntegerConstant = do
     sourcePos <- getPosition
     value <- try (P.integer lexer)
     return (sourcePos, IntegerConstant value)
 
-  characterConstant = do
+  scanCharacterConstant = do
     sourcePos <- getPosition
     value <- try (P.charLiteral lexer)
     return (sourcePos, CharacterConstant value)
 
-  stringLiteral = do
+  scanStringLiteral = do
     sourcePos <- getPosition
     value <- try (P.stringLiteral lexer)
     return (sourcePos, StringLiteral value)
 
-  operator = do
+  scanOperator = do
     sourcePos <- getPosition
     value <- choice (map try (map (P.symbol lexer) (P.reservedOpNames languageDef)))
     return (sourcePos, Operator value)
 
-  punctuator = do
+  scanPunctuator = do
     sourcePos <- getPosition
     value <- try (choice (map (P.symbol lexer) (["[", "]", "(", ")", "{", "}", "*", ",", ":", "=", ";", "...", "#"])))
     return (sourcePos, Punctuator value)
 
-  token =
-    keyword <|>
-    identifier <|>
-    operator <|>
-    punctuator <|>
-    floatingConstant <|>
-    integerConstant <|>
-    characterConstant <|>
-    stringLiteral
+  scanToken =
+    scanKeyword <|>
+    scanIdentifier <|>
+    scanOperator <|>
+    scanPunctuator <|>
+    scanFloatingConstant <|>
+    scanIntegerConstant <|>
+    scanCharacterConstant <|>
+    scanStringLiteral
 
-  scan = parse (many (P.whiteSpace lexer >> Lexer.token)) ""
+  scan = parse (many (P.whiteSpace lexer >> scanToken)) ""
