@@ -3,7 +3,11 @@ module Lexer where
   import qualified Text.Parsec.Token as P
   import Text.Parsec.Language
 
-  type Token = (SourcePos, TokenValue)
+  data Token = Token SourcePos TokenValue deriving (Show, Eq)
+
+  pos (Token pos val) = pos
+
+  val (Token pos val) = val
 
   data TokenValue =
     Keyword String |
@@ -13,7 +17,7 @@ module Lexer where
     CharacterConstant Char|
     StringLiteral String |
     Operator String |
-    Punctuator String deriving Show
+    Punctuator String deriving (Show, Eq)
 
   languageDef = emptyDef {
     P.commentStart = "/*",
@@ -111,42 +115,42 @@ module Lexer where
   scanKeyword = do
     sourcePos <- getPosition
     value <- choice (map try (map (P.symbol lexer) (P.reservedNames languageDef)))
-    return (sourcePos, Keyword value)
+    return (Token sourcePos (Keyword value))
 
   scanIdentifier = do
     sourcePos <- getPosition
     value <- try (P.identifier lexer)
-    return (sourcePos, Identifier value)
+    return (Token sourcePos (Identifier value))
 
   scanFloatingConstant = do
     sourcePos <- getPosition
     value <- try (P.float lexer)
-    return (sourcePos, FloatingConstant value)
+    return (Token sourcePos (FloatingConstant value))
 
   scanIntegerConstant = do
     sourcePos <- getPosition
     value <- try (P.integer lexer)
-    return (sourcePos, IntegerConstant value)
+    return (Token sourcePos (IntegerConstant value))
 
   scanCharacterConstant = do
     sourcePos <- getPosition
     value <- try (P.charLiteral lexer)
-    return (sourcePos, CharacterConstant value)
+    return (Token sourcePos (CharacterConstant value))
 
   scanStringLiteral = do
     sourcePos <- getPosition
     value <- try (P.stringLiteral lexer)
-    return (sourcePos, StringLiteral value)
+    return (Token sourcePos (StringLiteral value))
 
   scanOperator = do
     sourcePos <- getPosition
     value <- choice (map try (map (P.symbol lexer) (P.reservedOpNames languageDef)))
-    return (sourcePos, Operator value)
+    return (Token sourcePos (Operator value))
 
   scanPunctuator = do
     sourcePos <- getPosition
     value <- try (choice (map (P.symbol lexer) (["[", "]", "(", ")", "{", "}", "*", ",", ":", "=", ";", "...", "#"])))
-    return (sourcePos, Punctuator value)
+    return (Token sourcePos (Punctuator value))
 
   scanToken =
     scanKeyword <|>
