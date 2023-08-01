@@ -32,6 +32,13 @@ module Parser where
     ArithmeticOperator UnaryExpr |
     SizeofOperator (Either UnaryExpr String) deriving Show
 
+  parseToken t =
+    tokenPrim showTok nextPos testTok
+    where
+      showTok x = show x
+      nextPos pos x xs = pos
+      testTok x = if x == t then Just x else Nothing
+
   parseIdentifier =
     tokenPrim showTok nextPos testTok
     where
