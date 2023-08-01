@@ -3,7 +3,7 @@ module Lexer where
   import qualified Text.Parsec.Token as P
   import Text.Parsec.Language
 
-  data Token = Token SourcePos TokenValue deriving Show
+  data Token = Token (Maybe SourcePos) TokenValue deriving Show
 
   instance Eq Token 
     where 
@@ -119,42 +119,42 @@ module Lexer where
   scanKeyword = do
     sourcePos <- getPosition
     value <- choice (map try (map (P.symbol lexer) (P.reservedNames languageDef)))
-    return (Token sourcePos (Keyword value))
+    return (Token (Just sourcePos) (Keyword value))
 
   scanIdentifier = do
     sourcePos <- getPosition
     value <- try (P.identifier lexer)
-    return (Token sourcePos (Identifier value))
+    return (Token (Just sourcePos) (Identifier value))
 
   scanFloatingConstant = do
     sourcePos <- getPosition
     value <- try (P.float lexer)
-    return (Token sourcePos (FloatingConstant value))
+    return (Token (Just sourcePos) (FloatingConstant value))
 
   scanIntegerConstant = do
     sourcePos <- getPosition
     value <- try (P.integer lexer)
-    return (Token sourcePos (IntegerConstant value))
+    return (Token (Just sourcePos) (IntegerConstant value))
 
   scanCharacterConstant = do
     sourcePos <- getPosition
     value <- try (P.charLiteral lexer)
-    return (Token sourcePos (CharacterConstant value))
+    return (Token (Just sourcePos) (CharacterConstant value))
 
   scanStringLiteral = do
     sourcePos <- getPosition
     value <- try (P.stringLiteral lexer)
-    return (Token sourcePos (StringLiteral value))
+    return (Token (Just sourcePos) (StringLiteral value))
 
   scanOperator = do
     sourcePos <- getPosition
     value <- choice (map try (map (P.symbol lexer) (P.reservedOpNames languageDef)))
-    return (Token sourcePos (Operator value))
+    return (Token (Just sourcePos) (Operator value))
 
   scanPunctuator = do
     sourcePos <- getPosition
     value <- try (choice (map (P.symbol lexer) (["[", "]", "(", ")", "{", "}", "*", ",", ":", "=", ";", "...", "#"])))
-    return (Token sourcePos (Punctuator value))
+    return (Token (Just sourcePos) (Punctuator value))
 
   scanToken =
     scanKeyword <|>
