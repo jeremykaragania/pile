@@ -18,10 +18,10 @@ module Parser where
   data PostfixExpr =
     PrimaryExpr PrimaryExpr |
     ArraySubscript PostfixExpr Expr |
-    StructMember PostfixExpr String |
-    UnionMember PostfixExpr String |
-    PostfixIncrement PostfixExpr |
-    PostfixDecrement PostfixExpr deriving Show
+    StructMember Expr Expr |
+    UnionMember Expr Expr|
+    PostfixIncrement Expr |
+    PostfixDecrement Expr deriving Show
 
   data UnaryExpr =
     PostfixExpr PostfixExpr |
@@ -44,7 +44,7 @@ module Parser where
     where
       showTok x = show x
       nextPos pos x xs = pos
-      testTok (Token pos (Lexer.Identifier x)) = Just (Parser.Identifier x)
+      testTok (Token pos (Lexer.Identifier x)) = Just (Primary (Parser.Identifier x))
       testTok x = Nothing
 
   parseFloatingConstant =
@@ -52,7 +52,7 @@ module Parser where
     where
       showTok x = show x
       nextPos pos x xs = pos
-      testTok (Token pos (Lexer.FloatingConstant x)) = Just (Parser.FloatingConstant x)
+      testTok (Token pos (Lexer.FloatingConstant x)) = Just (Primary (Parser.FloatingConstant x))
       testTok x = Nothing
 
   parseIntegerConstant =
@@ -60,7 +60,7 @@ module Parser where
     where
       showTok x = show x
       nextPos pos x xs = pos
-      testTok (Token pos (Lexer.IntegerConstant x)) = Just (Parser.IntegerConstant x)
+      testTok (Token pos (Lexer.IntegerConstant x)) = Just (Primary (Parser.IntegerConstant x))
       testTok x = Nothing
 
   parseCharacterConstant =
@@ -68,7 +68,7 @@ module Parser where
     where
       showTok x = show x
       nextPos pos x xs = pos
-      testTok (Token pos (Lexer.CharacterConstant x)) = Just (Parser.CharacterConstant x)
+      testTok (Token pos (Lexer.CharacterConstant x)) = Just (Primary (Parser.CharacterConstant x))
       testTok x = Nothing
 
   parseStringLiteral =
@@ -76,7 +76,7 @@ module Parser where
     where
       showTok x = show x
       nextPos pos x xs = pos
-      testTok (Token pos (Lexer.StringLiteral x)) = Just (Parser.StringLiteral x)
+      testTok (Token pos (Lexer.StringLiteral x)) = Just (Primary (Parser.StringLiteral x))
       testTok x = Nothing
 
   parsePrimaryExpr =
@@ -85,3 +85,32 @@ module Parser where
     parseIntegerConstant <|>
     parseCharacterConstant <|>
     parseStringLiteral
+
+  parseStructMember = do
+    postfixExpr <- parsePostfixExpr
+    parseToken (Token Nothing (Operator ".")) <|> parseToken (Token Nothing (Operator "->"))
+    identifier <- parseIdentifier
+    return (Postfix (StructMember postfixExpr identifier))
+
+  parseUnionMember = do
+    postfixExpr <- parsePostfixExpr
+    parseToken (Token Nothing (Operator ".")) <|> parseToken (Token Nothing (Operator "->"))
+    identifier <- parseIdentifier
+    return (Postfix (UnionMember postfixExpr identifier))
+
+  parsePostfixIncrement = do
+    postfixExpr <- parsePostfixExpr
+    parseToken (Token Nothing (Operator "++"))
+    return (Postfix (PostfixIncrement postfixExpr))
+
+  parsePostfixDecrement = do
+    postfixExpr <- parsePostfixExpr
+    parseToken (Token Nothing (Operator "--"))
+    return (Postfix (PostfixDecrement postfixExpr))
+
+  parsePostfixExpr =
+    parsePrimaryExpr <|>
+    parseStructMember <|>
+    parseUnionMember <|>
+    parsePostfixIncrement <|>
+    parsePostfixDecrement
