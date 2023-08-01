@@ -3,7 +3,11 @@ module Lexer where
   import qualified Text.Parsec.Token as P
   import Text.Parsec.Language
 
-  data Token = Token SourcePos TokenValue deriving (Show, Eq)
+  data Token = Token SourcePos TokenValue deriving Show
+
+  instance Eq Token 
+    where 
+      (Token lhsPos lhsVal) == (Token rhsPos rhsVal) = if lhsVal == rhsVal then True else False
 
   pos (Token pos val) = pos
 
