@@ -25,11 +25,11 @@ module Parser where
 
   data UnaryExpr =
     PostfixExpr PostfixExpr |
-    PrefixIncrement UnaryExpr |
-    PrefixDecrement UnaryExpr |
-    AddressOperator UnaryExpr |
-    IndirectionOperator UnaryExpr |
-    ArithmeticOperator UnaryExpr |
+    PrefixIncrement Expr |
+    PrefixDecrement Expr |
+    AddressOperator Expr |
+    IndirectionOperator Expr |
+    ArithmeticOperator Expr |
     SizeofOperator (Either UnaryExpr String) deriving Show
 
   identifierVal (Primary (Parser.Identifier x)) = x
@@ -97,26 +97,26 @@ module Parser where
     parseStringLiteral
 
   parseStructMember = do
-    postfixExpr <- parsePostfixExpr
+    expr <- parsePostfixExpr
     parseToken (Token Nothing (Operator ".")) <|> parseToken (Token Nothing (Operator "->"))
     identifier <- parseIdentifier
-    return (Postfix (StructMember postfixExpr identifier))
+    return (Postfix (StructMember expr identifier))
 
   parseUnionMember = do
-    postfixExpr <- parsePostfixExpr
+    expr <- parsePostfixExpr
     parseToken (Token Nothing (Operator ".")) <|> parseToken (Token Nothing (Operator "->"))
     identifier <- parseIdentifier
-    return (Postfix (UnionMember postfixExpr identifier))
+    return (Postfix (UnionMember expr identifier))
 
   parsePostfixIncrement = do
-    postfixExpr <- parsePostfixExpr
+    expr <- parsePostfixExpr
     parseToken (Token Nothing (Operator "++"))
-    return (Postfix (PostfixIncrement postfixExpr))
+    return (Postfix (PostfixIncrement expr))
 
   parsePostfixDecrement = do
-    postfixExpr <- parsePostfixExpr
+    expr <- parsePostfixExpr
     parseToken (Token Nothing (Operator "--"))
-    return (Postfix (PostfixDecrement postfixExpr))
+    return (Postfix (PostfixDecrement expr))
 
   parsePostfixExpr =
     parsePrimaryExpr <|>
@@ -124,3 +124,36 @@ module Parser where
     parseUnionMember <|>
     parsePostfixIncrement <|>
     parsePostfixDecrement
+
+  parsePrefixIncrement = do
+    parseToken (Token Nothing (Operator "++"))
+    expr <- parseUnaryExpr
+    return (Unary (PrefixIncrement expr))
+
+  parsePrefixDecrement = do
+    parseToken (Token Nothing (Operator "--"))
+    expr <- parseUnaryExpr
+    return (Unary (PrefixDecrement expr))
+
+  parseAddressOperator = do
+    parseToken (Token Nothing (Operator "&"))
+    expr <- parseUnaryExpr
+    return (Unary (AddressOperator expr))
+
+  parseIndirectionOperator = do
+    parseToken (Token Nothing (Operator "*"))
+    expr <- parseUnaryExpr
+    return (Unary (IndirectionOperator expr))
+
+  parseArithmeticOperator = do
+    parseToken (Token Nothing (Operator "+")) <|> parseToken (Token Nothing (Operator "-")) <|> parseToken (Token Nothing (Operator "~")) <|> parseToken (Token Nothing (Operator "!"))
+    expr <- parseUnaryExpr
+    return (Unary (ArithmeticOperator expr))
+
+  parseUnaryExpr =
+    parsePostfixExpr <|>
+    parsePrefixIncrement <|>
+    parsePrefixDecrement <|>
+    parseAddressOperator <|>
+    parseIndirectionOperator <|>
+    parseArithmeticOperator
