@@ -97,33 +97,33 @@ module Parser where
     parseStringLiteral
 
   parseStructMember = do
-    expr <- parsePostfixExpr
+    expr <- parsePrimaryExpr <|> parsePostfixExpr
     parseToken (Token Nothing (Operator ".")) <|> parseToken (Token Nothing (Operator "->"))
     identifier <- parseIdentifier
     return (Postfix (StructMember expr identifier))
 
   parseUnionMember = do
-    expr <- parsePostfixExpr
+    expr <- parsePrimaryExpr <|> parsePostfixExpr
     parseToken (Token Nothing (Operator ".")) <|> parseToken (Token Nothing (Operator "->"))
     identifier <- parseIdentifier
     return (Postfix (UnionMember expr identifier))
 
   parsePostfixIncrement = do
-    expr <- parsePostfixExpr
+    expr <- parsePrimaryExpr <|> parsePostfixExpr
     parseToken (Token Nothing (Operator "++"))
     return (Postfix (PostfixIncrement expr))
 
   parsePostfixDecrement = do
-    expr <- parsePostfixExpr
+    expr <- parsePrimaryExpr <|> parsePostfixExpr
     parseToken (Token Nothing (Operator "--"))
     return (Postfix (PostfixDecrement expr))
 
   parsePostfixExpr =
-    parsePrimaryExpr <|>
-    parseStructMember <|>
-    parseUnionMember <|>
-    parsePostfixIncrement <|>
-    parsePostfixDecrement
+    try parseStructMember <|>
+    try parseUnionMember <|>
+    try parsePostfixIncrement <|>
+    try parsePostfixDecrement <|>
+    try parsePrimaryExpr
 
   parsePrefixIncrement = do
     parseToken (Token Nothing (Operator "++"))
