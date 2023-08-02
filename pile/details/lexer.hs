@@ -9,9 +9,9 @@ module Lexer where
     where 
       (Token lhsPos lhsVal) == (Token rhsPos rhsVal) = if lhsVal == rhsVal then True else False
 
-  pos (Token pos val) = pos
+  tokenPos (Token pos val) = pos
 
-  val (Token pos val) = val
+  tokenVal (Token pos val) = val
 
   data TokenValue =
     Keyword String |
