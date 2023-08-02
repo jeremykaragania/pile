@@ -32,6 +32,16 @@ module Parser where
     ArithmeticOperator UnaryExpr |
     SizeofOperator (Either UnaryExpr String) deriving Show
 
+  identifierVal (Primary (Parser.Identifier x)) = x
+
+  floatingConstantVal (Primary (Parser.FloatingConstant x)) = x
+
+  integerConstantVal (Primary (Parser.IntegerConstant x)) = x
+
+  characterConstantVal (Primary (Parser.CharacterConstant x)) = x
+
+  stringLiteralVal (Primary (Parser.StringLiteral x)) = x
+
   parseToken t =
     tokenPrim showTok nextPos testTok
     where
