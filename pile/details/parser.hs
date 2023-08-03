@@ -5,7 +5,8 @@ module Parser where
   data Expr =
     Primary PrimaryExpr |
     Postfix PostfixExpr |
-    Unary UnaryExpr deriving Show
+    Unary UnaryExpr |
+    Multiplicative MultiplicativeExpr deriving Show
 
   data PrimaryExpr =
     Identifier String |
@@ -16,7 +17,6 @@ module Parser where
     ParensExpr Expr deriving Show
 
   data PostfixExpr =
-    PrimaryExpr PrimaryExpr |
     ArraySubscript PostfixExpr Expr |
     StructMember Expr Expr |
     UnionMember Expr Expr|
@@ -24,13 +24,17 @@ module Parser where
     PostfixDecrement Expr deriving Show
 
   data UnaryExpr =
-    PostfixExpr PostfixExpr |
     PrefixIncrement Expr |
     PrefixDecrement Expr |
     AddressOperator Expr |
     IndirectionOperator Expr |
     ArithmeticOperator Expr |
     SizeofOperator (Either UnaryExpr String) deriving Show
+
+  data MultiplicativeExpr =
+    Product Expr Expr |
+    Quotient Expr Expr |
+    Remainder Expr Expr deriving Show
 
   identifierVal (Primary (Parser.Identifier x)) = x
 
@@ -156,7 +160,31 @@ module Parser where
     try parseIndirectionOperator <|>
     try parseArithmeticOperator
 
+  parseProduct = do
+    lhs <- parsePrimaryExpr
+    parseToken (Token Nothing (Operator "*"))
+    rhs <- parsePrimaryExpr
+    return (Multiplicative (Product lhs rhs))
+
+  parseQuotient = do
+    lhs <- parsePrimaryExpr
+    parseToken (Token Nothing (Operator "/"))
+    rhs <- parsePrimaryExpr
+    return (Multiplicative (Quotient lhs rhs))
+
+  parseRemainder = do
+    lhs <- parsePrimaryExpr
+    parseToken (Token Nothing (Operator "%"))
+    rhs <- parsePrimaryExpr
+    return (Multiplicative (Remainder lhs rhs))
+
+  parseMultiplicativeExpr =
+    parseProduct <|>
+    parseQuotient <|>
+    parseRemainder
+
   parseExpr =
+    try parseMultiplicativeExpr <|>
     try parseUnaryExpr <|>
     try parsePostfixExpr <|>
     try parsePrimaryExpr
