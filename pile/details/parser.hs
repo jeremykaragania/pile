@@ -157,3 +157,8 @@ module Parser where
     parseAddressOperator <|>
     parseIndirectionOperator <|>
     parseArithmeticOperator
+
+  parseExpr =
+    parseUnaryExpr <|>
+    parsePostfixExpr <|>
+    parsePrimaryExpr
