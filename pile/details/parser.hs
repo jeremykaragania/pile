@@ -97,24 +97,24 @@ module Parser where
     parseStringLiteral
 
   parseStructMember = do
-    expr <- parsePrimaryExpr <|> parsePostfixExpr
+    expr <- parsePrimaryExpr
     parseToken (Token Nothing (Operator ".")) <|> parseToken (Token Nothing (Operator "->"))
     identifier <- parseIdentifier
     return (Postfix (StructMember expr identifier))
 
   parseUnionMember = do
-    expr <- parsePrimaryExpr <|> parsePostfixExpr
+    expr <- parsePrimaryExpr
     parseToken (Token Nothing (Operator ".")) <|> parseToken (Token Nothing (Operator "->"))
     identifier <- parseIdentifier
     return (Postfix (UnionMember expr identifier))
 
   parsePostfixIncrement = do
-    expr <- parsePrimaryExpr <|> parsePostfixExpr
+    expr <- parsePrimaryExpr
     parseToken (Token Nothing (Operator "++"))
     return (Postfix (PostfixIncrement expr))
 
   parsePostfixDecrement = do
-    expr <- parsePrimaryExpr <|> parsePostfixExpr
+    expr <- parsePrimaryExpr
     parseToken (Token Nothing (Operator "--"))
     return (Postfix (PostfixDecrement expr))
 
@@ -122,43 +122,41 @@ module Parser where
     try parseStructMember <|>
     try parseUnionMember <|>
     try parsePostfixIncrement <|>
-    try parsePostfixDecrement <|>
-    try parsePrimaryExpr
+    try parsePostfixDecrement
 
   parsePrefixIncrement = do
     parseToken (Token Nothing (Operator "++"))
-    expr <- parseUnaryExpr
+    expr <- parsePrimaryExpr
     return (Unary (PrefixIncrement expr))
 
   parsePrefixDecrement = do
     parseToken (Token Nothing (Operator "--"))
-    expr <- parseUnaryExpr
+    expr <- parsePrimaryExpr
     return (Unary (PrefixDecrement expr))
 
   parseAddressOperator = do
     parseToken (Token Nothing (Operator "&"))
-    expr <- parseUnaryExpr
+    expr <- parsePrimaryExpr
     return (Unary (AddressOperator expr))
 
   parseIndirectionOperator = do
     parseToken (Token Nothing (Operator "*"))
-    expr <- parseUnaryExpr
+    expr <- parsePrimaryExpr
     return (Unary (IndirectionOperator expr))
 
   parseArithmeticOperator = do
     parseToken (Token Nothing (Operator "+")) <|> parseToken (Token Nothing (Operator "-")) <|> parseToken (Token Nothing (Operator "~")) <|> parseToken (Token Nothing (Operator "!"))
-    expr <- parseUnaryExpr
+    expr <- parsePrimaryExpr
     return (Unary (ArithmeticOperator expr))
 
   parseUnaryExpr =
-    parsePostfixExpr <|>
-    parsePrefixIncrement <|>
-    parsePrefixDecrement <|>
-    parseAddressOperator <|>
-    parseIndirectionOperator <|>
-    parseArithmeticOperator
+    try parsePrefixIncrement <|>
+    try parsePrefixDecrement <|>
+    try parseAddressOperator <|>
+    try parseIndirectionOperator <|>
+    try parseArithmeticOperator
 
   parseExpr =
-    parseUnaryExpr <|>
-    parsePostfixExpr <|>
-    parsePrimaryExpr
+    try parseUnaryExpr <|>
+    try parsePostfixExpr <|>
+    try parsePrimaryExpr
