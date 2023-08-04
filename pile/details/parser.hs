@@ -9,7 +9,8 @@ module Parser where
     Multiplicative MultiplicativeExpr |
     Additive AdditiveExpr |
     Shift ShiftExpr |
-    Relational RelationalExpr deriving Show
+    Relational RelationalExpr |
+    Equality EqualityExpr deriving Show
 
   data PrimaryExpr =
     Identifier String |
@@ -50,8 +51,12 @@ module Parser where
   data RelationalExpr =
     Lesser Expr Expr |
     Greater Expr Expr |
-    LesserOrEq Expr Expr |
-    GreaterOrEq Expr Expr deriving Show
+    LesserOrEqual Expr Expr |
+    GreaterOrEqual Expr Expr deriving Show
+
+  data EqualityExpr =
+    Equal Expr Expr |
+    NotEqual Expr Expr deriving Show
 
   identifierVal (Primary (Parser.Identifier x)) = x
 
@@ -244,25 +249,42 @@ module Parser where
     rhs <- parsePrimaryExpr
     return (Relational (Greater lhs rhs))
 
-  parseLesserOrEq = do
+  parseLesserOrEqual = do
     lhs <- parsePrimaryExpr
     parseToken (Token Nothing (Operator "<="))
     rhs <- parsePrimaryExpr
-    return (Relational (LesserOrEq lhs rhs))
+    return (Relational (LesserOrEqual lhs rhs))
 
-  parseGreaterOrEq = do
+  parseGreaterOrEqual = do
     lhs <- parsePrimaryExpr
     parseToken (Token Nothing (Operator ">="))
     rhs <- parsePrimaryExpr
-    return (Relational (GreaterOrEq lhs rhs))
+    return (Relational (GreaterOrEqual lhs rhs))
 
   parseRelationalExpr =
     try parseLesser <|>
     try parseGreater <|>
-    try parseLesserOrEq <|>
-    try parseGreaterOrEq
+    try parseLesserOrEqual <|>
+    try parseGreaterOrEqual
+
+  parseEqual = do
+    lhs <- parsePrimaryExpr
+    parseToken (Token Nothing (Operator "=="))
+    rhs <- parsePrimaryExpr
+    return (Equality (Equal lhs rhs))
+
+  parseNotEqual = do
+    lhs <- parsePrimaryExpr
+    parseToken (Token Nothing (Operator "!="))
+    rhs <- parsePrimaryExpr
+    return (Equality (NotEqual lhs rhs))
+
+  parseEqualityExpr =
+    try parseEqual <|>
+    try parseNotEqual
 
   parseExpr =
+    try parseEqualityExpr <|>
     try parseRelationalExpr <|>
     try parseShiftExpr <|>
     try parseAdditiveExpr <|>
