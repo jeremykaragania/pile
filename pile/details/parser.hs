@@ -8,7 +8,8 @@ module Parser where
     Unary UnaryExpr |
     Multiplicative MultiplicativeExpr |
     Additive AdditiveExpr |
-    Shift ShiftExpr deriving Show
+    Shift ShiftExpr |
+    Relational RelationalExpr deriving Show
 
   data PrimaryExpr =
     Identifier String |
@@ -45,6 +46,12 @@ module Parser where
   data ShiftExpr =
     LeftShift Expr Expr |
     RightShift Expr Expr deriving Show
+
+  data RelationalExpr =
+    Lesser Expr Expr |
+    Greater Expr Expr |
+    LesserOrEq Expr Expr |
+    GreaterOrEq Expr Expr deriving Show
 
   identifierVal (Primary (Parser.Identifier x)) = x
 
@@ -225,7 +232,38 @@ module Parser where
     try parseLeftShift <|>
     try parseRightShift
 
+  parseLesser = do
+    lhs <- parsePrimaryExpr
+    parseToken (Token Nothing (Operator "<"))
+    rhs <- parsePrimaryExpr
+    return (Relational (Lesser lhs rhs))
+
+  parseGreater = do
+    lhs <- parsePrimaryExpr
+    parseToken (Token Nothing (Operator ">"))
+    rhs <- parsePrimaryExpr
+    return (Relational (Greater lhs rhs))
+
+  parseLesserOrEq = do
+    lhs <- parsePrimaryExpr
+    parseToken (Token Nothing (Operator "<="))
+    rhs <- parsePrimaryExpr
+    return (Relational (LesserOrEq lhs rhs))
+
+  parseGreaterOrEq = do
+    lhs <- parsePrimaryExpr
+    parseToken (Token Nothing (Operator ">="))
+    rhs <- parsePrimaryExpr
+    return (Relational (GreaterOrEq lhs rhs))
+
+  parseRelationalExpr =
+    try parseLesser <|>
+    try parseGreater <|>
+    try parseLesserOrEq <|>
+    try parseGreaterOrEq
+
   parseExpr =
+    try parseRelationalExpr <|>
     try parseShiftExpr <|>
     try parseAdditiveExpr <|>
     try parseMultiplicativeExpr <|>
