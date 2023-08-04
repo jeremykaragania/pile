@@ -7,7 +7,8 @@ module Parser where
     Postfix PostfixExpr |
     Unary UnaryExpr |
     Multiplicative MultiplicativeExpr |
-    Additive AdditiveExpr deriving Show
+    Additive AdditiveExpr |
+    Shift ShiftExpr deriving Show
 
   data PrimaryExpr =
     Identifier String |
@@ -40,6 +41,10 @@ module Parser where
   data AdditiveExpr =
     Addition Expr Expr |
     Subtraction Expr Expr deriving Show
+
+  data ShiftExpr =
+    LeftShift Expr Expr |
+    RightShift Expr Expr deriving Show
 
   identifierVal (Primary (Parser.Identifier x)) = x
 
@@ -99,11 +104,11 @@ module Parser where
       testTok x = Nothing
 
   parsePrimaryExpr =
-    parseIdentifier <|>
-    parseFloatingConstant <|>
-    parseIntegerConstant <|>
-    parseCharacterConstant <|>
-    parseStringLiteral
+    try parseIdentifier <|>
+    try parseFloatingConstant <|>
+    try parseIntegerConstant <|>
+    try parseCharacterConstant <|>
+    try parseStringLiteral
 
   parseStructMember = do
     expr <- parsePrimaryExpr
@@ -184,9 +189,9 @@ module Parser where
     return (Multiplicative (Remainder lhs rhs))
 
   parseMultiplicativeExpr =
-    parseProduct <|>
-    parseQuotient <|>
-    parseRemainder
+    try parseProduct <|>
+    try parseQuotient <|>
+    try parseRemainder
 
   parseAddition = do
     lhs <- parsePrimaryExpr
@@ -201,10 +206,27 @@ module Parser where
     return (Additive (Subtraction lhs rhs))
 
   parseAdditiveExpr =
-    parseAddition <|>
-    parseSubtraction
+    try parseAddition <|>
+    try parseSubtraction
+
+  parseLeftShift = do
+    lhs <- parsePrimaryExpr
+    parseToken (Token Nothing (Operator "<<"))
+    rhs <- parsePrimaryExpr
+    return (Shift (LeftShift lhs rhs))
+
+  parseRightShift = do
+    lhs <- parsePrimaryExpr
+    parseToken (Token Nothing (Operator ">>"))
+    rhs <- parsePrimaryExpr
+    return (Shift (RightShift lhs rhs))
+
+  parseShiftExpr =
+    try parseLeftShift <|>
+    try parseRightShift
 
   parseExpr =
+    try parseShiftExpr <|>
     try parseAdditiveExpr <|>
     try parseMultiplicativeExpr <|>
     try parseUnaryExpr <|>
