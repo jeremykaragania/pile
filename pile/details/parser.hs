@@ -6,7 +6,8 @@ module Parser where
     Primary PrimaryExpr |
     Postfix PostfixExpr |
     Unary UnaryExpr |
-    Multiplicative MultiplicativeExpr deriving Show
+    Multiplicative MultiplicativeExpr |
+    Additive AdditiveExpr deriving Show
 
   data PrimaryExpr =
     Identifier String |
@@ -35,6 +36,10 @@ module Parser where
     Product Expr Expr |
     Quotient Expr Expr |
     Remainder Expr Expr deriving Show
+
+  data AdditiveExpr =
+    Addition Expr Expr |
+    Subtraction Expr Expr deriving Show
 
   identifierVal (Primary (Parser.Identifier x)) = x
 
@@ -183,7 +188,24 @@ module Parser where
     parseQuotient <|>
     parseRemainder
 
+  parseAddition = do
+    lhs <- parsePrimaryExpr
+    parseToken (Token Nothing (Operator "+"))
+    rhs <- parsePrimaryExpr
+    return (Additive (Addition lhs rhs))
+
+  parseSubtraction = do
+    lhs <- parsePrimaryExpr
+    parseToken (Token Nothing (Operator "-"))
+    rhs <- parsePrimaryExpr
+    return (Additive (Subtraction lhs rhs))
+
+  parseAdditiveExpr =
+    parseAddition <|>
+    parseSubtraction
+
   parseExpr =
+    try parseAdditiveExpr <|>
     try parseMultiplicativeExpr <|>
     try parseUnaryExpr <|>
     try parsePostfixExpr <|>
