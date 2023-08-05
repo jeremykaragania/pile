@@ -10,7 +10,12 @@ module Parser where
     Additive AdditiveExpr |
     Shift ShiftExpr |
     Relational RelationalExpr |
-    Equality EqualityExpr deriving Show
+    Equality EqualityExpr |
+    BitwiseAnd BitwiseAndExpr |
+    BitwiseExclusiveOr BitwiseExclusiveOrExpr |
+    BitwiseInclusiveOr BitwiseInclusiveOrExpr |
+    LogicalAnd LogicalAndExpr |
+    LogicalOr LogicalOrExpr deriving Show
 
   data PrimaryExpr =
     Identifier String |
@@ -57,6 +62,16 @@ module Parser where
   data EqualityExpr =
     Equal Expr Expr |
     NotEqual Expr Expr deriving Show
+
+  data BitwiseAndExpr = BitwiseAndExpr Expr Expr deriving Show
+
+  data BitwiseExclusiveOrExpr = BitwiseExclusiveOrExpr Expr Expr deriving Show
+
+  data BitwiseInclusiveOrExpr = BitwiseInclusiveOrExpr Expr Expr deriving Show
+
+  data LogicalAndExpr = LogicalAndExpr Expr Expr deriving Show
+
+  data LogicalOrExpr = LogicalOrExpr Expr Expr deriving Show
 
   identifierVal (Primary (Parser.Identifier x)) = x
 
@@ -237,7 +252,22 @@ module Parser where
     try parseEqual <|>
     try parseNotEqual
 
+  parseBitwiseAndExpr = parseBinaryOperator "&" BitwiseAnd BitwiseAndExpr
+
+  parseBitwiseExclusiveOrExpr = parseBinaryOperator "^" BitwiseExclusiveOr BitwiseExclusiveOrExpr
+
+  parseBitwiseInclusiveOrExpr = parseBinaryOperator "|" BitwiseInclusiveOr BitwiseInclusiveOrExpr
+
+  parseLogicalAndExpr = parseBinaryOperator "&&" LogicalAnd LogicalAndExpr
+
+  parseLogicalOrExpr = parseBinaryOperator "||" LogicalOr LogicalOrExpr
+
   parseExpr =
+    try parseLogicalOrExpr <|>
+    try parseLogicalAndExpr <|>
+    try parseBitwiseInclusiveOrExpr <|>
+    try parseBitwiseExclusiveOrExpr <|>
+    try parseBitwiseAndExpr <|>
     try parseEqualityExpr <|>
     try parseRelationalExpr <|>
     try parseShiftExpr <|>
