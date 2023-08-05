@@ -122,6 +122,12 @@ module Parser where
     try parseCharacterConstant <|>
     try parseStringLiteral
 
+  parseBinaryOperator a b c = do
+    lhs <- parsePrimaryExpr
+    parseToken (Token Nothing (Operator a))
+    rhs <- parsePrimaryExpr
+    return (b (c lhs rhs))
+
   parseStructMember = do
     expr <- parsePrimaryExpr
     parseToken (Token Nothing (Operator ".")) <|> parseToken (Token Nothing (Operator "->"))
@@ -182,84 +188,40 @@ module Parser where
     try parseIndirectionOperator <|>
     try parseArithmeticOperator
 
-  parseProduct = do
-    lhs <- parsePrimaryExpr
-    parseToken (Token Nothing (Operator "*"))
-    rhs <- parsePrimaryExpr
-    return (Multiplicative (Product lhs rhs))
+  parseProduct = parseBinaryOperator "*" Multiplicative Product
 
-  parseQuotient = do
-    lhs <- parsePrimaryExpr
-    parseToken (Token Nothing (Operator "/"))
-    rhs <- parsePrimaryExpr
-    return (Multiplicative (Quotient lhs rhs))
+  parseQuotient = parseBinaryOperator "/" Multiplicative Quotient
 
-  parseRemainder = do
-    lhs <- parsePrimaryExpr
-    parseToken (Token Nothing (Operator "%"))
-    rhs <- parsePrimaryExpr
-    return (Multiplicative (Remainder lhs rhs))
+  parseRemainder = parseBinaryOperator "%" Multiplicative Remainder
 
   parseMultiplicativeExpr =
     try parseProduct <|>
     try parseQuotient <|>
     try parseRemainder
 
-  parseAddition = do
-    lhs <- parsePrimaryExpr
-    parseToken (Token Nothing (Operator "+"))
-    rhs <- parsePrimaryExpr
-    return (Additive (Addition lhs rhs))
+  parseAddition = parseBinaryOperator "+" Additive Addition
 
-  parseSubtraction = do
-    lhs <- parsePrimaryExpr
-    parseToken (Token Nothing (Operator "-"))
-    rhs <- parsePrimaryExpr
-    return (Additive (Subtraction lhs rhs))
+  parseSubtraction = parseBinaryOperator "-" Additive Subtraction
 
   parseAdditiveExpr =
     try parseAddition <|>
     try parseSubtraction
 
-  parseLeftShift = do
-    lhs <- parsePrimaryExpr
-    parseToken (Token Nothing (Operator "<<"))
-    rhs <- parsePrimaryExpr
-    return (Shift (LeftShift lhs rhs))
+  parseLeftShift = parseBinaryOperator "<<" Shift LeftShift
 
-  parseRightShift = do
-    lhs <- parsePrimaryExpr
-    parseToken (Token Nothing (Operator ">>"))
-    rhs <- parsePrimaryExpr
-    return (Shift (RightShift lhs rhs))
+  parseRightShift = parseBinaryOperator ">>" Shift RightShift
 
   parseShiftExpr =
     try parseLeftShift <|>
     try parseRightShift
 
-  parseLesser = do
-    lhs <- parsePrimaryExpr
-    parseToken (Token Nothing (Operator "<"))
-    rhs <- parsePrimaryExpr
-    return (Relational (Lesser lhs rhs))
+  parseLesser = parseBinaryOperator "<" Relational Lesser
 
-  parseGreater = do
-    lhs <- parsePrimaryExpr
-    parseToken (Token Nothing (Operator ">"))
-    rhs <- parsePrimaryExpr
-    return (Relational (Greater lhs rhs))
+  parseGreater = parseBinaryOperator ">" Relational Greater
 
-  parseLesserOrEqual = do
-    lhs <- parsePrimaryExpr
-    parseToken (Token Nothing (Operator "<="))
-    rhs <- parsePrimaryExpr
-    return (Relational (LesserOrEqual lhs rhs))
+  parseLesserOrEqual = parseBinaryOperator "<=" Relational LesserOrEqual
 
-  parseGreaterOrEqual = do
-    lhs <- parsePrimaryExpr
-    parseToken (Token Nothing (Operator ">="))
-    rhs <- parsePrimaryExpr
-    return (Relational (GreaterOrEqual lhs rhs))
+  parseGreaterOrEqual = parseBinaryOperator ">=" Relational GreaterOrEqual
 
   parseRelationalExpr =
     try parseLesser <|>
@@ -267,17 +229,9 @@ module Parser where
     try parseLesserOrEqual <|>
     try parseGreaterOrEqual
 
-  parseEqual = do
-    lhs <- parsePrimaryExpr
-    parseToken (Token Nothing (Operator "=="))
-    rhs <- parsePrimaryExpr
-    return (Equality (Equal lhs rhs))
+  parseEqual = parseBinaryOperator "==" Equality Equal
 
-  parseNotEqual = do
-    lhs <- parsePrimaryExpr
-    parseToken (Token Nothing (Operator "!="))
-    rhs <- parsePrimaryExpr
-    return (Equality (NotEqual lhs rhs))
+  parseNotEqual = parseBinaryOperator "!=" Equality NotEqual
 
   parseEqualityExpr =
     try parseEqual <|>
