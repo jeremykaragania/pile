@@ -252,27 +252,27 @@ module Parser where
     try parseEqual <|>
     try parseNotEqual
 
-  parseBitwiseAndExpr = parseBinaryOperator "&" BitwiseAnd BitwiseAndExpr
+  parseBitwiseAndExpr = try (parseBinaryOperator "&" BitwiseAnd BitwiseAndExpr)
 
-  parseBitwiseExclusiveOrExpr = parseBinaryOperator "^" BitwiseExclusiveOr BitwiseExclusiveOrExpr
+  parseBitwiseExclusiveOrExpr = try (parseBinaryOperator "^" BitwiseExclusiveOr BitwiseExclusiveOrExpr)
 
-  parseBitwiseInclusiveOrExpr = parseBinaryOperator "|" BitwiseInclusiveOr BitwiseInclusiveOrExpr
+  parseBitwiseInclusiveOrExpr = try (parseBinaryOperator "|" BitwiseInclusiveOr BitwiseInclusiveOrExpr)
 
-  parseLogicalAndExpr = parseBinaryOperator "&&" LogicalAnd LogicalAndExpr
+  parseLogicalAndExpr = try (parseBinaryOperator "&&" LogicalAnd LogicalAndExpr)
 
-  parseLogicalOrExpr = parseBinaryOperator "||" LogicalOr LogicalOrExpr
+  parseLogicalOrExpr = try (parseBinaryOperator "||" LogicalOr LogicalOrExpr)
 
   parseExpr =
-    try parseLogicalOrExpr <|>
-    try parseLogicalAndExpr <|>
-    try parseBitwiseInclusiveOrExpr <|>
-    try parseBitwiseExclusiveOrExpr <|>
-    try parseBitwiseAndExpr <|>
-    try parseEqualityExpr <|>
-    try parseRelationalExpr <|>
-    try parseShiftExpr <|>
-    try parseAdditiveExpr <|>
-    try parseMultiplicativeExpr <|>
-    try parseUnaryExpr <|>
-    try parsePostfixExpr <|>
-    try parsePrimaryExpr
+    parseLogicalOrExpr <|>
+    parseLogicalAndExpr <|>
+    parseBitwiseInclusiveOrExpr <|>
+    parseBitwiseExclusiveOrExpr <|>
+    parseBitwiseAndExpr <|>
+    parseEqualityExpr <|>
+    parseRelationalExpr <|>
+    parseShiftExpr <|>
+    parseAdditiveExpr <|>
+    parseMultiplicativeExpr <|>
+    parseUnaryExpr <|>
+    parsePostfixExpr <|>
+    parsePrimaryExpr
