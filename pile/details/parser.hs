@@ -1,5 +1,6 @@
 module Parser where
   import Lexer
+  import Data.Functor.Identity
   import Text.Parsec
 
   data Expr =
@@ -20,15 +21,16 @@ module Parser where
   data PrimaryExpr =
     Identifier String |
     FloatingConstant Double |
-    IntegerConstant Integer|
-    CharacterConstant Char|
+    IntegerConstant Integer |
+    CharacterConstant Char |
     StringLiteral String |
     ParensExpr Expr deriving Show
 
   data PostfixExpr =
+    PostfixValue Expr |
     ArraySubscript PostfixExpr Expr |
-    StructMember Expr Expr |
-    UnionMember Expr Expr|
+    StructMember PostfixExpr PostfixExpr |
+    UnionMember PostfixExpr PostfixExpr|
     PostfixIncrement Expr |
     PostfixDecrement Expr deriving Show
 
@@ -41,37 +43,52 @@ module Parser where
     SizeofOperator (Either UnaryExpr String) deriving Show
 
   data MultiplicativeExpr =
-    Product Expr Expr |
-    Quotient Expr Expr |
-    Remainder Expr Expr deriving Show
+    MultiplicativeValue Expr |
+    Product MultiplicativeExpr MultiplicativeExpr |
+    Quotient MultiplicativeExpr MultiplicativeExpr |
+    Remainder MultiplicativeExpr MultiplicativeExpr deriving Show
 
   data AdditiveExpr =
-    Addition Expr Expr |
-    Subtraction Expr Expr deriving Show
+    AdditiveValue Expr |
+    Addition AdditiveExpr AdditiveExpr |
+    Subtraction AdditiveExpr AdditiveExpr deriving Show
 
   data ShiftExpr =
-    LeftShift Expr Expr |
-    RightShift Expr Expr deriving Show
+    ShiftValue Expr |
+    LeftShift ShiftExpr ShiftExpr |
+    RightShift ShiftExpr ShiftExpr deriving Show
 
   data RelationalExpr =
-    Lesser Expr Expr |
-    Greater Expr Expr |
-    LesserOrEqual Expr Expr |
-    GreaterOrEqual Expr Expr deriving Show
+    RelationalValue Expr |
+    Lesser RelationalExpr RelationalExpr |
+    Greater RelationalExpr RelationalExpr |
+    LesserOrEqual RelationalExpr RelationalExpr |
+    GreaterOrEqual RelationalExpr RelationalExpr deriving Show
 
   data EqualityExpr =
-    Equal Expr Expr |
-    NotEqual Expr Expr deriving Show
+    EqualityValue Expr |
+    Equal EqualityExpr EqualityExpr |
+    NotEqual EqualityExpr EqualityExpr deriving Show
 
-  data BitwiseAndExpr = BitwiseAndExpr Expr Expr deriving Show
+  data BitwiseAndExpr =
+    BitwiseAndValue Expr |
+    BitwiseAndExpr BitwiseAndExpr BitwiseAndExpr deriving Show
 
-  data BitwiseExclusiveOrExpr = BitwiseExclusiveOrExpr Expr Expr deriving Show
+  data BitwiseExclusiveOrExpr =
+    BitwiseExclusiveOrValue Expr |
+    BitwiseExclusiveOrExpr BitwiseExclusiveOrExpr BitwiseExclusiveOrExpr deriving Show
 
-  data BitwiseInclusiveOrExpr = BitwiseInclusiveOrExpr Expr Expr deriving Show
+  data BitwiseInclusiveOrExpr =
+    BitwiseInclusiveOrValue Expr |
+    BitwiseInclusiveOrExpr BitwiseInclusiveOrExpr BitwiseInclusiveOrExpr deriving Show
 
-  data LogicalAndExpr = LogicalAndExpr Expr Expr deriving Show
+  data LogicalAndExpr =
+    LogicalAndValue Expr |
+    LogicalAndExpr LogicalAndExpr LogicalAndExpr deriving Show
 
-  data LogicalOrExpr = LogicalOrExpr Expr Expr deriving Show
+  data LogicalOrExpr =
+    LogicalOrValue Expr |
+    LogicalOrExpr LogicalOrExpr LogicalOrExpr deriving Show
 
   identifierVal (Primary (Parser.Identifier x)) = x
 
@@ -137,23 +154,39 @@ module Parser where
     try parseCharacterConstant <|>
     try parseStringLiteral
 
-  parseBinaryOperator a b c = do
-    lhs <- parsePrimaryExpr
-    parseToken (Token Nothing (Operator a))
-    rhs <- parsePrimaryExpr
-    return (b (c lhs rhs))
+  parseBinaryOperator :: String -> (t -> b) -> (t -> t -> t) -> (Expr -> t) -> ParsecT [Token] u Identity Expr -> ParsecT [Token] u Identity b
+  parseBinaryOperator a b c d e = do
+    expr <- chainl1 parseBinaryValue parseBinaryOperator
+    return (b expr)
+    where
+      parseBinaryValue = do
+        val <- e
+        return (d val)
+      parseBinaryOperator = do
+        parseToken (Token Nothing (Operator a))
+        return c
 
   parseStructMember = do
-    expr <- parsePrimaryExpr
-    parseToken (Token Nothing (Operator ".")) <|> parseToken (Token Nothing (Operator "->"))
-    identifier <- parseIdentifier
-    return (Postfix (StructMember expr identifier))
+    expr <- chainl1 parsePostfixValue parsePostfixOperator
+    return (Postfix expr)
+    where
+      parsePostfixValue = do
+        val <- parsePrimaryExpr
+        return (PostfixValue val)
+      parsePostfixOperator = do
+        parseToken (Token Nothing (Operator ".")) <|> parseToken (Token Nothing (Operator "->"))
+        return StructMember
 
   parseUnionMember = do
-    expr <- parsePrimaryExpr
-    parseToken (Token Nothing (Operator ".")) <|> parseToken (Token Nothing (Operator "->"))
-    identifier <- parseIdentifier
-    return (Postfix (UnionMember expr identifier))
+    expr <- chainl1 parsePostfixValue parsePostfixOperator
+    return (Postfix expr)
+    where
+      parsePostfixValue = do
+        val <- parsePrimaryExpr
+        return (PostfixValue val)
+      parsePostfixOperator = do
+        parseToken (Token Nothing (Operator ".")) <|> parseToken (Token Nothing (Operator "->"))
+        return UnionMember
 
   parsePostfixIncrement = do
     expr <- parsePrimaryExpr
@@ -173,27 +206,27 @@ module Parser where
 
   parsePrefixIncrement = do
     parseToken (Token Nothing (Operator "++"))
-    expr <- parsePrimaryExpr
+    expr <- parsePostfixExpr
     return (Unary (PrefixIncrement expr))
 
   parsePrefixDecrement = do
     parseToken (Token Nothing (Operator "--"))
-    expr <- parsePrimaryExpr
+    expr <- parsePostfixExpr
     return (Unary (PrefixDecrement expr))
 
   parseAddressOperator = do
     parseToken (Token Nothing (Operator "&"))
-    expr <- parsePrimaryExpr
+    expr <- parsePostfixExpr
     return (Unary (AddressOperator expr))
 
   parseIndirectionOperator = do
     parseToken (Token Nothing (Operator "*"))
-    expr <- parsePrimaryExpr
+    expr <- parsePostfixExpr
     return (Unary (IndirectionOperator expr))
 
   parseArithmeticOperator = do
     parseToken (Token Nothing (Operator "+")) <|> parseToken (Token Nothing (Operator "-")) <|> parseToken (Token Nothing (Operator "~")) <|> parseToken (Token Nothing (Operator "!"))
-    expr <- parsePrimaryExpr
+    expr <- parsePostfixExpr
     return (Unary (ArithmeticOperator expr))
 
   parseUnaryExpr =
@@ -203,40 +236,40 @@ module Parser where
     try parseIndirectionOperator <|>
     try parseArithmeticOperator
 
-  parseProduct = parseBinaryOperator "*" Multiplicative Product
+  parseProduct = parseBinaryOperator "*" Multiplicative Product MultiplicativeValue parsePrimaryExpr
 
-  parseQuotient = parseBinaryOperator "/" Multiplicative Quotient
+  parseQuotient = parseBinaryOperator "/" Multiplicative Quotient MultiplicativeValue parsePrimaryExpr
 
-  parseRemainder = parseBinaryOperator "%" Multiplicative Remainder
+  parseRemainder = parseBinaryOperator "%" Multiplicative Remainder MultiplicativeValue parsePrimaryExpr
 
   parseMultiplicativeExpr =
     try parseProduct <|>
     try parseQuotient <|>
     try parseRemainder
 
-  parseAddition = parseBinaryOperator "+" Additive Addition
+  parseAddition = parseBinaryOperator "+" Additive Addition AdditiveValue parseMultiplicativeExpr
 
-  parseSubtraction = parseBinaryOperator "-" Additive Subtraction
+  parseSubtraction = parseBinaryOperator "-" Additive Subtraction AdditiveValue parseMultiplicativeExpr
 
   parseAdditiveExpr =
     try parseAddition <|>
     try parseSubtraction
 
-  parseLeftShift = parseBinaryOperator "<<" Shift LeftShift
+  parseLeftShift = parseBinaryOperator "<<" Shift LeftShift ShiftValue parseAdditiveExpr
 
-  parseRightShift = parseBinaryOperator ">>" Shift RightShift
+  parseRightShift = parseBinaryOperator ">>" Shift RightShift ShiftValue parseAdditiveExpr
 
   parseShiftExpr =
     try parseLeftShift <|>
     try parseRightShift
 
-  parseLesser = parseBinaryOperator "<" Relational Lesser
+  parseLesser = parseBinaryOperator "<" Relational Lesser RelationalValue parseShiftExpr
 
-  parseGreater = parseBinaryOperator ">" Relational Greater
+  parseGreater = parseBinaryOperator ">" Relational Greater RelationalValue parseShiftExpr
 
-  parseLesserOrEqual = parseBinaryOperator "<=" Relational LesserOrEqual
+  parseLesserOrEqual = parseBinaryOperator "<=" Relational LesserOrEqual RelationalValue parseShiftExpr
 
-  parseGreaterOrEqual = parseBinaryOperator ">=" Relational GreaterOrEqual
+  parseGreaterOrEqual = parseBinaryOperator ">=" Relational GreaterOrEqual RelationalValue parseShiftExpr
 
   parseRelationalExpr =
     try parseLesser <|>
@@ -244,23 +277,23 @@ module Parser where
     try parseLesserOrEqual <|>
     try parseGreaterOrEqual
 
-  parseEqual = parseBinaryOperator "==" Equality Equal
+  parseEqual = parseBinaryOperator "==" Equality Equal EqualityValue parseRelationalExpr
 
-  parseNotEqual = parseBinaryOperator "!=" Equality NotEqual
+  parseNotEqual = parseBinaryOperator "!=" Equality NotEqual EqualityValue parseRelationalExpr
 
   parseEqualityExpr =
     try parseEqual <|>
     try parseNotEqual
 
-  parseBitwiseAndExpr = try (parseBinaryOperator "&" BitwiseAnd BitwiseAndExpr)
+  parseBitwiseAndExpr = parseBinaryOperator "&" BitwiseAnd BitwiseAndExpr BitwiseAndValue parseEqualityExpr
 
-  parseBitwiseExclusiveOrExpr = try (parseBinaryOperator "^" BitwiseExclusiveOr BitwiseExclusiveOrExpr)
+  parseBitwiseExclusiveOrExpr = parseBinaryOperator "^" BitwiseExclusiveOr BitwiseExclusiveOrExpr BitwiseExclusiveOrValue parseEqualityExpr
 
-  parseBitwiseInclusiveOrExpr = try (parseBinaryOperator "|" BitwiseInclusiveOr BitwiseInclusiveOrExpr)
+  parseBitwiseInclusiveOrExpr = parseBinaryOperator "|" BitwiseInclusiveOr BitwiseInclusiveOrExpr BitwiseInclusiveOrValue parseEqualityExpr
 
-  parseLogicalAndExpr = try (parseBinaryOperator "&&" LogicalAnd LogicalAndExpr)
+  parseLogicalAndExpr = parseBinaryOperator "&&" LogicalAnd LogicalAndExpr LogicalAndValue parseEqualityExpr
 
-  parseLogicalOrExpr = try (parseBinaryOperator "||" LogicalOr LogicalOrExpr)
+  parseLogicalOrExpr = parseBinaryOperator "||" LogicalOr LogicalOrExpr LogicalOrValue parseEqualityExpr
 
   parseExpr =
     parseLogicalOrExpr <|>
