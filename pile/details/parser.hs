@@ -285,15 +285,15 @@ module Parser where
     try parseEqual <|>
     try parseNotEqual
 
-  parseBitwiseAndExpr = parseBinaryOperator "&" BitwiseAnd BitwiseAndExpr BitwiseAndValue parseEqualityExpr
+  parseBitwiseAndExpr = try (parseBinaryOperator "&" BitwiseAnd BitwiseAndExpr BitwiseAndValue parseEqualityExpr)
 
-  parseBitwiseExclusiveOrExpr = parseBinaryOperator "^" BitwiseExclusiveOr BitwiseExclusiveOrExpr BitwiseExclusiveOrValue parseEqualityExpr
+  parseBitwiseExclusiveOrExpr = try (parseBinaryOperator "^" BitwiseExclusiveOr BitwiseExclusiveOrExpr BitwiseExclusiveOrValue parseEqualityExpr)
 
-  parseBitwiseInclusiveOrExpr = parseBinaryOperator "|" BitwiseInclusiveOr BitwiseInclusiveOrExpr BitwiseInclusiveOrValue parseEqualityExpr
+  parseBitwiseInclusiveOrExpr = try (parseBinaryOperator "|" BitwiseInclusiveOr BitwiseInclusiveOrExpr BitwiseInclusiveOrValue parseEqualityExpr)
 
-  parseLogicalAndExpr = parseBinaryOperator "&&" LogicalAnd LogicalAndExpr LogicalAndValue parseEqualityExpr
+  parseLogicalAndExpr = try (parseBinaryOperator "&&" LogicalAnd LogicalAndExpr LogicalAndValue parseEqualityExpr)
 
-  parseLogicalOrExpr = parseBinaryOperator "||" LogicalOr LogicalOrExpr LogicalOrValue parseEqualityExpr
+  parseLogicalOrExpr = try (parseBinaryOperator "||" LogicalOr LogicalOrExpr LogicalOrValue parseEqualityExpr)
 
   parseExpr =
     parseLogicalOrExpr <|>
