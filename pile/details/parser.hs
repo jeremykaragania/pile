@@ -17,7 +17,8 @@ module Parser where
     BitwiseInclusiveOr BitwiseInclusiveOrExpr |
     LogicalAnd LogicalAndExpr |
     LogicalOr LogicalOrExpr |
-    Conditional ConditionalExpr deriving Show
+    Conditional ConditionalExpr |
+    Assignment AssignmentExpr deriving Show
 
   data PrimaryExpr =
     Identifier String |
@@ -92,6 +93,8 @@ module Parser where
     LogicalOrExpr LogicalOrExpr LogicalOrExpr deriving Show
 
   data ConditionalExpr = ConditionalExpr Expr Expr Expr deriving Show
+
+  data AssignmentExpr = AssignmentExpr Expr TokenValue Expr deriving Show
 
   identifierVal (Primary (Parser.Identifier x)) = x
 
@@ -228,7 +231,10 @@ module Parser where
     return (Unary (IndirectionOperator expr))
 
   parseArithmeticOperator = do
-    parseToken (Token Nothing (Operator "+")) <|> parseToken (Token Nothing (Operator "-")) <|> parseToken (Token Nothing (Operator "~")) <|> parseToken (Token Nothing (Operator "!"))
+    parseToken (Token Nothing (Operator "+")) <|>
+      parseToken (Token Nothing (Operator "-")) <|>
+      parseToken (Token Nothing (Operator "~")) <|>
+      parseToken (Token Nothing (Operator "!"))
     expr <- parsePostfixExpr
     return (Unary (ArithmeticOperator expr))
 
@@ -237,7 +243,8 @@ module Parser where
     try parsePrefixDecrement <|>
     try parseAddressOperator <|>
     try parseIndirectionOperator <|>
-    try parseArithmeticOperator
+    try parseArithmeticOperator <|>
+    try parsePostfixExpr
 
   parseProduct = parseBinaryOperator "*" Multiplicative Product MultiplicativeValue parsePrimaryExpr
 
@@ -298,7 +305,33 @@ module Parser where
 
   parseLogicalOrExpr = try (parseBinaryOperator "||" LogicalOr LogicalOrExpr LogicalOrValue parseEqualityExpr)
 
+  parseConditionalExpr = do
+    firstExpr <- parseLogicalOrExpr
+    parseToken (Token Nothing (Operator "?"))
+    secondExpr <- parseExpr
+    parseToken (Token Nothing (Operator ":"))
+    thirdExpr <- parseLogicalOrExpr
+    return (Conditional (ConditionalExpr firstExpr secondExpr thirdExpr))
+
+  parseAssignmentExpr = do
+    lhs <- parseUnaryExpr
+    operator <-
+      parseToken (Token Nothing (Operator "=")) <|>
+      parseToken (Token Nothing (Operator "*=")) <|>
+      parseToken (Token Nothing (Operator "/=")) <|>
+      parseToken (Token Nothing (Operator "%=")) <|>
+      parseToken (Token Nothing (Operator "+=")) <|>
+      parseToken (Token Nothing (Operator "-=")) <|>
+      parseToken (Token Nothing (Operator "<<=")) <|>
+      parseToken (Token Nothing (Operator ">>=")) <|>
+      parseToken (Token Nothing (Operator "&=")) <|>
+      parseToken (Token Nothing (Operator "^=")) <|>
+      parseToken (Token Nothing (Operator "|="))
+    rhs <- parseUnaryExpr
+    return (Assignment (AssignmentExpr lhs (tokenVal operator) rhs))
+
   parseExpr =
+    parseAssignmentExpr <|>
     try parseConditionalExpr <|>
     parseLogicalOrExpr <|>
     parseLogicalAndExpr <|>
@@ -313,11 +346,3 @@ module Parser where
     parseUnaryExpr <|>
     parsePostfixExpr <|>
     parsePrimaryExpr
-
-  parseConditionalExpr = do
-    firstExpr <- parseLogicalOrExpr
-    parseToken (Token Nothing (Operator "?"))
-    secondExpr <- parseExpr
-    parseToken (Token Nothing (Operator ":"))
-    thirdExpr <- parseLogicalOrExpr
-    return (Conditional (ConditionalExpr firstExpr secondExpr thirdExpr))
