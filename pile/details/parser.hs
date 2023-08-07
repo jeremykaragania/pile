@@ -16,7 +16,8 @@ module Parser where
     BitwiseExclusiveOr BitwiseExclusiveOrExpr |
     BitwiseInclusiveOr BitwiseInclusiveOrExpr |
     LogicalAnd LogicalAndExpr |
-    LogicalOr LogicalOrExpr deriving Show
+    LogicalOr LogicalOrExpr |
+    Conditional ConditionalExpr deriving Show
 
   data PrimaryExpr =
     Identifier String |
@@ -89,6 +90,8 @@ module Parser where
   data LogicalOrExpr =
     LogicalOrValue Expr |
     LogicalOrExpr LogicalOrExpr LogicalOrExpr deriving Show
+
+  data ConditionalExpr = ConditionalExpr Expr Expr Expr deriving Show
 
   identifierVal (Primary (Parser.Identifier x)) = x
 
@@ -296,6 +299,7 @@ module Parser where
   parseLogicalOrExpr = try (parseBinaryOperator "||" LogicalOr LogicalOrExpr LogicalOrValue parseEqualityExpr)
 
   parseExpr =
+    try parseConditionalExpr <|>
     parseLogicalOrExpr <|>
     parseLogicalAndExpr <|>
     parseBitwiseInclusiveOrExpr <|>
@@ -309,3 +313,11 @@ module Parser where
     parseUnaryExpr <|>
     parsePostfixExpr <|>
     parsePrimaryExpr
+
+  parseConditionalExpr = do
+    firstExpr <- parseLogicalOrExpr
+    parseToken (Token Nothing (Operator "?"))
+    secondExpr <- parseExpr
+    parseToken (Token Nothing (Operator ":"))
+    thirdExpr <- parseLogicalOrExpr
+    return (Conditional (ConditionalExpr firstExpr secondExpr thirdExpr))
