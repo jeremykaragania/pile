@@ -96,6 +96,41 @@ module Parser where
 
   data AssignmentExpr = AssignmentExpr Expr TokenValue Expr deriving Show
 
+  data Declaration = Declaration DeclarationSpecifiers (Maybe InitDeclaratorList) deriving Show
+
+  data DeclarationSpecifiers =
+    StorageClassSpecifiers StorageClassSpecifier (Maybe DeclarationSpecifiers) |
+    TypeSpecifiers TypeSpecifier (Maybe DeclarationSpecifiers) |
+    TypeQualifiers TypeQualifier (Maybe DeclarationSpecifiers) deriving Show
+
+  data InitDeclaratorList = InitDeclaratorList [InitDeclarator] deriving Show
+
+  data InitDeclarator = InitDeclarator Declarator deriving Show
+
+  data StorageClassSpecifier = StorageClassSpecifier TokenValue deriving Show
+
+  data TypeSpecifier = TypeSpecifier TokenValue deriving Show
+
+  data TypeQualifier = TypeQualifier TokenValue deriving Show
+
+  data Declarator = Declarator (Maybe Pointer) DirectDeclarator deriving Show
+
+  data DirectDeclarator = DirectDeclaratorIdentifier TokenValue deriving Show
+
+  data Pointer = Pointer [(Maybe TypeQualifierList)] deriving Show
+
+  data TypeQualifierList = TypeQualifierList [TypeQualifier]  deriving Show
+
+  data ParameterTypeList =
+    ParamterTypeList [ParameterList] |
+    ParameterTypeListElipsis [ParameterList] deriving Show
+
+  data ParameterList = ParameterList [ParameterDeclaration] deriving Show
+
+  data ParameterDeclaration = ParamterDeclaration deriving Show
+
+  data IdentifierList = IdentifierList [TokenValue]
+
   identifierVal (Primary (Parser.Identifier x)) = x
 
   floatingConstantVal (Primary (Parser.FloatingConstant x)) = x
