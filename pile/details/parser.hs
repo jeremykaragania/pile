@@ -346,3 +346,5 @@ module Parser where
     try parseUnaryExpr <|>
     try parsePostfixExpr <|>
     try parsePrimaryExpr
+
+  parse = Text.Parsec.parse (many parseExpr) ""
