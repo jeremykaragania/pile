@@ -92,7 +92,7 @@ module Parser where
 
   data ConditionalExpr = ConditionalExpr Expr Expr Expr deriving Show
 
-  data AssignmentExpr = AssignmentExpr Expr TokenValue Expr deriving Show
+  data AssignmentExpr = AssignmentExpr Expr Operator Expr deriving Show
 
   data Declaration = Declaration DeclarationSpecifiers (Maybe InitDeclaratorList) deriving Show
 
@@ -361,7 +361,7 @@ module Parser where
       parseToken (Token Nothing (OperatorToken (Operator "^="))) <|>
       parseToken (Token Nothing (OperatorToken (Operator "|=")))
     rhs <- parseUnaryExpr
-    return (Assignment (AssignmentExpr lhs (tokenVal operator) rhs))
+    return (Assignment (AssignmentExpr lhs (operatorVal (tokenVal operator)) rhs))
 
   parseExpr =
     try parseAssignmentExpr <|>
