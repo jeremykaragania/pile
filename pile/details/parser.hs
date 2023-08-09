@@ -281,11 +281,11 @@ module Parser where
     parseArithmeticOperator <|>
     parsePostfixExpr
 
-  parseProduct = parseBinaryOperator "*" Multiplicative Product MultiplicativeValue parsePrimaryExpr
+  parseProduct = parseBinaryOperator "*" Multiplicative Product MultiplicativeValue parseUnaryExpr
 
-  parseQuotient = parseBinaryOperator "/" Multiplicative Quotient MultiplicativeValue parsePrimaryExpr
+  parseQuotient = parseBinaryOperator "/" Multiplicative Quotient MultiplicativeValue parseUnaryExpr
 
-  parseRemainder = parseBinaryOperator "%" Multiplicative Remainder MultiplicativeValue parsePrimaryExpr
+  parseRemainder = parseBinaryOperator "%" Multiplicative Remainder MultiplicativeValue parseUnaryExpr
 
   parseMultiplicativeExpr =
     parseProduct <|>
