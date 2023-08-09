@@ -21,12 +21,10 @@ module Parser where
     Assignment AssignmentExpr deriving Show
 
   data PrimaryExpr =
-    Identifier String |
-    FloatingConstant Double |
-    IntegerConstant Integer |
-    CharacterConstant Char |
-    StringLiteral String |
-    ParensExpr Expr deriving Show
+    IdentifierPrimary Identifier |
+    ConstantPrimary Constant |
+    StringLiteralPrimary StringLiteral |
+    ParensExprPrimary Expr deriving Show
 
   data PostfixExpr =
     PostfixValue Expr |
@@ -131,15 +129,15 @@ module Parser where
 
   data IdentifierList = IdentifierList [TokenValue]
 
-  identifierVal (Primary (Parser.Identifier x)) = x
+  identifierVal (Primary (IdentifierPrimary (Identifier x))) = x
 
-  floatingConstantVal (Primary (Parser.FloatingConstant x)) = x
+  floatingConstantVal (Primary (ConstantPrimary (FloatingConstant x))) = x
 
-  integerConstantVal (Primary (Parser.IntegerConstant x)) = x
+  integerConstantVal (Primary (ConstantPrimary (IntegerConstant x))) = x
 
-  characterConstantVal (Primary (Parser.CharacterConstant x)) = x
+  characterConstantVal (Primary (ConstantPrimary (CharacterConstant x))) = x
 
-  stringLiteralVal (Primary (Parser.StringLiteral x)) = x
+  stringLiteralVal (Primary (StringLiteralPrimary (StringLiteral x))) = x
 
   parseToken t =
     tokenPrim showTok nextPos testTok
@@ -153,7 +151,7 @@ module Parser where
     where
       showTok x = show x
       nextPos pos x xs = pos
-      testTok (Token pos (IdentifierToken (Lexer.Identifier x))) = Just (Primary (Parser.Identifier x))
+      testTok (Token pos (IdentifierToken (Identifier x))) = Just (Primary (IdentifierPrimary (Identifier x)))
       testTok x = Nothing
 
   parseFloatingConstant =
@@ -161,7 +159,7 @@ module Parser where
     where
       showTok x = show x
       nextPos pos x xs = pos
-      testTok (Token pos (ConstantToken (Lexer.FloatingConstant x))) = Just (Primary (Parser.FloatingConstant x))
+      testTok (Token pos (ConstantToken (FloatingConstant x))) = Just (Primary (ConstantPrimary (FloatingConstant x)))
       testTok x = Nothing
 
   parseIntegerConstant =
@@ -169,7 +167,7 @@ module Parser where
     where
       showTok x = show x
       nextPos pos x xs = pos
-      testTok (Token pos (ConstantToken (Lexer.IntegerConstant x))) = Just (Primary (Parser.IntegerConstant x))
+      testTok (Token pos (ConstantToken (IntegerConstant x))) = Just (Primary (ConstantPrimary (IntegerConstant x)))
       testTok x = Nothing
 
   parseCharacterConstant =
@@ -177,7 +175,7 @@ module Parser where
     where
       showTok x = show x
       nextPos pos x xs = pos
-      testTok (Token pos (ConstantToken (Lexer.CharacterConstant x))) = Just (Primary (Parser.CharacterConstant x))
+      testTok (Token pos (ConstantToken (CharacterConstant x))) = Just (Primary (ConstantPrimary (CharacterConstant x)))
       testTok x = Nothing
 
   parseStringLiteral =
@@ -185,7 +183,7 @@ module Parser where
     where
       showTok x = show x
       nextPos pos x xs = pos
-      testTok (Token pos (StringLiteralToken (Lexer.StringLiteral x))) = Just (Primary (Parser.StringLiteral x))
+      testTok (Token pos (StringLiteralToken (StringLiteral x))) = Just (Primary (StringLiteralPrimary (StringLiteral x)))
       testTok x = Nothing
 
   parsePrimaryExpr =
