@@ -14,14 +14,27 @@ module Lexer where
   tokenVal (Token pos val) = val
 
   data TokenValue =
-    Keyword String |
-    Identifier String |
+    KeywordToken Keyword |
+    IdentifierToken Identifier |
+    ConstantToken Constant |
+    StringLiteralToken StringLiteral |
+    OperatorToken Operator |
+    PunctuatorToken Punctuator deriving (Show, Eq)
+
+  data Keyword = Keyword String deriving (Show, Eq)
+
+  data Identifier = Identifier String deriving (Show, Eq)
+
+  data Constant =
     FloatingConstant Double |
-    IntegerConstant Integer|
-    CharacterConstant Char|
-    StringLiteral String |
-    Operator String |
-    Punctuator String deriving (Show, Eq)
+    IntegerConstant Integer |
+    CharacterConstant Char deriving (Show, Eq)
+
+  data StringLiteral = StringLiteral String deriving (Show, Eq)
+
+  data Operator = Operator String deriving (Show, Eq)
+
+  data Punctuator = Punctuator String deriving (Show, Eq)
 
   languageDef = emptyDef {
     P.commentStart = "/*",
@@ -119,42 +132,42 @@ module Lexer where
   scanKeyword = do
     sourcePos <- getPosition
     value <- choice (map try (map (P.symbol lexer) (P.reservedNames languageDef)))
-    return (Token (Just sourcePos) (Keyword value))
+    return (Token (Just sourcePos) (KeywordToken (Keyword value)))
 
   scanIdentifier = do
     sourcePos <- getPosition
     value <- try (P.identifier lexer)
-    return (Token (Just sourcePos) (Identifier value))
+    return (Token (Just sourcePos) (IdentifierToken (Identifier value)))
 
   scanFloatingConstant = do
     sourcePos <- getPosition
     value <- try (P.float lexer)
-    return (Token (Just sourcePos) (FloatingConstant value))
+    return (Token (Just sourcePos) (ConstantToken (FloatingConstant value)))
 
   scanIntegerConstant = do
     sourcePos <- getPosition
     value <- try (P.integer lexer)
-    return (Token (Just sourcePos) (IntegerConstant value))
+    return (Token (Just sourcePos) (ConstantToken (IntegerConstant value)))
 
   scanCharacterConstant = do
     sourcePos <- getPosition
     value <- try (P.charLiteral lexer)
-    return (Token (Just sourcePos) (CharacterConstant value))
+    return (Token (Just sourcePos) (ConstantToken (CharacterConstant value)))
 
   scanStringLiteral = do
     sourcePos <- getPosition
     value <- try (P.stringLiteral lexer)
-    return (Token (Just sourcePos) (StringLiteral value))
+    return (Token (Just sourcePos) (StringLiteralToken (StringLiteral value)))
 
   scanOperator = do
     sourcePos <- getPosition
     value <- choice (map try (map (P.symbol lexer) (P.reservedOpNames languageDef)))
-    return (Token (Just sourcePos) (Operator value))
+    return (Token (Just sourcePos) (OperatorToken (Operator value)))
 
   scanPunctuator = do
     sourcePos <- getPosition
     value <- try (choice (map (P.symbol lexer) (["[", "]", "(", ")", "{", "}", "*", ",", ":", "=", ";", "...", "#"])))
-    return (Token (Just sourcePos) (Punctuator value))
+    return (Token (Just sourcePos) (PunctuatorToken (Punctuator value)))
 
   scanToken =
     scanKeyword <|>

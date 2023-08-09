@@ -153,7 +153,7 @@ module Parser where
     where
       showTok x = show x
       nextPos pos x xs = pos
-      testTok (Token pos (Lexer.Identifier x)) = Just (Primary (Parser.Identifier x))
+      testTok (Token pos (IdentifierToken (Lexer.Identifier x))) = Just (Primary (Parser.Identifier x))
       testTok x = Nothing
 
   parseFloatingConstant =
@@ -161,7 +161,7 @@ module Parser where
     where
       showTok x = show x
       nextPos pos x xs = pos
-      testTok (Token pos (Lexer.FloatingConstant x)) = Just (Primary (Parser.FloatingConstant x))
+      testTok (Token pos (ConstantToken (Lexer.FloatingConstant x))) = Just (Primary (Parser.FloatingConstant x))
       testTok x = Nothing
 
   parseIntegerConstant =
@@ -169,7 +169,7 @@ module Parser where
     where
       showTok x = show x
       nextPos pos x xs = pos
-      testTok (Token pos (Lexer.IntegerConstant x)) = Just (Primary (Parser.IntegerConstant x))
+      testTok (Token pos (ConstantToken (Lexer.IntegerConstant x))) = Just (Primary (Parser.IntegerConstant x))
       testTok x = Nothing
 
   parseCharacterConstant =
@@ -177,7 +177,7 @@ module Parser where
     where
       showTok x = show x
       nextPos pos x xs = pos
-      testTok (Token pos (Lexer.CharacterConstant x)) = Just (Primary (Parser.CharacterConstant x))
+      testTok (Token pos (ConstantToken (Lexer.CharacterConstant x))) = Just (Primary (Parser.CharacterConstant x))
       testTok x = Nothing
 
   parseStringLiteral =
@@ -185,7 +185,7 @@ module Parser where
     where
       showTok x = show x
       nextPos pos x xs = pos
-      testTok (Token pos (Lexer.StringLiteral x)) = Just (Primary (Parser.StringLiteral x))
+      testTok (Token pos (StringLiteralToken (Lexer.StringLiteral x))) = Just (Primary (Parser.StringLiteral x))
       testTok x = Nothing
 
   parsePrimaryExpr =
@@ -204,7 +204,7 @@ module Parser where
         val <- e
         return (d val)
       parseBinaryOperator = do
-        parseToken (Token Nothing (Operator a))
+        parseToken (Token Nothing (OperatorToken (Operator a)))
         return c
 
   parseStructMember = do
@@ -215,7 +215,7 @@ module Parser where
         val <- parsePrimaryExpr
         return (PostfixValue val)
       parsePostfixOperator = do
-        parseToken (Token Nothing (Operator ".")) <|> parseToken (Token Nothing (Operator "->"))
+        parseToken (Token Nothing (OperatorToken (Operator "."))) <|> parseToken (Token Nothing (OperatorToken (Operator "->")))
         return StructMember
 
   parseUnionMember = do
@@ -226,17 +226,17 @@ module Parser where
         val <- parsePrimaryExpr
         return (PostfixValue val)
       parsePostfixOperator = do
-        parseToken (Token Nothing (Operator ".")) <|> parseToken (Token Nothing (Operator "->"))
+        parseToken (Token Nothing (OperatorToken (Operator "."))) <|> parseToken (Token Nothing (OperatorToken (Operator "->")))
         return UnionMember
 
   parsePostfixIncrement = do
     expr <- parsePrimaryExpr
-    parseToken (Token Nothing (Operator "++"))
+    parseToken (Token Nothing (OperatorToken (Operator "++")))
     return (Postfix (PostfixIncrement expr))
 
   parsePostfixDecrement = do
     expr <- parsePrimaryExpr
-    parseToken (Token Nothing (Operator "--"))
+    parseToken (Token Nothing (OperatorToken (Operator "--")))
     return (Postfix (PostfixDecrement expr))
 
   parsePostfixExpr =
@@ -246,30 +246,30 @@ module Parser where
     parsePostfixDecrement
 
   parsePrefixIncrement = do
-    parseToken (Token Nothing (Operator "++"))
+    parseToken (Token Nothing (OperatorToken (Operator "++")))
     expr <- parsePostfixExpr
     return (Unary (PrefixIncrement expr))
 
   parsePrefixDecrement = do
-    parseToken (Token Nothing (Operator "--"))
+    parseToken (Token Nothing (OperatorToken (Operator "--")))
     expr <- parsePostfixExpr
     return (Unary (PrefixDecrement expr))
 
   parseAddressOperator = do
-    parseToken (Token Nothing (Operator "&"))
+    parseToken (Token Nothing (OperatorToken (Operator "&")))
     expr <- parsePostfixExpr
     return (Unary (AddressOperator expr))
 
   parseIndirectionOperator = do
-    parseToken (Token Nothing (Operator "*"))
+    parseToken (Token Nothing (OperatorToken (Operator "*")))
     expr <- parsePostfixExpr
     return (Unary (IndirectionOperator expr))
 
   parseArithmeticOperator = do
-    parseToken (Token Nothing (Operator "+")) <|>
-      parseToken (Token Nothing (Operator "-")) <|>
-      parseToken (Token Nothing (Operator "~")) <|>
-      parseToken (Token Nothing (Operator "!"))
+    parseToken (Token Nothing (OperatorToken (Operator "+"))) <|>
+      parseToken (Token Nothing (OperatorToken (Operator "-"))) <|>
+      parseToken (Token Nothing (OperatorToken (Operator "~"))) <|>
+      parseToken (Token Nothing (OperatorToken (Operator "!")))
     expr <- parsePostfixExpr
     return (Unary (ArithmeticOperator expr))
 
@@ -342,26 +342,26 @@ module Parser where
 
   parseConditionalExpr = do
     firstExpr <- parseLogicalOrExpr
-    parseToken (Token Nothing (Operator "?"))
+    parseToken (Token Nothing (OperatorToken (Operator "?")))
     secondExpr <- parseExpr
-    parseToken (Token Nothing (Operator ":"))
+    parseToken (Token Nothing (OperatorToken (Operator ":")))
     thirdExpr <- parseLogicalOrExpr
     return (Conditional (ConditionalExpr firstExpr secondExpr thirdExpr))
 
   parseAssignmentExpr = do
     lhs <- parseUnaryExpr
     operator <-
-      parseToken (Token Nothing (Operator "=")) <|>
-      parseToken (Token Nothing (Operator "*=")) <|>
-      parseToken (Token Nothing (Operator "/=")) <|>
-      parseToken (Token Nothing (Operator "%=")) <|>
-      parseToken (Token Nothing (Operator "+=")) <|>
-      parseToken (Token Nothing (Operator "-=")) <|>
-      parseToken (Token Nothing (Operator "<<=")) <|>
-      parseToken (Token Nothing (Operator ">>=")) <|>
-      parseToken (Token Nothing (Operator "&=")) <|>
-      parseToken (Token Nothing (Operator "^=")) <|>
-      parseToken (Token Nothing (Operator "|="))
+      parseToken (Token Nothing (OperatorToken (Operator "="))) <|>
+      parseToken (Token Nothing (OperatorToken (Operator "*="))) <|>
+      parseToken (Token Nothing (OperatorToken (Operator "/="))) <|>
+      parseToken (Token Nothing (OperatorToken (Operator "%="))) <|>
+      parseToken (Token Nothing (OperatorToken (Operator "+="))) <|>
+      parseToken (Token Nothing (OperatorToken (Operator "-="))) <|>
+      parseToken (Token Nothing (OperatorToken (Operator "<<="))) <|>
+      parseToken (Token Nothing (OperatorToken (Operator ">>="))) <|>
+      parseToken (Token Nothing (OperatorToken (Operator "&="))) <|>
+      parseToken (Token Nothing (OperatorToken (Operator "^="))) <|>
+      parseToken (Token Nothing (OperatorToken (Operator "|=")))
     rhs <- parseUnaryExpr
     return (Assignment (AssignmentExpr lhs (tokenVal operator) rhs))
 
