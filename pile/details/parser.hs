@@ -105,11 +105,11 @@ module Parser where
 
   data InitDeclarator = InitDeclarator Declarator deriving Show
 
-  data StorageClassSpecifier = StorageClassSpecifier TokenValue deriving Show
+  data StorageClassSpecifier = StorageClassSpecifier Keyword deriving Show
 
-  data TypeSpecifier = TypeSpecifier TokenValue deriving Show
+  data TypeSpecifier = TypeSpecifier Keyword deriving Show
 
-  data TypeQualifier = TypeQualifier TokenValue deriving Show
+  data TypeQualifier = TypeQualifier Keyword deriving Show
 
   data Declarator = Declarator (Maybe Pointer) DirectDeclarator deriving Show
 
@@ -379,5 +379,33 @@ module Parser where
     try parseUnaryExpr <|>
     try parsePostfixExpr <|>
     try parsePrimaryExpr
+
+  parseStorageClassSpecifier = do
+    specifier <-
+      parseToken (Token Nothing (KeywordToken (Keyword "typedef"))) <|>
+      parseToken (Token Nothing (KeywordToken (Keyword "extern"))) <|>
+      parseToken (Token Nothing (KeywordToken (Keyword "static"))) <|>
+      parseToken (Token Nothing (KeywordToken (Keyword "auto"))) <|>
+      parseToken (Token Nothing (KeywordToken (Keyword "register")))
+    return (StorageClassSpecifier (keywordVal (tokenVal specifier)))
+
+  parseTypeSpecifier = do
+    specifier <-
+      parseToken (Token Nothing (KeywordToken (Keyword "void"))) <|>
+      parseToken (Token Nothing (KeywordToken (Keyword "char"))) <|>
+      parseToken (Token Nothing (KeywordToken (Keyword "short"))) <|>
+      parseToken (Token Nothing (KeywordToken (Keyword "int"))) <|>
+      parseToken (Token Nothing (KeywordToken (Keyword "long"))) <|>
+      parseToken (Token Nothing (KeywordToken (Keyword "float"))) <|>
+      parseToken (Token Nothing (KeywordToken (Keyword "double"))) <|>
+      parseToken (Token Nothing (KeywordToken (Keyword "signed"))) <|>
+      parseToken (Token Nothing (KeywordToken (Keyword "unsigned")))
+    return (TypeSpecifier (keywordVal (tokenVal specifier)))
+
+  parseTypeQualifier = do
+    qualifier <-
+      parseToken (Token Nothing (KeywordToken (Keyword "const"))) <|>
+      parseToken (Token Nothing (KeywordToken (Keyword "volatile")))
+    return (TypeQualifier (keywordVal (tokenVal qualifier)))
 
   parse = Text.Parsec.parse (many parseExpr) ""

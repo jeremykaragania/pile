@@ -48,7 +48,6 @@ module Lexer where
 
   punctuatorVal (PunctuatorToken val) = val
 
-
   languageDef = emptyDef {
     P.commentStart = "/*",
     P.commentEnd = "*/",
