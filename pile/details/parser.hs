@@ -96,28 +96,24 @@ module Parser where
 
   data Declaration = Declaration DeclarationSpecifiers (Maybe InitDeclaratorList) deriving Show
 
-  data DeclarationSpecifiers =
-    StorageClassSpecifiers StorageClassSpecifier (Maybe DeclarationSpecifiers) |
-    TypeSpecifiers TypeSpecifier (Maybe DeclarationSpecifiers) |
-    TypeQualifiers TypeQualifier (Maybe DeclarationSpecifiers) deriving Show
+  data DeclarationSpecifiers = DeclarationSpecifiers [DeclarationSpecifier] deriving Show
 
   data InitDeclaratorList = InitDeclaratorList [InitDeclarator] deriving Show
 
   data InitDeclarator = InitDeclarator Declarator deriving Show
 
-  data StorageClassSpecifier = StorageClassSpecifier Keyword deriving Show
-
-  data TypeSpecifier = TypeSpecifier Keyword deriving Show
-
-  data TypeQualifier = TypeQualifier Keyword deriving Show
+  data DeclarationSpecifier =
+    StorageClassSpecifier Keyword |
+    TypeSpecifier Keyword |
+    TypeQualifier Keyword deriving Show
 
   data Declarator = Declarator (Maybe Pointer) DirectDeclarator deriving Show
 
-  data DirectDeclarator = DirectDeclaratorIdentifier TokenValue deriving Show
+  data DirectDeclarator = DirectDeclaratorIdentifier Identifier deriving Show
 
-  data Pointer = Pointer [(Maybe TypeQualifierList)] deriving Show
+  data Pointer = Pointer (Maybe TypeQualifierList) deriving Show
 
-  data TypeQualifierList = TypeQualifierList [TypeQualifier]  deriving Show
+  data TypeQualifierList = TypeQualifierList [DeclarationSpecifier]  deriving Show
 
   data ParameterTypeList =
     ParamterTypeList [ParameterList] |
@@ -127,17 +123,17 @@ module Parser where
 
   data ParameterDeclaration = ParamterDeclaration deriving Show
 
-  data IdentifierList = IdentifierList [TokenValue]
+  data IdentifierList = IdentifierList [Identifier] deriving Show
 
-  identifierVal (Primary (IdentifierPrimary (Identifier x))) = x
+  identifierPrimaryVal (Primary (IdentifierPrimary x)) = x
 
-  floatingConstantVal (Primary (ConstantPrimary (FloatingConstant x))) = x
+  floatingConstantPrimaryVal (Primary (ConstantPrimary (FloatingConstant x))) = x
 
-  integerConstantVal (Primary (ConstantPrimary (IntegerConstant x))) = x
+  integerConstantPrimaryVal (Primary (ConstantPrimary x)) = x
 
-  characterConstantVal (Primary (ConstantPrimary (CharacterConstant x))) = x
+  characterConstantPrimaryVal (Primary (ConstantPrimary x)) = x
 
-  stringLiteralVal (Primary (StringLiteralPrimary (StringLiteral x))) = x
+  stringLiteralPrimaryVal (Primary (StringLiteralPrimary x)) = x
 
   parseToken t =
     tokenPrim showTok nextPos testTok
@@ -361,7 +357,7 @@ module Parser where
       parseToken (Token Nothing (OperatorToken (Operator "^="))) <|>
       parseToken (Token Nothing (OperatorToken (Operator "|=")))
     rhs <- parseUnaryExpr
-    return (Assignment (AssignmentExpr lhs (operatorVal (tokenVal operator)) rhs))
+    return (Assignment (AssignmentExpr lhs (operatorTokenVal (tokenVal operator)) rhs))
 
   parseExpr =
     try parseAssignmentExpr <|>
@@ -380,6 +376,22 @@ module Parser where
     try parsePostfixExpr <|>
     try parsePrimaryExpr
 
+  parseDeclaration = do
+    specifiers <- parseDeclarationSpecifiers
+    return (Declaration)
+
+  parseDeclarationSpecifiers = do
+    specifiers <- many parseDeclarationSpecifier
+    return (DeclarationSpecifiers specifiers)
+
+  parseInitDeclaratorList = do
+    list <- sepBy parseInitDeclarator (parseToken (Token Nothing (OperatorToken (Operator ","))))
+    return (InitDeclaratorList list)
+
+  parseInitDeclarator = do
+    declarator <- parseDeclarator
+    return (InitDeclarator declarator)
+
   parseStorageClassSpecifier = do
     specifier <-
       parseToken (Token Nothing (KeywordToken (Keyword "typedef"))) <|>
@@ -387,7 +399,7 @@ module Parser where
       parseToken (Token Nothing (KeywordToken (Keyword "static"))) <|>
       parseToken (Token Nothing (KeywordToken (Keyword "auto"))) <|>
       parseToken (Token Nothing (KeywordToken (Keyword "register")))
-    return (StorageClassSpecifier (keywordVal (tokenVal specifier)))
+    return (StorageClassSpecifier (keywordTokenVal (tokenVal specifier)))
 
   parseTypeSpecifier = do
     specifier <-
@@ -400,12 +412,41 @@ module Parser where
       parseToken (Token Nothing (KeywordToken (Keyword "double"))) <|>
       parseToken (Token Nothing (KeywordToken (Keyword "signed"))) <|>
       parseToken (Token Nothing (KeywordToken (Keyword "unsigned")))
-    return (TypeSpecifier (keywordVal (tokenVal specifier)))
+    return (TypeSpecifier (keywordTokenVal (tokenVal specifier)))
 
   parseTypeQualifier = do
     qualifier <-
       parseToken (Token Nothing (KeywordToken (Keyword "const"))) <|>
       parseToken (Token Nothing (KeywordToken (Keyword "volatile")))
-    return (TypeQualifier (keywordVal (tokenVal qualifier)))
+    return (TypeQualifier (keywordTokenVal (tokenVal qualifier)))
+
+  parseDeclarationSpecifier =
+    parseStorageClassSpecifier <|>
+    parseTypeSpecifier <|>
+    parseTypeQualifier
+
+  parseDeclarator = do
+    pointer <- optionMaybe parsePointer
+    declarator <- parseDirectDeclarator
+    return (Declarator pointer declarator)
+
+  parseDirectDeclarator = do
+    identifier <- parseIdentifier
+    return (DirectDeclaratorIdentifier (identifierPrimaryVal identifier))
+
+  parsePointer = do
+    parseToken (Token Nothing (OperatorToken (Operator "*")))
+    list <- parseTypeQualifierList
+    case list of
+      TypeQualifierList (x:xs) -> return (Pointer (Just list))
+      TypeQualifierList [] -> return (Pointer Nothing)
+
+  parseTypeQualifierList = do
+    list <- many parseTypeQualifier
+    return (TypeQualifierList list)
+
+  parseIdentifierList = do
+    list <- many parseIdentifier
+    return (IdentifierList (map identifierPrimaryVal list))
 
   parse = Text.Parsec.parse (many parseExpr) ""

@@ -36,17 +36,17 @@ module Lexer where
 
   data Punctuator = Punctuator String deriving (Show, Eq)
 
-  keywordVal (KeywordToken val) = val
+  keywordTokenVal (KeywordToken val) = val
 
-  identifierVal (IdentifierToken val) = val
+  identifierTokenVal (IdentifierToken val) = val
 
-  constantVal (ConstantToken val) = val
+  constantTokenVal (ConstantToken val) = val
 
-  stringLiteralVal (StringLiteral val) = val
+  stringLiteralTokenVal (StringLiteral val) = val
 
-  operatorVal (OperatorToken val) = val
+  operatorTokenVal (OperatorToken val) = val
 
-  punctuatorVal (PunctuatorToken val) = val
+  punctuatorTokenVal (PunctuatorToken val) = val
 
   languageDef = emptyDef {
     P.commentStart = "/*",
