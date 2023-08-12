@@ -182,12 +182,19 @@ module Parser where
       testTok (Token pos (StringLiteralToken (StringLiteral x))) = Just (Primary (StringLiteralPrimary (StringLiteral x)))
       testTok x = Nothing
 
+  parseParensExpr = do
+    parseToken (Token Nothing (OperatorToken (Operator "(")))
+    expr <- parseExpr
+    parseToken (Token Nothing (OperatorToken (Operator ")")))
+    return (Primary (ParensExprPrimary expr))
+
   parsePrimaryExpr =
     parseIdentifier <|>
     parseFloatingConstant <|>
     parseIntegerConstant <|>
     parseCharacterConstant <|>
-    parseStringLiteral
+    parseStringLiteral <|>
+    parseParensExpr
 
   parseBinaryOperator :: String -> (t -> b) -> (t -> t -> t) -> (Expr -> t) -> ParsecT [Token] u Identity Expr -> ParsecT [Token] u Identity b
   parseBinaryOperator a b c d e = do
