@@ -28,7 +28,7 @@ module Parser where
 
   data PostfixExpr =
     PostfixValue Expr |
-    ArraySubscript PostfixExpr Expr |
+    ArraySubscript Expr |
     StructMember PostfixExpr PostfixExpr |
     UnionMember PostfixExpr PostfixExpr|
     PostfixIncrement Expr |
@@ -207,6 +207,12 @@ module Parser where
       parseBinaryOperator = do
         parseToken (Token Nothing (OperatorToken (Operator a)))
         return c
+
+  parseArraySubscript = do
+    parseToken (Token Nothing (OperatorToken (Operator "[")))
+    expr <- parseExpr
+    parseToken (Token Nothing (OperatorToken (Operator "]")))
+    return (Postfix (ArraySubscript expr))
 
   parseStructMember = do
     expr <- chainl1 parsePostfixValue parsePostfixOperator
