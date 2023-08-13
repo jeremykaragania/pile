@@ -391,14 +391,16 @@ module Parser where
 
   parseDeclaration = do
     specifiers <- parseDeclarationSpecifiers
-    return (Declaration)
+    declarator <- optionMaybe parseInitDeclaratorList
+    parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
+    return (Declaration specifiers declarator)
 
   parseDeclarationSpecifiers = do
     specifiers <- many parseDeclarationSpecifier
     return (DeclarationSpecifiers specifiers)
 
   parseInitDeclaratorList = do
-    list <- sepBy parseInitDeclarator (parseToken (Token Nothing (OperatorToken (Operator ","))))
+    list <- sepBy1 parseInitDeclarator (parseToken (Token Nothing (OperatorToken (Operator ","))))
     return (InitDeclaratorList list)
 
   parseInitDeclarator = do
