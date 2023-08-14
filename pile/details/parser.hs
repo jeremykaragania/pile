@@ -127,7 +127,7 @@ module Parser where
 
   data Statement =
     LabeledIdentifierStatement Identifier Statement |
-    LabeledCaseStatement Statement |
+    LabeledCaseStatement Expr Statement |
     LabeledDefaultStatement Statement |
     CompoundStatement (Maybe DeclarationList) (Maybe StatementList) |
     ExprStatement (Maybe Expr) |
