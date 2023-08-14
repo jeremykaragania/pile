@@ -125,6 +125,26 @@ module Parser where
 
   data IdentifierList = IdentifierList [Identifier] deriving Show
 
+  data Statement =
+    LabeledStatement (Either Identifier Keyword) Statement |
+    CompoundStatement (Maybe DeclarationList) (Maybe StatementList) |
+    ExprStatement (Maybe Expr) |
+    IfStatement Expr Statement |
+    IfElseStatement Expr Statement Statement |
+    SwitchStatement Expr Statement |
+    WhileStatement Expr Statement |
+    DoStatement Statement Expr |
+    ForStatement (Maybe Expr) (Maybe Expr) (Maybe Expr) Statement |
+    GotoStatement Identifier |
+    ContinueStatement |
+    BreakStatement |
+    ReturnStatement (Maybe Expr) |
+    JumpStatement deriving Show
+
+  data DeclarationList = DeclarationList [Declaration] deriving Show
+
+  data StatementList = StatementList [StatementList] deriving Show
+
   identifierPrimaryVal (Primary (IdentifierPrimary x)) = x
 
   floatingConstantPrimaryVal (Primary (ConstantPrimary (FloatingConstant x))) = x
