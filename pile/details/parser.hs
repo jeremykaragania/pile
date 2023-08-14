@@ -140,8 +140,7 @@ module Parser where
     GotoStatement Identifier |
     ContinueStatement |
     BreakStatement |
-    ReturnStatement (Maybe Expr) |
-    JumpStatement deriving Show
+    ReturnStatement (Maybe Expr) deriving Show
 
   data DeclarationList = DeclarationList [Declaration] deriving Show
 
@@ -485,5 +484,29 @@ module Parser where
   parseIdentifierList = do
     list <- many parseIdentifier
     return (IdentifierList (map identifierPrimaryVal list))
+
+  parseStatement =
+    parseLabeledIdentifierStatement <|>
+    parseLabeledCaseStatement <|>
+    parseLabeledDefaultStatement
+
+  parseLabeledIdentifierStatement = do
+    identifier <- parseIdentifier
+    parseToken (Token Nothing (OperatorToken (Operator ":")))
+    statement <- parseStatement
+    return (LabeledIdentifierStatement (identifierPrimaryVal identifier) statement)
+
+  parseLabeledCaseStatement = do
+    parseToken (Token Nothing (KeywordToken (Keyword "case")))
+    expr <- parseExpr
+    parseToken (Token Nothing (OperatorToken (Operator ":")))
+    statement <- parseStatement
+    return (LabeledCaseStatement expr statement)
+
+  parseLabeledDefaultStatement = do
+    parseToken (Token Nothing (KeywordToken (Keyword "default")))
+    parseToken (Token Nothing (OperatorToken (Operator ":")))
+    statement <- parseStatement
+    return (LabeledDefaultStatement statement)
 
   parse = Text.Parsec.parse (many parseExpr) ""
