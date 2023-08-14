@@ -126,7 +126,9 @@ module Parser where
   data IdentifierList = IdentifierList [Identifier] deriving Show
 
   data Statement =
-    LabeledStatement (Either Identifier Keyword) Statement |
+    LabeledIdentifierStatement Identifier Statement |
+    LabeledCaseStatement Statement |
+    LabeledDefaultStatement Statement |
     CompoundStatement (Maybe DeclarationList) (Maybe StatementList) |
     ExprStatement (Maybe Expr) |
     IfStatement Expr Statement |
