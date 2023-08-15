@@ -488,7 +488,11 @@ module Parser where
   parseStatement =
     parseLabeledIdentifierStatement <|>
     parseLabeledCaseStatement <|>
-    parseLabeledDefaultStatement
+    parseLabeledDefaultStatement <|>
+    parseGotoStatement <|>
+    parseContinueStatement <|>
+    parseBreakStatement <|>
+    parseReturnStatement
 
   parseLabeledIdentifierStatement = do
     identifier <- parseIdentifier
@@ -508,5 +512,27 @@ module Parser where
     parseToken (Token Nothing (OperatorToken (Operator ":")))
     statement <- parseStatement
     return (LabeledDefaultStatement statement)
+
+  parseGotoStatement = do
+    parseToken (Token Nothing (KeywordToken (Keyword "goto")))
+    identifier <- parseIdentifier
+    parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
+    return (GotoStatement (identifierPrimaryVal identifier))
+
+  parseContinueStatement= do
+    parseToken (Token Nothing (KeywordToken (Keyword "continue")))
+    parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
+    return (ContinueStatement)
+
+  parseBreakStatement= do
+    parseToken (Token Nothing (KeywordToken (Keyword "break")))
+    parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
+    return (BreakStatement)
+
+  parseReturnStatement = do
+    parseToken (Token Nothing (KeywordToken (Keyword "return")))
+    expr <- optionMaybe parseExpr
+    parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
+    return (ReturnStatement expr)
 
   parse = Text.Parsec.parse (many parseExpr) ""
