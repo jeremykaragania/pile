@@ -129,7 +129,7 @@ module Parser where
     LabeledIdentifierStatement Identifier Statement |
     LabeledCaseStatement Expr Statement |
     LabeledDefaultStatement Statement |
-    CompoundStatement (Maybe DeclarationList) (Maybe StatementList) |
+    CompoundStatement [Either Declaration Statement] |
     ExprStatement (Maybe Expr) |
     IfStatement Expr Statement |
     IfElseStatement Expr Statement Statement |
@@ -141,10 +141,6 @@ module Parser where
     ContinueStatement |
     BreakStatement |
     ReturnStatement (Maybe Expr) deriving Show
-
-  data DeclarationList = DeclarationList [Declaration] deriving Show
-
-  data StatementList = StatementList [StatementList] deriving Show
 
   identifierPrimaryVal (Primary (IdentifierPrimary x)) = x
 
