@@ -509,6 +509,11 @@ module Parser where
     statement <- parseStatement
     return (LabeledDefaultStatement statement)
 
+  parseExprStatement = do
+    expr <- optionMaybe parseExpr
+    parseToken (Token Nothing (OperatorToken (Operator ":")))
+    return (ExprStatement expr)
+
   parseGotoStatement = do
     parseToken (Token Nothing (KeywordToken (Keyword "goto")))
     identifier <- parseIdentifier
