@@ -485,6 +485,7 @@ module Parser where
     parseLabeledIdentifierStatement <|>
     parseLabeledCaseStatement <|>
     parseLabeledDefaultStatement <|>
+    parseExprStatement <|>
     parseGotoStatement <|>
     parseContinueStatement <|>
     parseBreakStatement <|>
