@@ -486,6 +486,8 @@ module Parser where
     parseLabeledCaseStatement <|>
     parseLabeledDefaultStatement <|>
     parseExprStatement <|>
+    parseIfElseStatement <|>
+    parseIfStatement <|>
     parseGotoStatement <|>
     parseContinueStatement <|>
     parseBreakStatement <|>
@@ -514,6 +516,24 @@ module Parser where
     expr <- optionMaybe parseExpr
     parseToken (Token Nothing (OperatorToken (Operator ":")))
     return (ExprStatement expr)
+
+  parseIfStatement = do
+    parseToken (Token Nothing (KeywordToken (Keyword "if")))
+    parseToken (Token Nothing (OperatorToken (Operator "(")))
+    expr <- parseExpr
+    parseToken (Token Nothing (OperatorToken (Operator ")")))
+    statement <- parseStatement
+    return (IfStatement expr statement)
+
+  parseIfElseStatement = do
+    parseToken (Token Nothing (KeywordToken (Keyword "if")))
+    parseToken (Token Nothing (OperatorToken (Operator "(")))
+    expr <- parseExpr
+    parseToken (Token Nothing (OperatorToken (Operator ")")))
+    firstStatement <- parseStatement
+    parseToken (Token Nothing (KeywordToken (Keyword "else")))
+    secondStatement <- parseStatement
+    return (IfElseStatement expr firstStatement secondStatement)
 
   parseGotoStatement = do
     parseToken (Token Nothing (KeywordToken (Keyword "goto")))
