@@ -481,18 +481,6 @@ module Parser where
     list <- many parseIdentifier
     return (IdentifierList (map identifierPrimaryVal list))
 
-  parseStatement =
-    parseLabeledIdentifierStatement <|>
-    parseLabeledCaseStatement <|>
-    parseLabeledDefaultStatement <|>
-    parseExprStatement <|>
-    parseIfElseStatement <|>
-    parseIfStatement <|>
-    parseGotoStatement <|>
-    parseContinueStatement <|>
-    parseBreakStatement <|>
-    parseReturnStatement
-
   parseLabeledIdentifierStatement = do
     identifier <- parseIdentifier
     parseToken (Token Nothing (OperatorToken (Operator ":")))
@@ -535,6 +523,14 @@ module Parser where
     secondStatement <- parseStatement
     return (IfElseStatement expr firstStatement secondStatement)
 
+  parseSwitchStatement = do
+    parseToken (Token Nothing (KeywordToken (Keyword "switch")))
+    parseToken (Token Nothing (OperatorToken (Operator "(")))
+    expr <- parseExpr
+    parseToken (Token Nothing (OperatorToken (Operator ")")))
+    statement <- parseStatement
+    return (SwitchStatement expr statement)
+
   parseGotoStatement = do
     parseToken (Token Nothing (KeywordToken (Keyword "goto")))
     identifier <- parseIdentifier
@@ -556,5 +552,18 @@ module Parser where
     expr <- optionMaybe parseExpr
     parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
     return (ReturnStatement expr)
+
+  parseStatement =
+    parseLabeledIdentifierStatement <|>
+    parseLabeledCaseStatement <|>
+    parseLabeledDefaultStatement <|>
+    parseExprStatement <|>
+    parseIfElseStatement <|>
+    parseSwitchStatement <|>
+    parseIfStatement <|>
+    parseGotoStatement <|>
+    parseContinueStatement <|>
+    parseBreakStatement <|>
+    parseReturnStatement
 
   parse = Text.Parsec.parse (many parseExpr) ""
