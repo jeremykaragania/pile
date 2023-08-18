@@ -129,7 +129,9 @@ module Parser where
     LabeledIdentifierStatement Identifier Statement |
     LabeledCaseStatement Expr Statement |
     LabeledDefaultStatement Statement |
-    CompoundStatement [Either Declaration Statement] |
+    DeclarationList Declaration |
+    StatementList Statement |
+    CompoundStatement [Statement] |
     ExprStatement (Maybe Expr) |
     IfStatement Expr Statement |
     IfElseStatement Expr Statement Statement |
@@ -500,6 +502,20 @@ module Parser where
     statement <- parseStatement
     return (LabeledDefaultStatement statement)
 
+  parseDeclarationList = do
+    list <- parseDeclaration
+    return (DeclarationList list)
+
+  parseStatementList = do
+    list <- parseStatement
+    return (StatementList list)
+
+  parseCompoundStatement = do
+    parseToken (Token Nothing (PunctuatorToken (Punctuator "{")))
+    list <- many (try parseDeclarationList <|> try parseStatementList)
+    parseToken (Token Nothing (PunctuatorToken (Punctuator "}")))
+    return (CompoundStatement list)
+
   parseExprStatement = do
     expr <- optionMaybe parseExpr
     parseToken (Token Nothing (OperatorToken (Operator ":")))
@@ -557,6 +573,7 @@ module Parser where
     parseLabeledIdentifierStatement <|>
     parseLabeledCaseStatement <|>
     parseLabeledDefaultStatement <|>
+    parseCompoundStatement <|>
     parseExprStatement <|>
     parseIfElseStatement <|>
     parseSwitchStatement <|>
