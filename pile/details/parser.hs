@@ -547,6 +547,36 @@ module Parser where
     statement <- parseStatement
     return (SwitchStatement expr statement)
 
+  parseWhileStatement = do
+    parseToken (Token Nothing (KeywordToken (Keyword "while")))
+    parseToken (Token Nothing (OperatorToken (Operator "(")))
+    expr <- parseExpr
+    parseToken (Token Nothing (OperatorToken (Operator ")")))
+    statement <- parseStatement
+    return (WhileStatement expr statement)
+
+  parseDoStatement = do
+    parseToken (Token Nothing (KeywordToken (Keyword "do")))
+    statement <- parseStatement
+    parseToken (Token Nothing (KeywordToken (Keyword "while")))
+    parseToken (Token Nothing (OperatorToken (Operator "(")))
+    expr <- parseExpr
+    parseToken (Token Nothing (OperatorToken (Operator ")")))
+    parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
+    return (DoStatement statement expr)
+
+  parseForStatement = do
+    parseToken (Token Nothing (KeywordToken (Keyword "for")))
+    parseToken (Token Nothing (OperatorToken (Operator "(")))
+    firstExpr <- optionMaybe parseExpr
+    parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
+    secondExpr <- optionMaybe parseExpr
+    parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
+    thirdExpr <- optionMaybe parseExpr
+    parseToken (Token Nothing (OperatorToken (Operator ")")))
+    statement <- parseStatement
+    return (ForStatement firstExpr secondExpr thirdExpr statement)
+
   parseGotoStatement = do
     parseToken (Token Nothing (KeywordToken (Keyword "goto")))
     identifier <- parseIdentifier
@@ -577,6 +607,9 @@ module Parser where
     parseExprStatement <|>
     parseIfElseStatement <|>
     parseSwitchStatement <|>
+    parseWhileStatement <|>
+    parseDoStatement <|>
+    parseForStatement <|>
     parseIfStatement <|>
     parseGotoStatement <|>
     parseContinueStatement <|>
