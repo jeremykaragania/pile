@@ -616,4 +616,4 @@ module Parser where
     try parseBreakStatement <|>
     try parseReturnStatement
 
-  parse = Text.Parsec.parse (many parseExpr) ""
+  parse = Text.Parsec.parse (many parseStatement) ""
