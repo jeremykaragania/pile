@@ -600,20 +600,20 @@ module Parser where
     return (ReturnStatement expr)
 
   parseStatement =
-    parseLabeledIdentifierStatement <|>
-    parseLabeledCaseStatement <|>
-    parseLabeledDefaultStatement <|>
-    parseCompoundStatement <|>
-    parseExprStatement <|>
-    parseIfElseStatement <|>
-    parseSwitchStatement <|>
-    parseWhileStatement <|>
-    parseDoStatement <|>
-    parseForStatement <|>
-    parseIfStatement <|>
-    parseGotoStatement <|>
-    parseContinueStatement <|>
-    parseBreakStatement <|>
-    parseReturnStatement
+    try parseLabeledIdentifierStatement <|>
+    try parseLabeledCaseStatement <|>
+    try parseLabeledDefaultStatement <|>
+    try parseCompoundStatement <|>
+    try parseExprStatement <|>
+    try parseIfElseStatement <|>
+    try parseSwitchStatement <|>
+    try parseWhileStatement <|>
+    try parseDoStatement <|>
+    try parseForStatement <|>
+    try parseIfStatement <|>
+    try parseGotoStatement <|>
+    try parseContinueStatement <|>
+    try parseBreakStatement <|>
+    try parseReturnStatement
 
   parse = Text.Parsec.parse (many parseExpr) ""
