@@ -518,7 +518,7 @@ module Parser where
 
   parseExprStatement = do
     expr <- optionMaybe parseExpr
-    parseToken (Token Nothing (OperatorToken (Operator ";")))
+    parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
     return (ExprStatement expr)
 
   parseIfStatement = do
