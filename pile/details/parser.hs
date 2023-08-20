@@ -583,12 +583,12 @@ module Parser where
     parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
     return (GotoStatement (identifierPrimaryVal identifier))
 
-  parseContinueStatement= do
+  parseContinueStatement = do
     parseToken (Token Nothing (KeywordToken (Keyword "continue")))
     parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
     return (ContinueStatement)
 
-  parseBreakStatement= do
+  parseBreakStatement = do
     parseToken (Token Nothing (KeywordToken (Keyword "break")))
     parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
     return (BreakStatement)
@@ -601,19 +601,19 @@ module Parser where
 
   parseStatement =
     try parseLabeledIdentifierStatement <|>
-    try parseLabeledCaseStatement <|>
-    try parseLabeledDefaultStatement <|>
-    try parseCompoundStatement <|>
-    try parseExprStatement <|>
+    parseLabeledCaseStatement <|>
+    parseLabeledDefaultStatement <|>
+    parseCompoundStatement <|>
+    parseExprStatement <|>
     try parseIfElseStatement <|>
-    try parseSwitchStatement <|>
-    try parseWhileStatement <|>
-    try parseDoStatement <|>
-    try parseForStatement <|>
-    try parseIfStatement <|>
-    try parseGotoStatement <|>
-    try parseContinueStatement <|>
-    try parseBreakStatement <|>
-    try parseReturnStatement
+    parseIfStatement <|>
+    parseSwitchStatement <|>
+    parseWhileStatement <|>
+    parseDoStatement <|>
+    parseForStatement <|>
+    parseGotoStatement <|>
+    parseContinueStatement <|>
+    parseBreakStatement <|>
+    parseReturnStatement
 
   parse = Text.Parsec.parse (many parseStatement) ""
