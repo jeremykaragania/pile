@@ -217,9 +217,14 @@ module Parser where
 
   parseBinaryOperator :: String -> (t -> b) -> (t -> t -> t) -> (Expr -> t) -> ParsecT [Token] u Identity Expr -> ParsecT [Token] u Identity b
   parseBinaryOperator a b c d e = do
+    lookAhead parseLookAhead
     expr <- chainl1 parseBinaryValue parseBinaryOperator
     return (b expr)
     where
+      parseLookAhead = do
+        parseBinaryValue
+        parseBinaryOperator
+        parseBinaryValue
       parseBinaryValue = do
         val <- e
         return (d val)
@@ -234,9 +239,14 @@ module Parser where
     return (Postfix (ArraySubscript expr))
 
   parseStructMember = do
+    lookAhead parseLookAhead
     expr <- chainl1 parsePostfixValue parsePostfixOperator
     return (Postfix expr)
     where
+      parseLookAhead = do
+        parsePostfixValue
+        parsePostfixOperator
+        parsePostfixValue
       parsePostfixValue = do
         val <- parsePrimaryExpr
         return (PostfixValue val)
@@ -245,9 +255,14 @@ module Parser where
         return StructMember
 
   parseUnionMember = do
+    lookAhead parseLookAhead
     expr <- chainl1 parsePostfixValue parsePostfixOperator
     return (Postfix expr)
     where
+      parseLookAhead = do
+        parsePostfixValue
+        parsePostfixOperator
+        parsePostfixValue
       parsePostfixValue = do
         val <- parsePrimaryExpr
         return (PostfixValue val)
