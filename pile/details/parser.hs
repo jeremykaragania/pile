@@ -281,10 +281,11 @@ module Parser where
     return (Postfix (PostfixDecrement expr))
 
   parsePostfixExpr =
-    parseStructMember <|>
-    parseUnionMember <|>
-    parsePostfixIncrement <|>
-    parsePostfixDecrement
+    try parseStructMember <|>
+    try parseUnionMember <|>
+    try parsePostfixIncrement <|>
+    try parsePostfixDecrement <|>
+    parsePrimaryExpr
 
   parsePrefixIncrement = do
     parseToken (Token Nothing (OperatorToken (Operator "++")))
@@ -315,11 +316,11 @@ module Parser where
     return (Unary (ArithmeticOperator expr))
 
   parseUnaryExpr =
-    parsePrefixIncrement <|>
-    parsePrefixDecrement <|>
-    parseAddressOperator <|>
-    parseIndirectionOperator <|>
-    parseArithmeticOperator <|>
+    try parsePrefixIncrement <|>
+    try parsePrefixDecrement <|>
+    try parseAddressOperator <|>
+    try parseIndirectionOperator <|>
+    try parseArithmeticOperator <|>
     parsePostfixExpr
 
   parseProduct = parseBinaryOperator "*" Multiplicative Product MultiplicativeValue parseUnaryExpr
@@ -418,10 +419,7 @@ module Parser where
     try parseRelationalExpr <|>
     try parseShiftExpr <|>
     try parseAdditiveExpr <|>
-    try parseMultiplicativeExpr <|>
-    try parseUnaryExpr <|>
-    try parsePostfixExpr <|>
-    try parsePrimaryExpr
+    try parseMultiplicativeExpr
 
   parseDeclaration = do
     specifiers <- parseDeclarationSpecifiers
