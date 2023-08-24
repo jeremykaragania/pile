@@ -34,6 +34,8 @@ module Parser where
     PostfixIncrement Expr |
     PostfixDecrement Expr deriving Show
 
+  data ArgumentExprList = ArgumentExprList [AssignmentExpr]
+
   data UnaryExpr =
     PrefixIncrement Expr |
     PrefixDecrement Expr |
@@ -153,6 +155,8 @@ module Parser where
   characterConstantPrimaryVal (Primary (ConstantPrimary x)) = x
 
   stringLiteralPrimaryVal (Primary (StringLiteralPrimary x)) = x
+
+  assignmentVal (Assignment x) = x
 
   parseToken t =
     tokenPrim showTok nextPos testTok
@@ -286,6 +290,10 @@ module Parser where
     try parsePostfixIncrement <|>
     try parsePostfixDecrement <|>
     parsePrimaryExpr
+
+  parseArgumentExprList = do
+    list <- sepBy1 parseAssignmentExpr (parseToken (Token Nothing (OperatorToken (Operator ","))))
+    return (ArgumentExprList (map assignmentVal list))
 
   parsePrefixIncrement = do
     parseToken (Token Nothing (OperatorToken (Operator "++")))
