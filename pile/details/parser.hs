@@ -330,25 +330,28 @@ module Parser where
   parseRemainder = parseBinaryOperator "%" Multiplicative Remainder MultiplicativeValue parseUnaryExpr
 
   parseMultiplicativeExpr =
-    parseProduct <|>
-    parseQuotient <|>
-    parseRemainder
+    try parseProduct <|>
+    try parseQuotient <|>
+    try parseRemainder <|>
+    parseUnaryExpr
 
   parseAddition = parseBinaryOperator "+" Additive Addition AdditiveValue parseMultiplicativeExpr
 
   parseSubtraction = parseBinaryOperator "-" Additive Subtraction AdditiveValue parseMultiplicativeExpr
 
   parseAdditiveExpr =
-    parseAddition <|>
-    parseSubtraction
+    try parseAddition <|>
+    try parseSubtraction <|>
+    parseMultiplicativeExpr
 
   parseLeftShift = parseBinaryOperator "<<" Shift LeftShift ShiftValue parseAdditiveExpr
 
   parseRightShift = parseBinaryOperator ">>" Shift RightShift ShiftValue parseAdditiveExpr
 
   parseShiftExpr =
-    parseLeftShift <|>
-    parseRightShift
+    try parseLeftShift <|>
+    try parseRightShift <|>
+    parseAdditiveExpr
 
   parseLesser = parseBinaryOperator "<" Relational Lesser RelationalValue parseShiftExpr
 
@@ -359,67 +362,73 @@ module Parser where
   parseGreaterOrEqual = parseBinaryOperator ">=" Relational GreaterOrEqual RelationalValue parseShiftExpr
 
   parseRelationalExpr =
-    parseLesser <|>
-    parseGreater <|>
-    parseLesserOrEqual <|>
-    parseGreaterOrEqual
+    try parseLesser <|>
+    try parseGreater <|>
+    try parseLesserOrEqual <|>
+    try parseGreaterOrEqual <|>
+    parseShiftExpr
 
   parseEqual = parseBinaryOperator "==" Equality Equal EqualityValue parseRelationalExpr
 
   parseNotEqual = parseBinaryOperator "!=" Equality NotEqual EqualityValue parseRelationalExpr
 
   parseEqualityExpr =
-    parseEqual <|>
-    parseNotEqual
+    try parseEqual <|>
+    try parseNotEqual <|>
+    parseRelationalExpr
 
-  parseBitwiseAndExpr = parseBinaryOperator "&" BitwiseAnd BitwiseAndExpr BitwiseAndValue parseEqualityExpr
+  parseBitwiseAndExpr =
+    try (parseBinaryOperator "&" BitwiseAnd BitwiseAndExpr BitwiseAndValue parseEqualityExpr) <|>
+    parseEqualityExpr
 
-  parseBitwiseExclusiveOrExpr = parseBinaryOperator "^" BitwiseExclusiveOr BitwiseExclusiveOrExpr BitwiseExclusiveOrValue parseEqualityExpr
+  parseBitwiseExclusiveOrExpr =
+    try (parseBinaryOperator "^" BitwiseExclusiveOr BitwiseExclusiveOrExpr BitwiseExclusiveOrValue parseEqualityExpr) <|>
+    parseBitwiseAndExpr
 
-  parseBitwiseInclusiveOrExpr = parseBinaryOperator "|" BitwiseInclusiveOr BitwiseInclusiveOrExpr BitwiseInclusiveOrValue parseEqualityExpr
+  parseBitwiseInclusiveOrExpr =
+    try (parseBinaryOperator "|" BitwiseInclusiveOr BitwiseInclusiveOrExpr BitwiseInclusiveOrValue parseEqualityExpr) <|>
+    parseBitwiseExclusiveOrExpr
 
-  parseLogicalAndExpr = parseBinaryOperator "&&" LogicalAnd LogicalAndExpr LogicalAndValue parseEqualityExpr
+  parseLogicalAndExpr =
+    try (parseBinaryOperator "&&" LogicalAnd LogicalAndExpr LogicalAndValue parseEqualityExpr) <|>
+    parseBitwiseInclusiveOrExpr
 
-  parseLogicalOrExpr = parseBinaryOperator "||" LogicalOr LogicalOrExpr LogicalOrValue parseEqualityExpr
+  parseLogicalOrExpr =
+    try (parseBinaryOperator "||" LogicalOr LogicalOrExpr LogicalOrValue parseEqualityExpr) <|>
+    parseLogicalAndExpr
 
-  parseConditionalExpr = do
-    firstExpr <- parseLogicalOrExpr
-    parseToken (Token Nothing (OperatorToken (Operator "?")))
-    secondExpr <- parseExpr
-    parseToken (Token Nothing (OperatorToken (Operator ":")))
-    thirdExpr <- parseLogicalOrExpr
-    return (Conditional (ConditionalExpr firstExpr secondExpr thirdExpr))
+  parseConditionalExpr =
+    try (
+      do
+        firstExpr <- parseLogicalOrExpr
+        parseToken (Token Nothing (OperatorToken (Operator "?")))
+        secondExpr <- parseExpr
+        parseToken (Token Nothing (OperatorToken (Operator ":")))
+        thirdExpr <- parseLogicalOrExpr
+        return (Conditional (ConditionalExpr firstExpr secondExpr thirdExpr))) <|>
+    parseLogicalOrExpr
 
-  parseAssignmentExpr = do
-    lhs <- parseUnaryExpr
-    operator <-
-      parseToken (Token Nothing (OperatorToken (Operator "="))) <|>
-      parseToken (Token Nothing (OperatorToken (Operator "*="))) <|>
-      parseToken (Token Nothing (OperatorToken (Operator "/="))) <|>
-      parseToken (Token Nothing (OperatorToken (Operator "%="))) <|>
-      parseToken (Token Nothing (OperatorToken (Operator "+="))) <|>
-      parseToken (Token Nothing (OperatorToken (Operator "-="))) <|>
-      parseToken (Token Nothing (OperatorToken (Operator "<<="))) <|>
-      parseToken (Token Nothing (OperatorToken (Operator ">>="))) <|>
-      parseToken (Token Nothing (OperatorToken (Operator "&="))) <|>
-      parseToken (Token Nothing (OperatorToken (Operator "^="))) <|>
-      parseToken (Token Nothing (OperatorToken (Operator "|=")))
-    rhs <- parseUnaryExpr
-    return (Assignment (AssignmentExpr lhs (operatorTokenVal (tokenVal operator)) rhs))
+  parseAssignmentExpr =
+    try (
+    do
+      lhs <- parseUnaryExpr
+      operator <-
+        parseToken (Token Nothing (OperatorToken (Operator "="))) <|>
+        parseToken (Token Nothing (OperatorToken (Operator "*="))) <|>
+        parseToken (Token Nothing (OperatorToken (Operator "/="))) <|>
+        parseToken (Token Nothing (OperatorToken (Operator "%="))) <|>
+        parseToken (Token Nothing (OperatorToken (Operator "+="))) <|>
+        parseToken (Token Nothing (OperatorToken (Operator "-="))) <|>
+        parseToken (Token Nothing (OperatorToken (Operator "<<="))) <|>
+        parseToken (Token Nothing (OperatorToken (Operator ">>="))) <|>
+        parseToken (Token Nothing (OperatorToken (Operator "&="))) <|>
+        parseToken (Token Nothing (OperatorToken (Operator "^="))) <|>
+        parseToken (Token Nothing (OperatorToken (Operator "|=")))
+      rhs <- parseUnaryExpr
+      return (Assignment (AssignmentExpr lhs (operatorTokenVal (tokenVal operator)) rhs))) <|>
+    parseConditionalExpr
 
-  parseExpr =
-    try parseAssignmentExpr <|>
-    try parseConditionalExpr <|>
-    try parseLogicalOrExpr <|>
-    try parseLogicalAndExpr <|>
-    try parseBitwiseInclusiveOrExpr <|>
-    try parseBitwiseExclusiveOrExpr <|>
-    try parseBitwiseAndExpr <|>
-    try parseEqualityExpr <|>
-    try parseRelationalExpr <|>
-    try parseShiftExpr <|>
-    try parseAdditiveExpr <|>
-    try parseMultiplicativeExpr
+  parseExpr = parseAssignmentExpr
 
   parseDeclaration = do
     specifiers <- parseDeclarationSpecifiers
