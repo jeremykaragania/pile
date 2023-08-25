@@ -419,10 +419,13 @@ module Parser where
     parseLogicalOrExpr
 
 
-  parseAssignmentExpr = do
-    lookAhead parseLookAhead
-    expr <- chainr1 parseAssignmentValue parseAssignmentOperator
-    return (Assignment expr)
+  parseAssignmentExpr =
+    try (
+      do
+        lookAhead parseLookAhead
+        expr <- chainr1 parseAssignmentValue parseAssignmentOperator
+        return (Assignment expr)) <|>
+    parseConditionalExpr
     where
       parseLookAhead = do
         parseAssignmentValue
