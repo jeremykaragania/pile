@@ -34,7 +34,7 @@ module Parser where
     PostfixIncrement Expr |
     PostfixDecrement Expr deriving Show
 
-  data ArgumentExprList = ArgumentExprList [AssignmentExpr]
+  data ArgumentExprList = ArgumentExprList [AssignmentExpr] deriving Show
 
   data UnaryExpr =
     PrefixIncrement Expr |
@@ -94,7 +94,9 @@ module Parser where
 
   data ConditionalExpr = ConditionalExpr Expr Expr Expr deriving Show
 
-  data AssignmentExpr = AssignmentExpr Expr Operator Expr deriving Show
+  data AssignmentExpr =
+    AssignmentValue Expr |
+    AssignmentExpr Operator AssignmentExpr AssignmentExpr deriving Show
 
   data Declaration = Declaration DeclarationSpecifiers (Maybe InitDeclaratorList) deriving Show
 
@@ -416,25 +418,33 @@ module Parser where
         return (Conditional (ConditionalExpr firstExpr secondExpr thirdExpr))) <|>
     parseLogicalOrExpr
 
-  parseAssignmentExpr =
-    try (
-    do
-      lhs <- parseUnaryExpr
-      operator <-
-        parseToken (Token Nothing (OperatorToken (Operator "="))) <|>
-        parseToken (Token Nothing (OperatorToken (Operator "*="))) <|>
-        parseToken (Token Nothing (OperatorToken (Operator "/="))) <|>
-        parseToken (Token Nothing (OperatorToken (Operator "%="))) <|>
-        parseToken (Token Nothing (OperatorToken (Operator "+="))) <|>
-        parseToken (Token Nothing (OperatorToken (Operator "-="))) <|>
-        parseToken (Token Nothing (OperatorToken (Operator "<<="))) <|>
-        parseToken (Token Nothing (OperatorToken (Operator ">>="))) <|>
-        parseToken (Token Nothing (OperatorToken (Operator "&="))) <|>
-        parseToken (Token Nothing (OperatorToken (Operator "^="))) <|>
-        parseToken (Token Nothing (OperatorToken (Operator "|=")))
-      rhs <- parseUnaryExpr
-      return (Assignment (AssignmentExpr lhs (operatorTokenVal (tokenVal operator)) rhs))) <|>
-    parseConditionalExpr
+
+  parseAssignmentExpr = do
+    lookAhead parseLookAhead
+    expr <- chainr1 parseAssignmentValue parseAssignmentOperator
+    return (Assignment expr)
+    where
+      parseLookAhead = do
+        parseAssignmentValue
+        parseAssignmentOperator
+        parseAssignmentValue
+      parseAssignmentValue = do
+        val <- parseUnaryExpr
+        return (AssignmentValue val)
+      parseAssignmentOperator = do
+        operator <-
+          parseToken (Token Nothing (OperatorToken (Operator "="))) <|>
+          parseToken (Token Nothing (OperatorToken (Operator "*="))) <|>
+          parseToken (Token Nothing (OperatorToken (Operator "/="))) <|>
+          parseToken (Token Nothing (OperatorToken (Operator "%="))) <|>
+          parseToken (Token Nothing (OperatorToken (Operator "+="))) <|>
+          parseToken (Token Nothing (OperatorToken (Operator "-="))) <|>
+          parseToken (Token Nothing (OperatorToken (Operator "<<="))) <|>
+          parseToken (Token Nothing (OperatorToken (Operator ">>="))) <|>
+          parseToken (Token Nothing (OperatorToken (Operator "&="))) <|>
+          parseToken (Token Nothing (OperatorToken (Operator "^="))) <|>
+          parseToken (Token Nothing (OperatorToken (Operator "|=")))
+        return (AssignmentExpr (operatorTokenVal (tokenVal operator)))
 
   parseExpr = parseAssignmentExpr
 
