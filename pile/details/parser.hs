@@ -29,6 +29,7 @@ module Parser where
   data PostfixExpr =
     PostfixValue Expr |
     ArraySubscript Expr Expr |
+    FunctionCall Expr ArgumentExprList |
     StructMember PostfixExpr PostfixExpr |
     UnionMember PostfixExpr PostfixExpr|
     PostfixIncrement Expr |
@@ -245,6 +246,13 @@ module Parser where
     parseToken (Token Nothing (OperatorToken (Operator "]")))
     return (Postfix (ArraySubscript firstExpr secondExpr))
 
+  parseFunctionCall = do
+    expr <- parsePrimaryExpr
+    parseToken (Token Nothing (OperatorToken (Operator "(")))
+    list <- parseArgumentExprList
+    parseToken (Token Nothing (OperatorToken (Operator ")")))
+    return (Postfix (FunctionCall expr list))
+
   parseStructMember = do
     lookAhead parseLookAhead
     expr <- chainl1 parsePostfixValue parsePostfixOperator
@@ -289,6 +297,7 @@ module Parser where
 
   parsePostfixExpr =
     try parseArraySubscript <|>
+    try parseFunctionCall <|>
     try parseStructMember <|>
     try parseUnionMember <|>
     try parsePostfixIncrement <|>
