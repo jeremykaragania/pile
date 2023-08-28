@@ -3,163 +3,105 @@ module Parser where
   import Data.Functor.Identity
   import Text.Parsec
 
-  data Expr =
-    Primary PrimaryExpr |
-    Postfix PostfixExpr |
-    Unary UnaryExpr |
-    Multiplicative MultiplicativeExpr |
-    Additive AdditiveExpr |
-    Shift ShiftExpr |
-    Relational RelationalExpr |
-    Equality EqualityExpr |
-    BitwiseAnd BitwiseAndExpr |
-    BitwiseExclusiveOr BitwiseExclusiveOrExpr |
-    BitwiseInclusiveOr BitwiseInclusiveOrExpr |
-    LogicalAnd LogicalAndExpr |
-    LogicalOr LogicalOrExpr |
-    Conditional ConditionalExpr |
-    Assignment AssignmentExpr deriving Show
+  data Expression =
+    EIdentifier Identifier |
+    EConstant Constant |
+    EStringLiteral StringLiteral |
+    EParens Expression |
+    EArraySubscript Expression [Expression] |
+    EFunctionCall Expression Expression |
+    EStructOrUnionMember Expression [Expression] |
+    EPostfixIncrement Expression |
+    EPostfixDecrement Expression |
+    EArgumentList [Expression] |
+    EPrefixIncrement Expression |
+    EPrefixDecrement Expression |
+    EAddressOperator Expression |
+    EIndirectionOperator Expression |
+    EArithmeticOperator (Operator, Expression) |
+    ESizeofEUnary Expression |
+    ESizeofTypeName Declaration |
+    ECast Declaration Expression |
+    EProduct Expression [Expression] |
+    EQuotient Expression [Expression] |
+    ERemainder Expression [Expression] |
+    EAddition Expression [Expression] |
+    ESubtraction Expression [Expression] |
+    ELeftShift Expression [Expression] |
+    ERightShift Expression [Expression] |
+    ELesser Expression [Expression] |
+    EGreater Expression [Expression] |
+    ELesserOrEqual Expression [Expression] |
+    EGreaterOrEqual Expression [Expression] |
+    EEqual Expression [Expression] |
+    ENotEqual Expression [Expression] |
+    EBitwiseAnd Expression [Expression] |
+    EBitwiseExclusiveOr Expression [Expression] |
+    EBitwiseInclusiveOr Expression [Expression] |
+    ELogicalAnd Expression [Expression] |
+    ELogicalOr Expression [Expression] |
+    EConditional Expression Expression Expression |
+    EAssignment Expression [(Operator, Expression)] deriving Show
 
-  data PrimaryExpr =
-    IdentifierPrimary Identifier |
-    ConstantPrimary Constant |
-    StringLiteralPrimary StringLiteral |
-    ParensExprPrimary Expr deriving Show
-
-  data PostfixExpr =
-    PostfixValue Expr |
-    ArraySubscript Expr Expr |
-    FunctionCall Expr ArgumentExprList |
-    StructMember PostfixExpr PostfixExpr |
-    UnionMember PostfixExpr PostfixExpr|
-    PostfixIncrement Expr |
-    PostfixDecrement Expr deriving Show
-
-  data ArgumentExprList = ArgumentExprList [AssignmentExpr] deriving Show
-
-  data UnaryExpr =
-    PrefixIncrement Expr |
-    PrefixDecrement Expr |
-    AddressOperator Expr |
-    IndirectionOperator Expr |
-    ArithmeticOperator Expr |
-    SizeofOperator (Either UnaryExpr String) deriving Show
-
-  data MultiplicativeExpr =
-    MultiplicativeValue Expr |
-    Product MultiplicativeExpr MultiplicativeExpr |
-    Quotient MultiplicativeExpr MultiplicativeExpr |
-    Remainder MultiplicativeExpr MultiplicativeExpr deriving Show
-
-  data AdditiveExpr =
-    AdditiveValue Expr |
-    Addition AdditiveExpr AdditiveExpr |
-    Subtraction AdditiveExpr AdditiveExpr deriving Show
-
-  data ShiftExpr =
-    ShiftValue Expr |
-    LeftShift ShiftExpr ShiftExpr |
-    RightShift ShiftExpr ShiftExpr deriving Show
-
-  data RelationalExpr =
-    RelationalValue Expr |
-    Lesser RelationalExpr RelationalExpr |
-    Greater RelationalExpr RelationalExpr |
-    LesserOrEqual RelationalExpr RelationalExpr |
-    GreaterOrEqual RelationalExpr RelationalExpr deriving Show
-
-  data EqualityExpr =
-    EqualityValue Expr |
-    Equal EqualityExpr EqualityExpr |
-    NotEqual EqualityExpr EqualityExpr deriving Show
-
-  data BitwiseAndExpr =
-    BitwiseAndValue Expr |
-    BitwiseAndExpr BitwiseAndExpr BitwiseAndExpr deriving Show
-
-  data BitwiseExclusiveOrExpr =
-    BitwiseExclusiveOrValue Expr |
-    BitwiseExclusiveOrExpr BitwiseExclusiveOrExpr BitwiseExclusiveOrExpr deriving Show
-
-  data BitwiseInclusiveOrExpr =
-    BitwiseInclusiveOrValue Expr |
-    BitwiseInclusiveOrExpr BitwiseInclusiveOrExpr BitwiseInclusiveOrExpr deriving Show
-
-  data LogicalAndExpr =
-    LogicalAndValue Expr |
-    LogicalAndExpr LogicalAndExpr LogicalAndExpr deriving Show
-
-  data LogicalOrExpr =
-    LogicalOrValue Expr |
-    LogicalOrExpr LogicalOrExpr LogicalOrExpr deriving Show
-
-  data ConditionalExpr = ConditionalExpr Expr Expr Expr deriving Show
-
-  data AssignmentExpr =
-    AssignmentValue Expr |
-    AssignmentExpr Operator AssignmentExpr AssignmentExpr deriving Show
-
-  data Declaration = Declaration DeclarationSpecifiers (Maybe InitDeclaratorList) deriving Show
-
-  data DeclarationSpecifiers = DeclarationSpecifiers [DeclarationSpecifier] deriving Show
-
-  data InitDeclaratorList = InitDeclaratorList [InitDeclarator] deriving Show
-
-  data InitDeclarator = InitDeclarator Declarator deriving Show
-
-  data DeclarationSpecifier =
-    StorageClassSpecifier Keyword |
-    TypeSpecifier Keyword |
-    TypeQualifier Keyword deriving Show
-
-  data Declarator = Declarator (Maybe Pointer) DirectDeclarator deriving Show
-
-  data DirectDeclarator = DirectDeclaratorIdentifier Identifier deriving Show
-
-  data Pointer = Pointer (Maybe TypeQualifierList) deriving Show
-
-  data TypeQualifierList = TypeQualifierList [DeclarationSpecifier]  deriving Show
-
-  data ParameterTypeList =
-    ParamterTypeList [ParameterList] |
-    ParameterTypeListElipsis [ParameterList] deriving Show
-
-  data ParameterList = ParameterList [ParameterDeclaration] deriving Show
-
-  data ParameterDeclaration = ParamterDeclaration deriving Show
-
-  data IdentifierList = IdentifierList [Identifier] deriving Show
+  data Declaration =
+    DDeclaration Declaration (Maybe Declaration) |
+    DSpecifiers [Declaration] |
+    DInitDeclaratorList [Declaration] |
+    DInitDeclarator Declaration Expression |
+    DStorageClassSpecifier Keyword |
+    DTypeSpecifier Keyword |
+    DStructOrUnionSpecifierComplete (Maybe Identifier) Declaration |
+    DStructOrUnionSpecifierIncomplete Identifier |
+    DStructOrUnion Keyword |
+    DStructDeclarationList [Declaration] |
+    DStructDeclaration Declaration Declaration |
+    DSpecifierQualifierList [Declaration] |
+    DStructDeclaratorList [Declaration] |
+    DStructDeclarator (Maybe Declaration) Expression |
+    DEnumSpecifierComplete (Maybe Identifier) Declaration |
+    DEnumSpecifierIncomplete Identifier |
+    DEnumeratorList [Declaration] |
+    DEnumerator Expression Expression |
+    DTypeQualifier Keyword |
+    DDeclarator (Maybe Declaration) Declaration |
+    DDirectDeclaratorIdentifier Expression |
+    DDirectDeclaratorParens Declaration |
+    DDirectDeclaratorArraySubscript Declaration |
+    DDirectDeclaratorFunctionCall Declaration |
+    DPointer (Maybe Declaration) |
+    DTypeQualifierList [Declaration] |
+    DParameterTypeList [Declaration] |
+    DParameterList [Declaration] |
+    DParameterDeclaration Declaration Declaration |
+    DParameterDeclarationAbstract Declaration (Maybe Declaration) |
+    DIdentifierList [Expression] |
+    DTypeName Declaration (Maybe Declaration) |
+    DAbstractDeclarator (Maybe Declaration) Declaration |
+    DDirectAbstractDeclaratorParens Declaration |
+    DDirectAbstractDeclaratorArraySubscript Declaration |
+    DDirectAbstractDeclaratorFunctionCall Declaration |
+    DTypedefName Expression |
+    DInitializer (Either Expression Declaration) |
+    DInitializerList [Declaration] deriving Show
 
   data Statement =
-    LabeledIdentifierStatement Identifier Statement |
-    LabeledCaseStatement Expr Statement |
-    LabeledDefaultStatement Statement |
-    DeclarationList Declaration |
-    StatementList Statement |
-    CompoundStatement [Statement] |
-    ExprStatement (Maybe Expr) |
-    IfStatement Expr Statement |
-    IfElseStatement Expr Statement Statement |
-    SwitchStatement Expr Statement |
-    WhileStatement Expr Statement |
-    DoStatement Statement Expr |
-    ForStatement (Maybe Expr) (Maybe Expr) (Maybe Expr) Statement |
-    GotoStatement Identifier |
-    ContinueStatement |
-    BreakStatement |
-    ReturnStatement (Maybe Expr) deriving Show
-
-  identifierPrimaryVal (Primary (IdentifierPrimary x)) = x
-
-  floatingConstantPrimaryVal (Primary (ConstantPrimary (FloatingConstant x))) = x
-
-  integerConstantPrimaryVal (Primary (ConstantPrimary x)) = x
-
-  characterConstantPrimaryVal (Primary (ConstantPrimary x)) = x
-
-  stringLiteralPrimaryVal (Primary (StringLiteralPrimary x)) = x
-
-  assignmentVal (Assignment x) = x
+    SLabeledIdentifier Expression Statement |
+    SLabeledCase Expression Statement |
+    SLabeledDefault Statement |
+    SDeclarationList Declaration |
+    SList Statement |
+    SCompound [Statement] |
+    SExpression (Maybe Expression) |
+    SIf Expression Statement |
+    SIfElse Expression Statement Statement |
+    SSwitch Expression Statement |
+    SWhile Expression Statement |
+    SDo Statement Expression |
+    SFor (Maybe Expression) (Maybe Expression) (Maybe Expression) Statement |
+    SGoto Expression |
+    SContinue |
+    SBreak |
+    SReturn (Maybe Expression) deriving Show
 
   parseToken t =
     tokenPrim showTok nextPos testTok
@@ -168,285 +110,235 @@ module Parser where
       nextPos pos x xs = pos
       testTok x = if x == t then Just x else Nothing
 
-  parseIdentifier =
+  parseTokenValue testTok =
     tokenPrim showTok nextPos testTok
     where
       showTok x = show x
       nextPos pos x xs = pos
-      testTok (Token pos (IdentifierToken (Identifier x))) = Just (Primary (IdentifierPrimary (Identifier x)))
-      testTok x = Nothing
 
-  parseFloatingConstant =
-    tokenPrim showTok nextPos testTok
+  parseIdentifierToken =
+    parseTokenValue testTok
     where
-      showTok x = show x
-      nextPos pos x xs = pos
-      testTok (Token pos (ConstantToken (FloatingConstant x))) = Just (Primary (ConstantPrimary (FloatingConstant x)))
+      testTok (Token pos (IdentifierToken x)) = Just x
       testTok x = Nothing
 
-  parseIntegerConstant =
-    tokenPrim showTok nextPos testTok
+  parseConstantToken =
+    parseTokenValue testTok
     where
-      showTok x = show x
-      nextPos pos x xs = pos
-      testTok (Token pos (ConstantToken (IntegerConstant x))) = Just (Primary (ConstantPrimary (IntegerConstant x)))
+      testTok (Token pos (ConstantToken x)) = Just x
       testTok x = Nothing
 
-  parseCharacterConstant =
-    tokenPrim showTok nextPos testTok
+  parseStringLiteralToken =
+    parseTokenValue testTok
     where
-      showTok x = show x
-      nextPos pos x xs = pos
-      testTok (Token pos (ConstantToken (CharacterConstant x))) = Just (Primary (ConstantPrimary (CharacterConstant x)))
+      testTok (Token pos (StringLiteralToken x)) = Just x
       testTok x = Nothing
 
-  parseStringLiteral =
-    tokenPrim showTok nextPos testTok
-    where
-      showTok x = show x
-      nextPos pos x xs = pos
-      testTok (Token pos (StringLiteralToken (StringLiteral x))) = Just (Primary (StringLiteralPrimary (StringLiteral x)))
-      testTok x = Nothing
+  parseEIdentifier = do
+    expr <- parseIdentifierToken
+    return (EIdentifier expr)
 
-  parseParensExpr = do
+  parseEConstant = do
+    expr <- parseConstantToken
+    return (EConstant expr)
+
+  parseEStringLiteral = do
+    expr <- parseStringLiteralToken
+    return (EStringLiteral expr)
+
+  parseEParens = do
     parseToken (Token Nothing (OperatorToken (Operator "(")))
-    expr <- parseExpr
+    expr <- parseEPrimary
     parseToken (Token Nothing (OperatorToken (Operator ")")))
-    return (Primary (ParensExprPrimary expr))
+    return (EParens expr)
 
-  parsePrimaryExpr =
-    parseIdentifier <|>
-    parseFloatingConstant <|>
-    parseIntegerConstant <|>
-    parseCharacterConstant <|>
-    parseStringLiteral <|>
-    parseParensExpr
+  parseEPrimary =
+      parseEIdentifier <|>
+      parseEConstant <|>
+      parseEStringLiteral<|>
+      parseEParens
 
-  parseBinaryOperator :: String -> (t -> b) -> (t -> t -> t) -> (Expr -> t) -> ParsecT [Token] u Identity Expr -> ParsecT [Token] u Identity b
-  parseBinaryOperator a b c d e = do
-    lookAhead parseLookAhead
-    expr <- chainl1 parseBinaryValue parseBinaryOperator
-    return (b expr)
+  parseLeftRecursion parseLeft parseRight a = do
+    left <- parseLeft
+    right <- many1 (parseRight)
+    return (a left right)
+
+  parseBinaryOperator :: String -> ParsecT [Token] u Identity Expression -> (Expression -> [Expression] -> Expression) -> ParsecT [Token] u Identity Expression
+  parseBinaryOperator a b c = do
+    parseLeftRecursion parseLeft parseRight c
     where
-      parseLookAhead = do
-        parseBinaryValue
-        parseBinaryOperator
-        parseBinaryValue
-      parseBinaryValue = do
-        val <- e
-        return (d val)
-      parseBinaryOperator = do
+      parseLeft = b
+      parseRight = do
         parseToken (Token Nothing (OperatorToken (Operator a)))
-        return c
+        expr <- parseLeft
+        return expr
 
-  parseArraySubscript = do
-    firstExpr <- parsePrimaryExpr
-    parseToken (Token Nothing (OperatorToken (Operator "[")))
-    secondExpr <- parsePrimaryExpr
-    parseToken (Token Nothing (OperatorToken (Operator "]")))
-    return (Postfix (ArraySubscript firstExpr secondExpr))
+  parseEArraySubscript =
+    parseLeftRecursion parseLeft parseRight EArraySubscript
+    where
+      parseLeft = parseEPrimary
+      parseRight = between (parseToken (Token Nothing (OperatorToken (Operator "[")))) (parseToken (Token Nothing (OperatorToken (Operator "]")))) parseEPrimary
 
-  parseFunctionCall = do
-    expr <- parsePrimaryExpr
+  parseEFunctionCall = do
+    expr <- parseEPrimary
     parseToken (Token Nothing (OperatorToken (Operator "(")))
-    list <- parseArgumentExprList
+    list <- parseEArgumentList
     parseToken (Token Nothing (OperatorToken (Operator ")")))
-    return (Postfix (FunctionCall expr list))
+    return (EFunctionCall expr list)
 
-  parseStructMember = do
-    lookAhead parseLookAhead
-    expr <- chainl1 parsePostfixValue parsePostfixOperator
-    return (Postfix expr)
+  parseEStructOrUnionMember = do
+    parseLeftRecursion parseLeft parseRight EStructOrUnionMember
     where
-      parseLookAhead = do
-        parsePostfixValue
-        parsePostfixOperator
-        parsePostfixValue
-      parsePostfixValue = do
-        val <- parsePrimaryExpr
-        return (PostfixValue val)
-      parsePostfixOperator = do
-        parseToken (Token Nothing (OperatorToken (Operator "."))) <|> parseToken (Token Nothing (OperatorToken (Operator "->")))
-        return StructMember
+      parseLeft = parseEPrimary
+      parseRight = do
+        (parseToken (Token Nothing (OperatorToken (Operator "."))) <|> parseToken (Token Nothing (OperatorToken (Operator "->"))))
+        expr <- parseLeft
+        return expr
 
-  parseUnionMember = do
-    lookAhead parseLookAhead
-    expr <- chainl1 parsePostfixValue parsePostfixOperator
-    return (Postfix expr)
-    where
-      parseLookAhead = do
-        parsePostfixValue
-        parsePostfixOperator
-        parsePostfixValue
-      parsePostfixValue = do
-        val <- parsePrimaryExpr
-        return (PostfixValue val)
-      parsePostfixOperator = do
-        parseToken (Token Nothing (OperatorToken (Operator "."))) <|> parseToken (Token Nothing (OperatorToken (Operator "->")))
-        return UnionMember
-
-  parsePostfixIncrement = do
-    expr <- parsePrimaryExpr
+  parseEPostfixIncrement = do
+    expr <- parseEPrimary
     parseToken (Token Nothing (OperatorToken (Operator "++")))
-    return (Postfix (PostfixIncrement expr))
+    return (EPostfixIncrement expr)
 
-  parsePostfixDecrement = do
-    expr <- parsePrimaryExpr
+  parseEPostfixDecrement = do
+    expr <- parseEPrimary
     parseToken (Token Nothing (OperatorToken (Operator "--")))
-    return (Postfix (PostfixDecrement expr))
+    return (EPostfixDecrement expr)
 
-  parsePostfixExpr =
-    try parseArraySubscript <|>
-    try parseFunctionCall <|>
-    try parseStructMember <|>
-    try parseUnionMember <|>
-    try parsePostfixIncrement <|>
-    try parsePostfixDecrement <|>
-    parsePrimaryExpr
+  parseEPostfix =
+    try parseEArraySubscript <|>
+    try parseEStructOrUnionMember <|>
+    try parseEFunctionCall <|>
+    try parseEStructOrUnionMember <|>
+    try parseEPostfixIncrement <|>
+    try parseEPostfixDecrement <|>
+    parseEPrimary
 
-  parseArgumentExprList = do
-    list <- sepBy1 parseAssignmentExpr (parseToken (Token Nothing (OperatorToken (Operator ","))))
-    return (ArgumentExprList (map assignmentVal list))
+  parseEArgumentList = do
+    list <- sepBy1 parseEAssignment (parseToken (Token Nothing (OperatorToken (Operator ","))))
+    return (EArgumentList list)
 
-  parsePrefixIncrement = do
+  parseEPrefixIncrement = do
     parseToken (Token Nothing (OperatorToken (Operator "++")))
-    expr <- parsePostfixExpr
-    return (Unary (PrefixIncrement expr))
+    expr <- parseEPostfix
+    return (EPrefixIncrement expr)
 
-  parsePrefixDecrement = do
+  parseEPrefixDecrement = do
     parseToken (Token Nothing (OperatorToken (Operator "--")))
-    expr <- parsePostfixExpr
-    return (Unary (PrefixDecrement expr))
+    expr <- parseEPostfix
+    return (EPrefixDecrement expr)
 
-  parseAddressOperator = do
+  parseEAddressOperator = do
     parseToken (Token Nothing (OperatorToken (Operator "&")))
-    expr <- parsePostfixExpr
-    return (Unary (AddressOperator expr))
+    expr <- parseEPostfix
+    return (EAddressOperator expr)
 
-  parseIndirectionOperator = do
+  parseEIndirectionOperator = do
     parseToken (Token Nothing (OperatorToken (Operator "*")))
-    expr <- parsePostfixExpr
-    return (Unary (IndirectionOperator expr))
+    expr <- parseEPostfix
+    return (EIndirectionOperator expr)
 
-  parseArithmeticOperator = do
-    parseToken (Token Nothing (OperatorToken (Operator "+"))) <|>
+  parseEArithmeticOperator = do
+    op <- parseToken (Token Nothing (OperatorToken (Operator "+"))) <|>
       parseToken (Token Nothing (OperatorToken (Operator "-"))) <|>
       parseToken (Token Nothing (OperatorToken (Operator "~"))) <|>
       parseToken (Token Nothing (OperatorToken (Operator "!")))
-    expr <- parsePostfixExpr
-    return (Unary (ArithmeticOperator expr))
+    expr <- parseEPostfix
+    return (EArithmeticOperator ((operatorTokenValue (tokenValue op)), expr))
 
-  parseUnaryExpr =
-    try parsePrefixIncrement <|>
-    try parsePrefixDecrement <|>
-    try parseAddressOperator <|>
-    try parseIndirectionOperator <|>
-    try parseArithmeticOperator <|>
-    parsePostfixExpr
+  parseEUnary =
+    try parseEPrefixIncrement <|>
+    try parseEPrefixDecrement <|>
+    try parseEAddressOperator <|>
+    try parseEIndirectionOperator <|>
+    try parseEArithmeticOperator <|>
+    parseEPostfix
 
-  parseProduct = parseBinaryOperator "*" Multiplicative Product MultiplicativeValue parseUnaryExpr
+  parseECast = parseEUnary
 
-  parseQuotient = parseBinaryOperator "/" Multiplicative Quotient MultiplicativeValue parseUnaryExpr
+  parseEProduct = parseBinaryOperator "*" parseECast EProduct
 
-  parseRemainder = parseBinaryOperator "%" Multiplicative Remainder MultiplicativeValue parseUnaryExpr
+  parseEQuotient = parseBinaryOperator "/" parseECast EQuotient
 
-  parseMultiplicativeExpr =
-    try parseProduct <|>
-    try parseQuotient <|>
-    try parseRemainder <|>
-    parseUnaryExpr
+  parseERemainder = parseBinaryOperator "%" parseECast ERemainder
 
-  parseAddition = parseBinaryOperator "+" Additive Addition AdditiveValue parseMultiplicativeExpr
+  parseEMultiplicative =
+    try parseEProduct <|>
+    try parseEQuotient <|>
+    try parseERemainder <|>
+    parseECast
 
-  parseSubtraction = parseBinaryOperator "-" Additive Subtraction AdditiveValue parseMultiplicativeExpr
+  parseEAddition = parseBinaryOperator "+" parseEMultiplicative EAddition
 
-  parseAdditiveExpr =
-    try parseAddition <|>
-    try parseSubtraction <|>
-    parseMultiplicativeExpr
+  parseESubtraction = parseBinaryOperator "-" parseEMultiplicative EAddition
 
-  parseLeftShift = parseBinaryOperator "<<" Shift LeftShift ShiftValue parseAdditiveExpr
+  parseEAdditive =
+    try parseEAddition <|>
+    try parseESubtraction <|>
+    parseEMultiplicative
 
-  parseRightShift = parseBinaryOperator ">>" Shift RightShift ShiftValue parseAdditiveExpr
+  parseELeftShift = parseBinaryOperator "<<" parseEAdditive ELeftShift
 
-  parseShiftExpr =
-    try parseLeftShift <|>
-    try parseRightShift <|>
-    parseAdditiveExpr
+  parseERightShift = parseBinaryOperator ">>" parseEAdditive ELeftShift
 
-  parseLesser = parseBinaryOperator "<" Relational Lesser RelationalValue parseShiftExpr
+  parseEShift =
+    try parseELeftShift <|>
+    try parseERightShift <|>
+    parseEAdditive
 
-  parseGreater = parseBinaryOperator ">" Relational Greater RelationalValue parseShiftExpr
+  parseELesser = parseBinaryOperator "<" parseEShift ELesser
 
-  parseLesserOrEqual = parseBinaryOperator "<=" Relational LesserOrEqual RelationalValue parseShiftExpr
+  parseEGreater = parseBinaryOperator ">" parseEShift EGreater
 
-  parseGreaterOrEqual = parseBinaryOperator ">=" Relational GreaterOrEqual RelationalValue parseShiftExpr
+  parseELesserOrEqual = parseBinaryOperator "<=" parseEShift ELesserOrEqual
 
-  parseRelationalExpr =
-    try parseLesser <|>
-    try parseGreater <|>
-    try parseLesserOrEqual <|>
-    try parseGreaterOrEqual <|>
-    parseShiftExpr
+  parseEGreaterOrEqual = parseBinaryOperator ">=" parseEShift EGreaterOrEqual
 
-  parseEqual = parseBinaryOperator "==" Equality Equal EqualityValue parseRelationalExpr
+  parseERelational =
+    try parseELesser <|>
+    try parseEGreater <|>
+    try parseELesserOrEqual <|>
+    try parseEGreaterOrEqual <|>
+    parseEShift
 
-  parseNotEqual = parseBinaryOperator "!=" Equality NotEqual EqualityValue parseRelationalExpr
+  parseEEqual = parseBinaryOperator "==" parseEShift EEqual
 
-  parseEqualityExpr =
-    try parseEqual <|>
-    try parseNotEqual <|>
-    parseRelationalExpr
+  parseENotEqual = parseBinaryOperator "!=" parseEShift ENotEqual
 
-  parseBitwiseAndExpr =
-    try (parseBinaryOperator "&" BitwiseAnd BitwiseAndExpr BitwiseAndValue parseEqualityExpr) <|>
-    parseEqualityExpr
+  parseEquality =
+    try parseEEqual <|>
+    try parseENotEqual <|>
+    parseERelational
 
-  parseBitwiseExclusiveOrExpr =
-    try (parseBinaryOperator "^" BitwiseExclusiveOr BitwiseExclusiveOrExpr BitwiseExclusiveOrValue parseEqualityExpr) <|>
-    parseBitwiseAndExpr
+  parseEBitwiseAnd =
+    try (parseBinaryOperator "&" parseEquality EBitwiseAnd) <|>
+    parseEquality
 
-  parseBitwiseInclusiveOrExpr =
-    try (parseBinaryOperator "|" BitwiseInclusiveOr BitwiseInclusiveOrExpr BitwiseInclusiveOrValue parseEqualityExpr) <|>
-    parseBitwiseExclusiveOrExpr
+  parseEBitwiseExclusiveOr =
+    try (parseBinaryOperator "|" parseEquality EBitwiseExclusiveOr) <|>
+    parseEBitwiseAnd
 
-  parseLogicalAndExpr =
-    try (parseBinaryOperator "&&" LogicalAnd LogicalAndExpr LogicalAndValue parseEqualityExpr) <|>
-    parseBitwiseInclusiveOrExpr
+  parseEBitwiseInclusiveOr =
+    try (parseBinaryOperator "|" parseEquality EBitwiseInclusiveOr) <|>
+    parseEBitwiseExclusiveOr
 
-  parseLogicalOrExpr =
-    try (parseBinaryOperator "||" LogicalOr LogicalOrExpr LogicalOrValue parseEqualityExpr) <|>
-    parseLogicalAndExpr
+  parseELogicalAnd =
+    try (parseBinaryOperator "&&" parseEquality EBitwiseInclusiveOr) <|>
+    parseEBitwiseInclusiveOr
 
-  parseConditionalExpr =
-    try (
-      do
-        firstExpr <- parseLogicalOrExpr
-        parseToken (Token Nothing (OperatorToken (Operator "?")))
-        secondExpr <- parseExpr
-        parseToken (Token Nothing (OperatorToken (Operator ":")))
-        thirdExpr <- parseLogicalOrExpr
-        return (Conditional (ConditionalExpr firstExpr secondExpr thirdExpr))) <|>
-    parseLogicalOrExpr
+  parseELogicalOr =
+    try (parseBinaryOperator "||" parseEquality EBitwiseInclusiveOr) <|>
+    parseELogicalAnd
 
+  parseEConditional = parseELogicalOr
 
-  parseAssignmentExpr =
-    try (
-      do
-        lookAhead parseLookAhead
-        expr <- chainr1 parseAssignmentValue parseAssignmentOperator
-        return (Assignment expr)) <|>
-    parseConditionalExpr
+  parseEAssignment =
+    try (parseLeftRecursion parseLeft parseRight EAssignment) <|>
+    parseEConditional
     where
-      parseLookAhead = do
-        parseAssignmentValue
-        parseAssignmentOperator
-        parseAssignmentValue
-      parseAssignmentValue = do
-        val <- parseUnaryExpr
-        return (AssignmentValue val)
-      parseAssignmentOperator = do
-        operator <-
+      parseLeft = parseEUnary
+      parseRight = do
+        op <-
           parseToken (Token Nothing (OperatorToken (Operator "="))) <|>
           parseToken (Token Nothing (OperatorToken (Operator "*="))) <|>
           parseToken (Token Nothing (OperatorToken (Operator "/="))) <|>
@@ -458,38 +350,48 @@ module Parser where
           parseToken (Token Nothing (OperatorToken (Operator "&="))) <|>
           parseToken (Token Nothing (OperatorToken (Operator "^="))) <|>
           parseToken (Token Nothing (OperatorToken (Operator "|=")))
-        return (AssignmentExpr (operatorTokenVal (tokenVal operator)))
+        expr <- parseLeft
+        return (operatorTokenValue (tokenValue op), expr)
 
-  parseExpr = parseAssignmentExpr
+  parseExpression = parseEAssignment
 
   parseDeclaration = do
-    specifiers <- parseDeclarationSpecifiers
-    declarator <- optionMaybe parseInitDeclaratorList
+    spec <- parseDSpecifiers
+    dec <- optionMaybe parseDInitDeclaratorList
     parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
-    return (Declaration specifiers declarator)
+    return (DDeclaration spec dec)
 
-  parseDeclarationSpecifiers = do
-    specifiers <- many parseDeclarationSpecifier
-    return (DeclarationSpecifiers specifiers)
+  parseDSpecifiers = do
+    specifiers <-
+      many1 (
+        parseDStorageClassSpecifier <|>
+        parseDTypeSpecifier <|>
+        parseDTypeQualifier)
+    return (DSpecifiers specifiers)
 
-  parseInitDeclaratorList = do
-    list <- sepBy1 parseInitDeclarator (parseToken (Token Nothing (OperatorToken (Operator ","))))
-    return (InitDeclaratorList list)
+  parseDInitDeclaratorList =
+    do
+      list <- sepBy1 parseDInitDeclarator (parseToken (Token Nothing (OperatorToken (Operator ","))))
+      return (DInitDeclaratorList list)
+      <|>
+    parseDDeclarator
 
-  parseInitDeclarator = do
-    declarator <- parseDeclarator
-    return (InitDeclarator declarator)
+  parseDInitDeclarator = do
+      dec <- parseDDeclarator
+      parseToken (Token Nothing (OperatorToken (Operator "=")))
+      expr <- parseExpression
+      return (DInitDeclarator dec expr)
 
-  parseStorageClassSpecifier = do
+  parseDStorageClassSpecifier = do
     specifier <-
       parseToken (Token Nothing (KeywordToken (Keyword "typedef"))) <|>
       parseToken (Token Nothing (KeywordToken (Keyword "extern"))) <|>
       parseToken (Token Nothing (KeywordToken (Keyword "static"))) <|>
       parseToken (Token Nothing (KeywordToken (Keyword "auto"))) <|>
       parseToken (Token Nothing (KeywordToken (Keyword "register")))
-    return (StorageClassSpecifier (keywordTokenVal (tokenVal specifier)))
+    return (DStorageClassSpecifier (keywordTokenValue (tokenValue specifier)))
 
-  parseTypeSpecifier = do
+  parseDTypeSpecifier = do
     specifier <-
       parseToken (Token Nothing (KeywordToken (Keyword "void"))) <|>
       parseToken (Token Nothing (KeywordToken (Keyword "char"))) <|>
@@ -500,174 +402,169 @@ module Parser where
       parseToken (Token Nothing (KeywordToken (Keyword "double"))) <|>
       parseToken (Token Nothing (KeywordToken (Keyword "signed"))) <|>
       parseToken (Token Nothing (KeywordToken (Keyword "unsigned")))
-    return (TypeSpecifier (keywordTokenVal (tokenVal specifier)))
+    return (DTypeSpecifier (keywordTokenValue (tokenValue specifier)))
 
-  parseTypeQualifier = do
+  parseDTypeQualifier = do
     qualifier <-
       parseToken (Token Nothing (KeywordToken (Keyword "const"))) <|>
       parseToken (Token Nothing (KeywordToken (Keyword "volatile")))
-    return (TypeQualifier (keywordTokenVal (tokenVal qualifier)))
+    return (DTypeQualifier (keywordTokenValue (tokenValue qualifier)))
 
-  parseDeclarationSpecifier =
-    parseStorageClassSpecifier <|>
-    parseTypeSpecifier <|>
-    parseTypeQualifier
+  parseDDeclarator = do
+    pointer <- optionMaybe parseDPointer
+    dec <- parseDDirectDeclarator
+    return (DDeclarator pointer dec)
 
-  parseDeclarator = do
-    pointer <- optionMaybe parsePointer
-    declarator <- parseDirectDeclarator
-    return (Declarator pointer declarator)
+  parseDDirectDeclarator = parseDDirectDeclaratorIdentifier
 
-  parseDirectDeclarator = do
-    identifier <- parseIdentifier
-    return (DirectDeclaratorIdentifier (identifierPrimaryVal identifier))
+  parseDDirectDeclaratorIdentifier = do
+    expr <- parseEIdentifier
+    return (DDirectDeclaratorIdentifier expr)
 
-  parsePointer = do
-    parseToken (Token Nothing (OperatorToken (Operator "*")))
-    list <- parseTypeQualifierList
-    case list of
-      TypeQualifierList (x:xs) -> return (Pointer (Just list))
-      TypeQualifierList [] -> return (Pointer Nothing)
+  parseDPointer = do
+    many1 (parseToken (Token Nothing (OperatorToken (Operator "*"))))
+    list <- optionMaybe (parseDTypeQualifierList)
+    return (DPointer list)
 
-  parseTypeQualifierList = do
-    list <- many parseTypeQualifier
-    return (TypeQualifierList list)
+  parseDTypeQualifierList = do
+    list <- many1 (parseDTypeQualifier)
+    return (DTypeQualifierList list)
 
-  parseIdentifierList = do
-    list <- many parseIdentifier
-    return (IdentifierList (map identifierPrimaryVal list))
+  parseDIdentifierList = do
+    list <- sepBy1 parseEIdentifier (parseToken (Token Nothing (OperatorToken (Operator ","))))
+    return (DIdentifierList list)
 
-  parseLabeledIdentifierStatement = do
-    identifier <- parseIdentifier
+  parseSLabeledIdentifier = do
+    expr <- parseEIdentifier
     parseToken (Token Nothing (OperatorToken (Operator ":")))
-    statement <- parseStatement
-    return (LabeledIdentifierStatement (identifierPrimaryVal identifier) statement)
+    stat <- parseStatement
+    return (SLabeledIdentifier expr stat)
 
-  parseLabeledCaseStatement = do
+  parseSLabeledCase = do
     parseToken (Token Nothing (KeywordToken (Keyword "case")))
-    expr <- parseExpr
+    expr <- parseExpression
     parseToken (Token Nothing (OperatorToken (Operator ":")))
     statement <- parseStatement
-    return (LabeledCaseStatement expr statement)
+    return (SLabeledCase expr statement)
 
-  parseLabeledDefaultStatement = do
+  parseSLabeledDefault = do
     parseToken (Token Nothing (KeywordToken (Keyword "default")))
     parseToken (Token Nothing (OperatorToken (Operator ":")))
     statement <- parseStatement
-    return (LabeledDefaultStatement statement)
+    return (SLabeledDefault statement)
 
-  parseDeclarationList = do
+  parseSDeclarationList = do
     list <- parseDeclaration
-    return (DeclarationList list)
+    return (SDeclarationList list)
 
-  parseStatementList = do
+  parseSList = do
     list <- parseStatement
-    return (StatementList list)
+    return (SList list)
 
-  parseCompoundStatement = do
+  parseSCompound = do
     parseToken (Token Nothing (PunctuatorToken (Punctuator "{")))
-    list <- many (try parseDeclarationList <|> try parseStatementList)
+    list <- many (try parseSDeclarationList <|> try parseSList)
     parseToken (Token Nothing (PunctuatorToken (Punctuator "}")))
-    return (CompoundStatement list)
+    return (SCompound list)
 
-  parseExprStatement = do
-    expr <- optionMaybe parseExpr
+  parseSExpression = do
+    expr <- optionMaybe parseExpression
     parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
-    return (ExprStatement expr)
+    return (SExpression expr)
 
-  parseIfStatement = do
+  parseSIf = do
     parseToken (Token Nothing (KeywordToken (Keyword "if")))
     parseToken (Token Nothing (OperatorToken (Operator "(")))
-    expr <- parseExpr
+    expr <- parseExpression
     parseToken (Token Nothing (OperatorToken (Operator ")")))
     statement <- parseStatement
-    return (IfStatement expr statement)
+    return (SIf expr statement)
 
-  parseIfElseStatement = do
+  parseSIfElse = do
     parseToken (Token Nothing (KeywordToken (Keyword "if")))
     parseToken (Token Nothing (OperatorToken (Operator "(")))
-    expr <- parseExpr
+    expr <- parseExpression
     parseToken (Token Nothing (OperatorToken (Operator ")")))
     firstStatement <- parseStatement
     parseToken (Token Nothing (KeywordToken (Keyword "else")))
     secondStatement <- parseStatement
-    return (IfElseStatement expr firstStatement secondStatement)
+    return (SIfElse expr firstStatement secondStatement)
 
-  parseSwitchStatement = do
+  parseSSwitch = do
     parseToken (Token Nothing (KeywordToken (Keyword "switch")))
     parseToken (Token Nothing (OperatorToken (Operator "(")))
-    expr <- parseExpr
+    expr <- parseExpression
     parseToken (Token Nothing (OperatorToken (Operator ")")))
     statement <- parseStatement
-    return (SwitchStatement expr statement)
+    return (SSwitch expr statement)
 
-  parseWhileStatement = do
+  parseSWhile = do
     parseToken (Token Nothing (KeywordToken (Keyword "while")))
     parseToken (Token Nothing (OperatorToken (Operator "(")))
-    expr <- parseExpr
+    expr <- parseExpression
     parseToken (Token Nothing (OperatorToken (Operator ")")))
     statement <- parseStatement
-    return (WhileStatement expr statement)
+    return (SWhile expr statement)
 
-  parseDoStatement = do
+  parseSDo = do
     parseToken (Token Nothing (KeywordToken (Keyword "do")))
     statement <- parseStatement
     parseToken (Token Nothing (KeywordToken (Keyword "while")))
     parseToken (Token Nothing (OperatorToken (Operator "(")))
-    expr <- parseExpr
+    expr <- parseExpression
     parseToken (Token Nothing (OperatorToken (Operator ")")))
     parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
-    return (DoStatement statement expr)
+    return (SDo statement expr)
 
-  parseForStatement = do
+  parseSFor = do
     parseToken (Token Nothing (KeywordToken (Keyword "for")))
     parseToken (Token Nothing (OperatorToken (Operator "(")))
-    firstExpr <- optionMaybe parseExpr
+    firstExpr <- optionMaybe parseExpression
     parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
-    secondExpr <- optionMaybe parseExpr
+    secondExpr <- optionMaybe parseExpression
     parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
-    thirdExpr <- optionMaybe parseExpr
+    thirdExpr <- optionMaybe parseExpression
     parseToken (Token Nothing (OperatorToken (Operator ")")))
     statement <- parseStatement
-    return (ForStatement firstExpr secondExpr thirdExpr statement)
+    return (SFor firstExpr secondExpr thirdExpr statement)
 
-  parseGotoStatement = do
+  parseSGoto = do
     parseToken (Token Nothing (KeywordToken (Keyword "goto")))
-    identifier <- parseIdentifier
+    identifier <- parseEIdentifier
     parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
-    return (GotoStatement (identifierPrimaryVal identifier))
+    return (SGoto identifier)
 
-  parseContinueStatement = do
+  parseSContinue = do
     parseToken (Token Nothing (KeywordToken (Keyword "continue")))
     parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
-    return (ContinueStatement)
+    return SContinue
 
-  parseBreakStatement = do
+  parseSBreak = do
     parseToken (Token Nothing (KeywordToken (Keyword "break")))
     parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
-    return (BreakStatement)
+    return SBreak
 
-  parseReturnStatement = do
+  parseSReturn = do
     parseToken (Token Nothing (KeywordToken (Keyword "return")))
-    expr <- optionMaybe parseExpr
+    expr <- optionMaybe parseExpression
     parseToken (Token Nothing (PunctuatorToken (Punctuator ";")))
-    return (ReturnStatement expr)
+    return (SReturn expr)
 
   parseStatement =
-    try parseLabeledIdentifierStatement <|>
-    parseLabeledCaseStatement <|>
-    parseLabeledDefaultStatement <|>
-    parseCompoundStatement <|>
-    parseExprStatement <|>
-    try parseIfElseStatement <|>
-    parseIfStatement <|>
-    parseSwitchStatement <|>
-    parseWhileStatement <|>
-    parseDoStatement <|>
-    parseForStatement <|>
-    parseGotoStatement <|>
-    parseContinueStatement <|>
-    parseBreakStatement <|>
-    parseReturnStatement
+    try parseSLabeledIdentifier <|>
+    parseSLabeledCase <|>
+    parseSLabeledDefault <|>
+    parseSCompound <|>
+    parseSExpression <|>
+    try parseSIfElse <|>
+    parseSIf <|>
+    parseSSwitch <|>
+    parseSWhile <|>
+    parseSDo <|>
+    parseSFor <|>
+    parseSGoto <|>
+    parseSContinue <|>
+    parseSBreak <|>
+    parseSReturn
 
   parse = Text.Parsec.parse (many parseStatement) ""
