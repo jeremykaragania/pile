@@ -9,9 +9,9 @@ module Lexer where
     where 
       (Token lhsPos lhsVal) == (Token rhsPos rhsVal) = if lhsVal == rhsVal then True else False
 
-  tokenPos (Token pos val) = pos
+  tokenPosition (Token a b) = b
 
-  tokenVal (Token pos val) = val
+  tokenValue (Token a b) = b
 
   data TokenValue =
     KeywordToken Keyword |
@@ -36,17 +36,17 @@ module Lexer where
 
   data Punctuator = Punctuator String deriving (Show, Eq)
 
-  keywordTokenVal (KeywordToken val) = val
+  keywordTokenValue (KeywordToken a) = a
 
-  identifierTokenVal (IdentifierToken val) = val
+  identifierTokenValue (IdentifierToken a) = a
 
-  constantTokenVal (ConstantToken val) = val
+  constantTokenValue (ConstantToken a) = a
 
-  stringLiteralTokenVal (StringLiteral val) = val
+  stringLiteralTokenValue (StringLiteral a) = a
 
-  operatorTokenVal (OperatorToken val) = val
+  operatorTokenValue (OperatorToken a) = a
 
-  punctuatorTokenVal (PunctuatorToken val) = val
+  punctuatorTokenValue (PunctuatorToken a) = a
 
   languageDef = emptyDef {
     P.commentStart = "/*",
