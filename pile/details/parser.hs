@@ -163,8 +163,7 @@ module Parser where
     try (
       do
         right <- many1 (parseRight)
-        return (a left right))
-      <|>
+        return (a left right)) <|>
       return left
 
   parseBinaryOperator :: String -> ParsecT [Token] u Identity Expression -> (Expression -> [Expression] -> Expression) -> ParsecT [Token] u Identity Expression
@@ -371,11 +370,14 @@ module Parser where
       <|>
     parseDDeclarator
 
-  parseDInitDeclarator = do
-      dec <- parseDDeclarator
-      parseToken (Token Nothing (OperatorToken (Operator "=")))
-      expr <- parseExpression
-      return (DInitDeclarator dec expr)
+  parseDInitDeclarator = 
+    try (
+      do
+        dec <- parseDDeclarator
+        parseToken (Token Nothing (OperatorToken (Operator "=")))
+        expr <- parseExpression
+        return (DInitDeclarator dec expr)) <|>
+      parseDDeclarator
 
   parseDStorageClassSpecifier = do
     specifier <-
