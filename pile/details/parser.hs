@@ -248,7 +248,7 @@ module Parser where
       parseToken (Token Nothing (OperatorToken (Operator "~"))) <|>
       parseToken (Token Nothing (OperatorToken (Operator "!")))
     expr <- parseEPostfix
-    return (EArithmeticOperator ((operatorTokenValue (tokenValue op)), expr))
+    return (EArithmeticOperator ((operatorTokenValue . tokenValue) op, expr))
 
   parseEUnary =
     try parseEPrefixIncrement <|>
@@ -345,7 +345,7 @@ module Parser where
           parseToken (Token Nothing (OperatorToken (Operator "^="))) <|>
           parseToken (Token Nothing (OperatorToken (Operator "|=")))
         expr <- parseLeft
-        return (operatorTokenValue (tokenValue op), expr)
+        return ((operatorTokenValue . tokenValue) op, expr)
 
   parseExpression = parseEAssignment
 
@@ -386,7 +386,7 @@ module Parser where
       parseToken (Token Nothing (KeywordToken (Keyword "static"))) <|>
       parseToken (Token Nothing (KeywordToken (Keyword "auto"))) <|>
       parseToken (Token Nothing (KeywordToken (Keyword "register")))
-    return (DStorageClassSpecifier (keywordTokenValue (tokenValue specifier)))
+    return (DStorageClassSpecifier ((keywordTokenValue . tokenValue) specifier))
 
   parseDTypeSpecifier = do
     specifier <-
@@ -399,13 +399,13 @@ module Parser where
       parseToken (Token Nothing (KeywordToken (Keyword "double"))) <|>
       parseToken (Token Nothing (KeywordToken (Keyword "signed"))) <|>
       parseToken (Token Nothing (KeywordToken (Keyword "unsigned")))
-    return (DTypeSpecifier (keywordTokenValue (tokenValue specifier)))
+    return (DTypeSpecifier ((keywordTokenValue . tokenValue) specifier))
 
   parseDTypeQualifier = do
     qualifier <-
       parseToken (Token Nothing (KeywordToken (Keyword "const"))) <|>
       parseToken (Token Nothing (KeywordToken (Keyword "volatile")))
-    return (DTypeQualifier (keywordTokenValue (tokenValue qualifier)))
+    return (DTypeQualifier ((keywordTokenValue . tokenValue) qualifier))
 
   parseDDeclarator = do
     pointer <- optionMaybe parseDPointer
