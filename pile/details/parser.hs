@@ -9,7 +9,7 @@ module Parser where
     EStringLiteral StringLiteral |
     EParens Expression |
     EArraySubscript Expression [Expression] |
-    EFunctionCall Expression Expression |
+    EFunctionCall Expression [(Maybe Expression)] |
     EStructOrUnionMember Expression [Expression] |
     EPostfixIncrement Expression |
     EPostfixDecrement Expression |
@@ -160,8 +160,12 @@ module Parser where
 
   parseLeftRecursion parseLeft parseRight a = do
     left <- parseLeft
-    right <- many1 (parseRight)
-    return (a left right)
+    try (
+      do
+        right <- many1 (parseRight)
+        return (a left right))
+      <|>
+      return left
 
   parseBinaryOperator :: String -> ParsecT [Token] u Identity Expression -> (Expression -> [Expression] -> Expression) -> ParsecT [Token] u Identity Expression
   parseBinaryOperator a b c = do
@@ -176,15 +180,14 @@ module Parser where
   parseEArraySubscript =
     parseLeftRecursion parseLeft parseRight EArraySubscript
     where
-      parseLeft = parseEPrimary
+      parseLeft = parseEFunctionCall
       parseRight = between (parseToken (Token Nothing (OperatorToken (Operator "[")))) (parseToken (Token Nothing (OperatorToken (Operator "]")))) parseEPrimary
 
   parseEFunctionCall = do
-    expr <- parseEPrimary
-    parseToken (Token Nothing (OperatorToken (Operator "(")))
-    list <- parseEArgumentList
-    parseToken (Token Nothing (OperatorToken (Operator ")")))
-    return (EFunctionCall expr list)
+    parseLeftRecursion parseLeft parseRight EFunctionCall
+    where
+      parseLeft = parseEPrimary
+      parseRight = between (parseToken (Token Nothing (OperatorToken (Operator "(")))) (parseToken (Token Nothing (OperatorToken (Operator ")")))) (optionMaybe parseEArgumentList)
 
   parseEStructOrUnionMember = do
     parseLeftRecursion parseLeft parseRight EStructOrUnionMember
@@ -207,16 +210,18 @@ module Parser where
 
   parseEPostfix =
     try parseEArraySubscript <|>
-    try parseEStructOrUnionMember <|>
     try parseEFunctionCall <|>
     try parseEStructOrUnionMember <|>
     try parseEPostfixIncrement <|>
     try parseEPostfixDecrement <|>
     parseEPrimary
 
-  parseEArgumentList = do
-    list <- sepBy1 parseEAssignment (parseToken (Token Nothing (OperatorToken (Operator ","))))
-    return (EArgumentList list)
+  parseEArgumentList =
+    do
+      list <- sepBy1 parseEAssignment (parseToken (Token Nothing (OperatorToken (Operator ","))))
+      return (EArgumentList list)
+      <|>
+    parseEAssignment
 
   parseEPrefixIncrement = do
     parseToken (Token Nothing (OperatorToken (Operator "++")))
@@ -270,7 +275,7 @@ module Parser where
 
   parseEAddition = parseBinaryOperator "+" parseEMultiplicative EAddition
 
-  parseESubtraction = parseBinaryOperator "-" parseEMultiplicative EAddition
+  parseESubtraction = parseBinaryOperator "-" parseEMultiplicative ESubtraction
 
   parseEAdditive =
     try parseEAddition <|>
@@ -279,7 +284,7 @@ module Parser where
 
   parseELeftShift = parseBinaryOperator "<<" parseEAdditive ELeftShift
 
-  parseERightShift = parseBinaryOperator ">>" parseEAdditive ELeftShift
+  parseERightShift = parseBinaryOperator ">>" parseEAdditive ERightShift
 
   parseEShift =
     try parseELeftShift <|>
@@ -301,34 +306,24 @@ module Parser where
     try parseEGreaterOrEqual <|>
     parseEShift
 
-  parseEEqual = parseBinaryOperator "==" parseEShift EEqual
+  parseEEqual = parseBinaryOperator "==" parseERelational EEqual
 
-  parseENotEqual = parseBinaryOperator "!=" parseEShift ENotEqual
+  parseENotEqual = parseBinaryOperator "!=" parseERelational ENotEqual
 
   parseEquality =
     try parseEEqual <|>
     try parseENotEqual <|>
     parseERelational
 
-  parseEBitwiseAnd =
-    try (parseBinaryOperator "&" parseEquality EBitwiseAnd) <|>
-    parseEquality
+  parseEBitwiseAnd = parseBinaryOperator "&" parseEquality EBitwiseAnd
 
-  parseEBitwiseExclusiveOr =
-    try (parseBinaryOperator "|" parseEquality EBitwiseExclusiveOr) <|>
-    parseEBitwiseAnd
+  parseEBitwiseExclusiveOr = parseBinaryOperator "|" parseEBitwiseAnd EBitwiseExclusiveOr
 
-  parseEBitwiseInclusiveOr =
-    try (parseBinaryOperator "|" parseEquality EBitwiseInclusiveOr) <|>
-    parseEBitwiseExclusiveOr
+  parseEBitwiseInclusiveOr = parseBinaryOperator "|" parseEBitwiseExclusiveOr EBitwiseInclusiveOr
 
-  parseELogicalAnd =
-    try (parseBinaryOperator "&&" parseEquality EBitwiseInclusiveOr) <|>
-    parseEBitwiseInclusiveOr
+  parseELogicalAnd = parseBinaryOperator "&&" parseEBitwiseInclusiveOr ELogicalAnd
 
-  parseELogicalOr =
-    try (parseBinaryOperator "||" parseEquality EBitwiseInclusiveOr) <|>
-    parseELogicalAnd
+  parseELogicalOr = parseBinaryOperator "||" parseELogicalAnd ELogicalOr
 
   parseEConditional = parseELogicalOr
 
