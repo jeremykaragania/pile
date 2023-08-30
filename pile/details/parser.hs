@@ -327,10 +327,14 @@ module Parser where
   parseEConditional = parseELogicalOr
 
   parseEAssignment =
-    try (parseLeftRecursion parseLeft parseRight EAssignment) <|>
-    parseEConditional
+    parseLeftRecursion parseLeft parseRight EAssignment
     where
-      parseLeft = parseEUnary
+      parseLeft =
+        try (
+          do
+            left <- parseEConditional
+            return left) <|>
+          parseEUnary
       parseRight = do
         op <-
           parseToken (Token Nothing (OperatorToken (Operator "="))) <|>
