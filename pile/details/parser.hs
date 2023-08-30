@@ -67,7 +67,7 @@ module Parser where
     DDirectDeclaratorIdentifier Expression |
     DDirectDeclaratorParens Declaration |
     DDirectDeclaratorArraySubscript Declaration |
-    DDirectDeclaratorFunctionCall Declaration |
+    DDirectDeclaratorFunctionCall Declaration [Declaration] |
     DPointer (Maybe Declaration) |
     DTypeQualifierList [Declaration] |
     DParameterTypeList [Declaration] |
@@ -102,6 +102,11 @@ module Parser where
     SContinue |
     SBreak |
     SReturn (Maybe Expression) deriving Show
+
+  data ExternalDefinition =
+    EDTranslationUnit [ExternalDefinition] |
+    EDDeclaration Declaration |
+    EDFunction (Maybe Declaration) Declaration (Maybe Statement) Statement deriving Show
 
   parseToken t =
     tokenPrim showTok nextPos testTok
@@ -416,11 +421,17 @@ module Parser where
     dec <- parseDDirectDeclarator
     return (DDeclarator pointer dec)
 
-  parseDDirectDeclarator = parseDDirectDeclaratorIdentifier
+  parseDDirectDeclarator = parseDDirectDeclaratorFunctionCall
 
   parseDDirectDeclaratorIdentifier = do
     expr <- parseEIdentifier
     return (DDirectDeclaratorIdentifier expr)
+
+  parseDDirectDeclaratorFunctionCall = do
+    parseLeftRecursion parseLeft parseRight DDirectDeclaratorFunctionCall
+    where
+      parseLeft = parseDDirectDeclaratorIdentifier
+      parseRight = between (parseToken (Token Nothing (OperatorToken (Operator "(")))) (parseToken (Token Nothing (OperatorToken (Operator ")")))) parseDParameterTypeList
 
   parseDPointer = do
     many1 (parseToken (Token Nothing (OperatorToken (Operator "*"))))
@@ -430,6 +441,17 @@ module Parser where
   parseDTypeQualifierList = do
     list <- many1 (parseDTypeQualifier)
     return (DTypeQualifierList list)
+
+  parseDParameterTypeList = parseDParameterList
+
+  parseDParameterList = do
+    list <- many (parseDParameterDeclaration)
+    return (DParameterList list)
+
+  parseDParameterDeclaration = do
+    spec <- parseDSpecifiers
+    dec <- parseDDeclarator
+    return (DParameterDeclaration spec dec)
 
   parseDIdentifierList = do
     list <- sepBy1 parseEIdentifier (parseToken (Token Nothing (OperatorToken (Operator ","))))
@@ -568,4 +590,19 @@ module Parser where
     parseSBreak <|>
     parseSReturn
 
-  parse = Text.Parsec.parse (many parseStatement) ""
+  parseEDTranslationUnit = do
+    list <- many (try parseEDDeclaration <|> try parseEDFunction)
+    return (EDTranslationUnit list)
+
+  parseEDDeclaration = do
+    dec <- parseDeclaration
+    return (EDDeclaration dec)
+
+  parseEDFunction = do
+    firstDec <- optionMaybe parseDSpecifiers
+    secondDec <- parseDDeclarator
+    firstStat <- optionMaybe parseSDeclarationList
+    secondStat <- parseSCompound
+    return (EDFunction firstDec secondDec firstStat secondStat)
+
+  parse = Text.Parsec.parse (parseEDTranslationUnit) ""
