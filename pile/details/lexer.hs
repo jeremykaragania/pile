@@ -3,50 +3,34 @@ module Lexer where
   import qualified Text.Parsec.Token as P
   import Text.Parsec.Language
 
-  data Token = Token (Maybe SourcePos) TokenValue deriving Show
+  data Token = Token {tPosition :: (Maybe SourcePos), tValue :: TokenValue} deriving Show
 
   instance Eq Token 
     where 
       (Token lhsPos lhsVal) == (Token rhsPos rhsVal) = if lhsVal == rhsVal then True else False
 
-  tokenPosition (Token a b) = b
-
-  tokenValue (Token a b) = b
-
   data TokenValue =
-    KeywordToken Keyword |
-    IdentifierToken Identifier |
-    ConstantToken Constant |
-    StringLiteralToken StringLiteral |
-    OperatorToken Operator |
-    PunctuatorToken Punctuator deriving (Show, Eq)
+    KeywordToken {tvKeyword :: Keyword} |
+    IdentifierToken {tvIdentifier :: Identifier} |
+    ConstantToken {tvConstant :: Constant} |
+    StringLiteralToken {tvLiteral :: StringLiteral} |
+    OperatorToken {tvOperator :: Operator} |
+    PunctuatorToken {tvPunctuator :: Punctuator} deriving (Show, Eq)
 
-  data Keyword = Keyword String deriving (Show, Eq)
+  data Keyword = Keyword {keyword :: String} deriving (Show, Eq)
 
-  data Identifier = Identifier String deriving (Show, Eq)
+  data Identifier = Identifier {identifier :: String} deriving (Show, Eq)
 
   data Constant =
-    FloatingConstant Double |
-    IntegerConstant Integer |
-    CharacterConstant Char deriving (Show, Eq)
+    FloatingConstant {floatingConstant :: Double} |
+    IntegerConstant {integerConstant :: Integer} |
+    CharacterConstant {characterConstant :: Char} deriving (Show, Eq)
 
-  data StringLiteral = StringLiteral String deriving (Show, Eq)
+  data StringLiteral = StringLiteral {stringLiteral :: String} deriving (Show, Eq)
 
-  data Operator = Operator String deriving (Show, Eq)
+  data Operator = Operator {operator :: String} deriving (Show, Eq)
 
-  data Punctuator = Punctuator String deriving (Show, Eq)
-
-  keywordTokenValue (KeywordToken a) = a
-
-  identifierTokenValue (IdentifierToken a) = a
-
-  constantTokenValue (ConstantToken a) = a
-
-  stringLiteralTokenValue (StringLiteral a) = a
-
-  operatorTokenValue (OperatorToken a) = a
-
-  punctuatorTokenValue (PunctuatorToken a) = a
+  data Punctuator = Punctuator {punctuator :: String} deriving (Show, Eq)
 
   languageDef = emptyDef {
     P.commentStart = "/*",
