@@ -88,9 +88,9 @@ module Parser where
     SLabeledIdentifier Expression Statement |
     SLabeledCase Expression Statement |
     SLabeledDefault Statement |
-    SDeclarationList Declaration |
-    SList Statement |
-    SCompound [Statement] |
+    SDeclarationList [Declaration] |
+    SList [Statement] |
+    SCompound (Maybe Statement) (Maybe Statement) |
     SExpression (Maybe Expression) |
     SIf Expression Statement |
     SIfElse Expression Statement Statement |
@@ -477,18 +477,19 @@ module Parser where
     return (SLabeledDefault statement)
 
   parseSDeclarationList = do
-    list <- parseDeclaration
+    list <- many1 parseDeclaration
     return (SDeclarationList list)
 
   parseSList = do
-    list <- parseStatement
+    list <- many1 parseStatement
     return (SList list)
 
   parseSCompound = do
     parseToken (Token Nothing (PunctuatorToken (Punctuator "{")))
-    list <- many (try parseSDeclarationList <|> try parseSList)
+    firstList <- optionMaybe parseSDeclarationList
+    secondList <- optionMaybe parseSList
     parseToken (Token Nothing (PunctuatorToken (Punctuator "}")))
-    return (SCompound list)
+    return (SCompound firstList secondList)
 
   parseSExpression = do
     expr <- optionMaybe parseExpression
