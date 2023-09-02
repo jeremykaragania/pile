@@ -3,9 +3,9 @@ module CodeGenerator where
   import Lexer
   import Parser
 
-  edIdentifier (EDDeclaration a) = ""
+  dIdentifier (DDeclarator _ (DDirectDeclaratorFunctionCall (DDirectDeclaratorIdentifier (EIdentifier (Identifier a))) _)) = a
 
-  edIdentifier (EDFunction _ (DDeclarator _ (DDirectDeclaratorFunctionCall (DDirectDeclaratorIdentifier (EIdentifier a)) _)) _ _) = identifier a
+  edDeclarator (EDFunction _ a _ _) = a
 
   edSCompound (EDFunction _ _ _ a) = a
 
@@ -45,7 +45,7 @@ module CodeGenerator where
             return code
 
   generateEDFunction a = intercalate "\n" [
-    edIdentifier a ++ ":",
+    (dIdentifier . edDeclarator) a ++ ":",
     "push {r7}",
     (generateSCompound . edSCompound) a,
     "bx lr"]
