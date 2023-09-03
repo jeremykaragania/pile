@@ -5,6 +5,8 @@ module CodeGenerator where
 
   dIdentifier (DDeclarator _ (DDirectDeclaratorFunctionCall (DDirectDeclaratorIdentifier (EIdentifier (Identifier a))) _)) = a
 
+  edDInitDeclaratorList (EDDeclaration (DDeclaration _ (Just a))) = a
+
   edDeclarator (EDFunction _ a _ _) = a
 
   edSCompound (EDFunction _ _ _ a) = a
@@ -40,9 +42,20 @@ module CodeGenerator where
     where 
       function x = do
         case x of
+          (EDDeclaration a) -> do
+            code <- generateEDDeclaration x
+            return code
           (EDFunction a b c d) -> do
             code <- generateEDFunction x
             return code
+
+  generateEDDeclaration a = ((((intercalate "\n") . (map symbol) . dList . edDInitDeclaratorList) a))
+    where
+      symbol (DDeclarator _ (DDirectDeclaratorIdentifier (EIdentifier (Identifier a)))) = a ++ ":"
+
+      symbol (DInitDeclarator a b) = intercalate "\n" [symbol a, value b]
+
+      value (EConstant (IntegerConstant a)) = ".word " ++ show a ++ "\n"
 
   generateEDFunction a = intercalate "\n" [
     (dIdentifier . edDeclarator) a ++ ":",
@@ -50,4 +63,4 @@ module CodeGenerator where
     (generateSCompound . edSCompound) a,
     "bx lr"]
 
-  generate a = generateEDTranslationUnit a
+  generate a = generateEDTranslationUnit a ++ "\n"

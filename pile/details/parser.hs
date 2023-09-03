@@ -46,7 +46,7 @@ module Parser where
   data Declaration =
     DDeclaration Declaration (Maybe Declaration) |
     DSpecifiers [Declaration] |
-    DInitDeclaratorList [Declaration] |
+    DInitDeclaratorList {dList :: [Declaration]} |
     DInitDeclarator Declaration Expression |
     DStorageClassSpecifier Keyword |
     DTypeSpecifier Keyword |
