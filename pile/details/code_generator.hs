@@ -1,4 +1,5 @@
 module CodeGenerator where
+  import Data.Char
   import Data.List
   import Lexer
   import Parser
@@ -53,9 +54,25 @@ module CodeGenerator where
     where
       symbol (DDeclarator _ (DDirectDeclaratorIdentifier (EIdentifier (Identifier a)))) = a ++ ":"
 
-      symbol (DInitDeclarator a b) = intercalate "\n" [symbol a, value b]
+      symbol (DInitDeclarator a (EArithmeticOperator (Operator b, c))) = intercalate "\n" [symbol a, directive c ++ b ++ value c] ++ "\n"
 
-      value (EConstant (IntegerConstant a)) = ".word " ++ show a ++ "\n"
+      symbol (DInitDeclarator a b) = intercalate "\n" [symbol a, value b] ++ "\n"
+
+      directive (EConstant (IntegerConstant _)) = ".word "
+
+      directive (EConstant (FloatingConstant _)) = ".word "
+
+      directive (EConstant (CharacterConstant _)) = ".byte "
+
+      directive (EStringLiteral (StringLiteral _)) = ".ascii "
+
+      value (EConstant (FloatingConstant a)) = show a
+
+      value (EConstant (IntegerConstant a)) = show a
+
+      value (EConstant (CharacterConstant a)) = (show . ord) a
+
+      value (EStringLiteral (StringLiteral a)) = "\"" ++ a ++ "\\0\""
 
   generateEDFunction a = intercalate "\n" [
     (dIdentifier . edDeclarator) a ++ ":",
