@@ -592,7 +592,7 @@ module Parser where
     parseSReturn
 
   parseEDTranslationUnit = do
-    list <- many (try parseEDDeclaration <|> try parseEDFunction)
+    list <- many1 (try parseEDDeclaration <|> try parseEDFunction)
     return (EDTranslationUnit list)
 
   parseEDDeclaration = do
