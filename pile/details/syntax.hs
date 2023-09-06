@@ -1,12 +1,12 @@
 module Syntax where
 
   data CToken =
-    TKeyword {tvCKeyword :: CKeyword} |
-    TIdentifier {tvCIdentifier :: CIdentifier} |
-    TConstant {tvConstant :: CConstant} |
-    TStringLiteral {tvCStringLiteral :: CStringLiteral} |
-    TOperator {tvCOperator :: COperator} |
-    TPunctuator {tvCPunctuator :: CPunctuator} deriving (Show, Eq)
+    TKeyword {tCKeyword :: CKeyword} |
+    TIdentifier {tCIdentifier :: CIdentifier} |
+    TConstant {tConstant :: CConstant} |
+    TStringLiteral {tCStringLiteral :: CStringLiteral} |
+    TOperator {tCOperator :: COperator} |
+    TPunctuator {tCPunctuator :: CPunctuator} deriving (Show, Eq)
 
   data CKeyword = CKeyword {keyword :: String} deriving (Show, Eq)
 

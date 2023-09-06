@@ -149,7 +149,7 @@ module Parser where
       parseToken (Token Nothing (TOperator (COperator "~"))) <|>
       parseToken (Token Nothing (TOperator (COperator "!")))
     expr <- parseEPostfix
-    return (EArithmeticOperator ((tvCOperator . tValue) op, expr))
+    return (EArithmeticOperator ((tCOperator . tValue) op, expr))
 
   parseEUnary =
     try parseEPrefixIncrement <|>
@@ -250,7 +250,7 @@ module Parser where
           parseToken (Token Nothing (TOperator (COperator "^="))) <|>
           parseToken (Token Nothing (TOperator (COperator "|=")))
         expr <- parseLeft
-        return ((tvCOperator . tValue) op, expr)
+        return ((tCOperator . tValue) op, expr)
 
   parseCExpression = parseEAssignment
 
@@ -291,7 +291,7 @@ module Parser where
       parseToken (Token Nothing (TKeyword (CKeyword "static"))) <|>
       parseToken (Token Nothing (TKeyword (CKeyword "auto"))) <|>
       parseToken (Token Nothing (TKeyword (CKeyword "register")))
-    return (DStorageClassSpecifier ((tvCKeyword . tValue) specifier))
+    return (DStorageClassSpecifier ((tCKeyword . tValue) specifier))
 
   parseDTypeSpecifier = do
     specifier <-
@@ -304,13 +304,13 @@ module Parser where
       parseToken (Token Nothing (TKeyword (CKeyword "double"))) <|>
       parseToken (Token Nothing (TKeyword (CKeyword "signed"))) <|>
       parseToken (Token Nothing (TKeyword (CKeyword "unsigned")))
-    return (DTypeSpecifier ((tvCKeyword . tValue) specifier))
+    return (DTypeSpecifier ((tCKeyword . tValue) specifier))
 
   parseDTypeQualifier = do
     qualifier <-
       parseToken (Token Nothing (TKeyword (CKeyword "const"))) <|>
       parseToken (Token Nothing (TKeyword (CKeyword "volatile")))
-    return (DTypeQualifier ((tvCKeyword . tValue) qualifier))
+    return (DTypeQualifier ((tCKeyword . tValue) qualifier))
 
   parseDDeclarator = do
     pointer <- optionMaybe parseDPointer
