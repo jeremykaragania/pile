@@ -2,35 +2,13 @@ module Lexer where
   import Text.Parsec
   import qualified Text.Parsec.Token as P
   import Text.Parsec.Language
+  import Syntax
 
-  data Token = Token {tPosition :: (Maybe SourcePos), tValue :: TokenValue} deriving Show
+  data Token = Token {tPosition :: (Maybe SourcePos), tValue :: CToken} deriving Show
 
   instance Eq Token 
     where 
       (Token lhsPos lhsVal) == (Token rhsPos rhsVal) = if lhsVal == rhsVal then True else False
-
-  data TokenValue =
-    KeywordToken {tvKeyword :: Keyword} |
-    IdentifierToken {tvIdentifier :: Identifier} |
-    ConstantToken {tvConstant :: Constant} |
-    StringLiteralToken {tvLiteral :: StringLiteral} |
-    OperatorToken {tvOperator :: Operator} |
-    PunctuatorToken {tvPunctuator :: Punctuator} deriving (Show, Eq)
-
-  data Keyword = Keyword {keyword :: String} deriving (Show, Eq)
-
-  data Identifier = Identifier {identifier :: String} deriving (Show, Eq)
-
-  data Constant =
-    FloatingConstant {floatingConstant :: Double} |
-    IntegerConstant {integerConstant :: Integer} |
-    CharacterConstant {characterConstant :: Char} deriving (Show, Eq)
-
-  data StringLiteral = StringLiteral {stringLiteral :: String} deriving (Show, Eq)
-
-  data Operator = Operator {operator :: String} deriving (Show, Eq)
-
-  data Punctuator = Punctuator {punctuator :: String} deriving (Show, Eq)
 
   languageDef = emptyDef {
     P.commentStart = "/*",
@@ -125,54 +103,54 @@ module Lexer where
 
   lexer = P.makeTokenParser languageDef
 
-  scanKeyword = do
+  scanCKeyword = do
     sourcePos <- getPosition
     value <- choice (map try (map (P.symbol lexer) (P.reservedNames languageDef)))
-    return (Token (Just sourcePos) (KeywordToken (Keyword value)))
+    return (Token (Just sourcePos) (TKeyword (CKeyword value)))
 
-  scanIdentifier = do
+  scanCIdentifier = do
     sourcePos <- getPosition
     value <- try (P.identifier lexer)
-    return (Token (Just sourcePos) (IdentifierToken (Identifier value)))
+    return (Token (Just sourcePos) (TIdentifier (CIdentifier value)))
 
-  scanFloatingConstant = do
+  scanCFloatingConstant = do
     sourcePos <- getPosition
     value <- try (P.float lexer)
-    return (Token (Just sourcePos) (ConstantToken (FloatingConstant value)))
+    return (Token (Just sourcePos) (TConstant (CFloatingConstant value)))
 
-  scanIntegerConstant = do
+  scanCIntegerConstant = do
     sourcePos <- getPosition
     value <- try (P.integer lexer)
-    return (Token (Just sourcePos) (ConstantToken (IntegerConstant value)))
+    return (Token (Just sourcePos) (TConstant (CIntegerConstant value)))
 
-  scanCharacterConstant = do
+  scanCCharacterConstant = do
     sourcePos <- getPosition
     value <- try (P.charLiteral lexer)
-    return (Token (Just sourcePos) (ConstantToken (CharacterConstant value)))
+    return (Token (Just sourcePos) (TConstant (CCharacterConstant value)))
 
-  scanStringLiteral = do
+  scanCStringLiteral = do
     sourcePos <- getPosition
     value <- try (P.stringLiteral lexer)
-    return (Token (Just sourcePos) (StringLiteralToken (StringLiteral value)))
+    return (Token (Just sourcePos) (TStringLiteral (CStringLiteral value)))
 
-  scanOperator = do
+  scanCOperator = do
     sourcePos <- getPosition
     value <- choice (map try (map (P.symbol lexer) (P.reservedOpNames languageDef)))
-    return (Token (Just sourcePos) (OperatorToken (Operator value)))
+    return (Token (Just sourcePos) (TOperator (COperator value)))
 
-  scanPunctuator = do
+  scanCPunctuator = do
     sourcePos <- getPosition
     value <- try (choice (map (P.symbol lexer) (["[", "]", "(", ")", "{", "}", "*", ",", ":", "=", ";", "...", "#"])))
-    return (Token (Just sourcePos) (PunctuatorToken (Punctuator value)))
+    return (Token (Just sourcePos) (TPunctuator (CPunctuator value)))
 
   scanToken =
-    scanKeyword <|>
-    scanIdentifier <|>
-    scanOperator <|>
-    scanPunctuator <|>
-    scanFloatingConstant <|>
-    scanIntegerConstant <|>
-    scanCharacterConstant <|>
-    scanStringLiteral
+    scanCKeyword <|>
+    scanCIdentifier <|>
+    scanCOperator <|>
+    scanCPunctuator <|>
+    scanCFloatingConstant <|>
+    scanCIntegerConstant <|>
+    scanCCharacterConstant <|>
+    scanCStringLiteral
 
   scan = parse (many (P.whiteSpace lexer >> scanToken)) ""

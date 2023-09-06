@@ -3,8 +3,9 @@ module CodeGenerator where
   import Data.List
   import Lexer
   import Parser
+  import Syntax
 
-  dIdentifier (DDeclarator _ (DDirectDeclaratorFunctionCall (DDirectDeclaratorIdentifier (EIdentifier (Identifier a))) _)) = a
+  dCIdentifier (DDeclarator _ (DDirectDeclaratorFunctionCall (DDirectDeclaratorIdentifier (EIdentifier (CIdentifier a))) _)) = a
 
   edDInitDeclaratorList (EDDeclaration (DDeclaration _ (Just a))) = a
 
@@ -12,7 +13,7 @@ module CodeGenerator where
 
   edSCompound (EDFunction _ _ _ a) = a
 
-  generateEConstant (IntegerConstant a) = "mov r3, #" ++ show a
+  generateEConstant (CIntegerConstant a) = "mov r3, #" ++ show a
 
   generateExpression a = do
     case a of
@@ -52,30 +53,30 @@ module CodeGenerator where
 
   generateEDDeclaration a = ((((intercalate "\n") . (map symbol) . dList . edDInitDeclaratorList) a))
     where
-      symbol (DDeclarator _ (DDirectDeclaratorIdentifier (EIdentifier (Identifier a)))) = a ++ ":"
+      symbol (DDeclarator _ (DDirectDeclaratorIdentifier (EIdentifier (CIdentifier a)))) = a ++ ":"
 
-      symbol (DInitDeclarator a (EArithmeticOperator (Operator b, c))) = intercalate "\n" [symbol a, directive c ++ b ++ value c] ++ "\n"
+      symbol (DInitDeclarator a (EArithmeticOperator (COperator b, c))) = intercalate "\n" [symbol a, directive c ++ b ++ value c] ++ "\n"
 
       symbol (DInitDeclarator a b) = intercalate "\n" [symbol a, value b] ++ "\n"
 
-      directive (EConstant (IntegerConstant _)) = ".word "
+      directive (EConstant (CIntegerConstant _)) = ".word "
 
-      directive (EConstant (FloatingConstant _)) = ".word "
+      directive (EConstant (CFloatingConstant _)) = ".word "
 
-      directive (EConstant (CharacterConstant _)) = ".byte "
+      directive (EConstant (CCharacterConstant _)) = ".byte "
 
-      directive (EStringLiteral (StringLiteral _)) = ".ascii "
+      directive (EStringLiteral (CStringLiteral _)) = ".ascii "
 
-      value (EConstant (FloatingConstant a)) = show a
+      value (EConstant (CFloatingConstant a)) = show a
 
-      value (EConstant (IntegerConstant a)) = show a
+      value (EConstant (CIntegerConstant a)) = show a
 
-      value (EConstant (CharacterConstant a)) = (show . ord) a
+      value (EConstant (CCharacterConstant a)) = (show . ord) a
 
-      value (EStringLiteral (StringLiteral a)) = "\"" ++ a ++ "\\0\""
+      value (EStringLiteral (CStringLiteral a)) = "\"" ++ a ++ "\\0\""
 
   generateEDFunction a = intercalate "\n" [
-    (dIdentifier . edDeclarator) a ++ ":",
+    (dCIdentifier . edDeclarator) a ++ ":",
     "push {r7}",
     (generateSCompound . edSCompound) a,
     "bx lr"]
