@@ -11,53 +11,53 @@ module Parser where
       nextPos pos x xs = pos
       testTok x = if x == t then Just x else Nothing
 
-  parseTokenValue testTok =
+  parseCToken testTok =
     tokenPrim showTok nextPos testTok
     where
       showTok x = show x
       nextPos pos x xs = pos
 
-  parseTIdentifier =
-    parseTokenValue testTok
+  parseCIdentifierToken =
+    parseCToken testTok
     where
-      testTok (Token pos (TIdentifier x)) = Just x
+      testTok (Token pos (CIdentifierToken x)) = Just (CIdentifierToken x)
       testTok x = Nothing
 
-  parseTConstant =
-    parseTokenValue testTok
+  parseCConstantToken =
+    parseCToken testTok
     where
-      testTok (Token pos (TConstant x)) = Just x
+      testTok (Token pos (CConstantToken x)) = Just (CConstantToken x)
       testTok x = Nothing
 
-  parseTStringLiteral =
-    parseTokenValue testTok
+  parseCStringLiteralToken =
+    parseCToken testTok
     where
-      testTok (Token pos (TStringLiteral x)) = Just x
+      testTok (Token pos (CStringLiteralToken x)) = Just (CStringLiteralToken x)
       testTok x = Nothing
 
-  parseEIdentifier = do
-    expr <- parseTIdentifier
-    return (EIdentifier expr)
+  parseCIdentifier = do
+    expr <- parseCIdentifierToken
+    return (CIdentifier expr)
 
-  parseEConstant = do
-    expr <- parseTConstant
-    return (EConstant expr)
+  parseCConstant = do
+    expr <- parseCConstantToken
+    return (CConstant expr)
 
-  parseEStringLiteral = do
-    expr <- parseTStringLiteral
-    return (EStringLiteral expr)
+  parseCStringLiteral = do
+    expr <- parseCStringLiteralToken
+    return (CStringLiteral expr)
 
-  parseEParens = do
-    parseToken (Token Nothing (TOperator (COperator "(")))
-    expr <- parseEPrimary
-    parseToken (Token Nothing (TOperator (COperator ")")))
-    return (EParens expr)
+  parseCParens = do
+    parseToken (Token Nothing (COperatorToken "("))
+    expr <- parseCPrimary
+    parseToken (Token Nothing (COperatorToken ")"))
+    return (CParens expr)
 
-  parseEPrimary =
-      parseEIdentifier <|>
-      parseEConstant <|>
-      parseEStringLiteral<|>
-      parseEParens
+  parseCPrimary =
+      parseCIdentifier <|>
+      parseCConstant <|>
+      parseCStringLiteral<|>
+      parseCParens
 
   parseLeftRecursion parseLeft parseRight a = do
     left <- parseLeft
@@ -73,433 +73,433 @@ module Parser where
     where
       parseLeft = b
       parseRight = do
-        parseToken (Token Nothing (TOperator (COperator a)))
+        parseToken (Token Nothing (COperatorToken a))
         expr <- parseLeft
         return expr
 
-  parseEArraySubscript =
-    parseLeftRecursion parseLeft parseRight EArraySubscript
+  parseCArraySubscript =
+    parseLeftRecursion parseLeft parseRight CArraySubscript
     where
-      parseLeft = parseEFunctionCall
-      parseRight = between (parseToken (Token Nothing (TOperator (COperator "[")))) (parseToken (Token Nothing (TOperator (COperator "]")))) parseEPrimary
+      parseLeft = parseCFunctionCall
+      parseRight = between (parseToken (Token Nothing (COperatorToken "["))) (parseToken (Token Nothing (COperatorToken "]"))) parseCPrimary
 
-  parseEFunctionCall = do
-    parseLeftRecursion parseLeft parseRight EFunctionCall
+  parseCFunctionCall = do
+    parseLeftRecursion parseLeft parseRight CFunctionCall
     where
-      parseLeft = parseEPrimary
-      parseRight = between (parseToken (Token Nothing (TOperator (COperator "(")))) (parseToken (Token Nothing (TOperator (COperator ")")))) (optionMaybe parseEArgumentList)
+      parseLeft = parseCPrimary
+      parseRight = between (parseToken (Token Nothing (COperatorToken "("))) (parseToken (Token Nothing (COperatorToken ")"))) (optionMaybe parseCArgumentList)
 
-  parseEStructOrUnionMember = do
-    parseLeftRecursion parseLeft parseRight EStructOrUnionMember
+  parseCStructOrUnionMember = do
+    parseLeftRecursion parseLeft parseRight CStructOrUnionMember
     where
-      parseLeft = parseEPrimary
+      parseLeft = parseCPrimary
       parseRight = do
-        (parseToken (Token Nothing (TOperator (COperator "."))) <|> parseToken (Token Nothing (TOperator (COperator "->"))))
+        (parseToken (Token Nothing (COperatorToken ".")) <|> parseToken (Token Nothing (COperatorToken "->")))
         expr <- parseLeft
         return expr
 
-  parseEPostfixIncrement = do
-    expr <- parseEPrimary
-    parseToken (Token Nothing (TOperator (COperator "++")))
-    return (EPostfixIncrement expr)
+  parseCPostfixIncrement = do
+    expr <- parseCPrimary
+    parseToken (Token Nothing (COperatorToken "++"))
+    return (CPostfixIncrement expr)
 
-  parseEPostfixDecrement = do
-    expr <- parseEPrimary
-    parseToken (Token Nothing (TOperator (COperator "--")))
-    return (EPostfixDecrement expr)
+  parseCPostfixDecrement = do
+    expr <- parseCPrimary
+    parseToken (Token Nothing (COperatorToken "--"))
+    return (CPostfixDecrement expr)
 
-  parseEPostfix =
-    try parseEArraySubscript <|>
-    try parseEFunctionCall <|>
-    try parseEStructOrUnionMember <|>
-    try parseEPostfixIncrement <|>
-    try parseEPostfixDecrement <|>
-    parseEPrimary
+  parseCPostfix =
+    try parseCArraySubscript <|>
+    try parseCFunctionCall <|>
+    try parseCStructOrUnionMember <|>
+    try parseCPostfixIncrement <|>
+    try parseCPostfixDecrement <|>
+    parseCPrimary
 
-  parseEArgumentList =
+  parseCArgumentList =
     do
-      list <- sepBy1 parseEAssignment (parseToken (Token Nothing (TOperator (COperator ","))))
-      return (EArgumentList list)
+      list <- sepBy1 parseCAssignment (parseToken (Token Nothing (COperatorToken ",")))
+      return (CArgumentList list)
       <|>
-    parseEAssignment
+    parseCAssignment
 
-  parseEPrefixIncrement = do
-    parseToken (Token Nothing (TOperator (COperator "++")))
-    expr <- parseEPostfix
-    return (EPrefixIncrement expr)
+  parseCPrefixIncrement = do
+    parseToken (Token Nothing (COperatorToken "++"))
+    expr <- parseCPostfix
+    return (CPrefixIncrement expr)
 
-  parseEPrefixDecrement = do
-    parseToken (Token Nothing (TOperator (COperator "--")))
-    expr <- parseEPostfix
-    return (EPrefixDecrement expr)
+  parseCPrefixDecrement = do
+    parseToken (Token Nothing (COperatorToken "--"))
+    expr <- parseCPostfix
+    return (CPrefixDecrement expr)
 
-  parseEAddressOperator = do
-    parseToken (Token Nothing (TOperator (COperator "&")))
-    expr <- parseEPostfix
-    return (EAddressOperator expr)
+  parseCAddressOperator = do
+    parseToken (Token Nothing (COperatorToken "&"))
+    expr <- parseCPostfix
+    return (CAddressOperator expr)
 
-  parseEIndirectionOperator = do
-    parseToken (Token Nothing (TOperator (COperator "*")))
-    expr <- parseEPostfix
-    return (EIndirectionOperator expr)
+  parseCIndirectionOperator = do
+    parseToken (Token Nothing (COperatorToken "*"))
+    expr <- parseCPostfix
+    return (CIndirectionOperator expr)
 
-  parseEArithmeticOperator = do
-    op <- parseToken (Token Nothing (TOperator (COperator "+"))) <|>
-      parseToken (Token Nothing (TOperator (COperator "-"))) <|>
-      parseToken (Token Nothing (TOperator (COperator "~"))) <|>
-      parseToken (Token Nothing (TOperator (COperator "!")))
-    expr <- parseEPostfix
-    return (EArithmeticOperator ((tCOperator . tValue) op, expr))
+  parseCArithmeticOperator = do
+    op <- parseToken (Token Nothing (COperatorToken "+")) <|>
+      parseToken (Token Nothing (COperatorToken "-")) <|>
+      parseToken (Token Nothing (COperatorToken "~")) <|>
+      parseToken (Token Nothing (COperatorToken "!"))
+    expr <- parseCPostfix
+    return (CArithmeticOperator (tValue op, expr))
 
-  parseEUnary =
-    try parseEPrefixIncrement <|>
-    try parseEPrefixDecrement <|>
-    try parseEAddressOperator <|>
-    try parseEIndirectionOperator <|>
-    try parseEArithmeticOperator <|>
-    parseEPostfix
+  parseCUnary =
+    try parseCPrefixIncrement <|>
+    try parseCPrefixDecrement <|>
+    try parseCAddressOperator <|>
+    try parseCIndirectionOperator <|>
+    try parseCArithmeticOperator <|>
+    parseCPostfix
 
-  parseECast = parseEUnary
+  parseCEast = parseCUnary
 
-  parseEProduct = parseBinaryOperator "*" parseECast EProduct
+  parseCProduct = parseBinaryOperator "*" parseCEast CProduct
 
-  parseEQuotient = parseBinaryOperator "/" parseECast EQuotient
+  parseCQuotient = parseBinaryOperator "/" parseCEast CQuotient
 
-  parseERemainder = parseBinaryOperator "%" parseECast ERemainder
+  parseCRemainder = parseBinaryOperator "%" parseCEast CRemainder
 
-  parseEMultiplicative =
-    try parseEProduct <|>
-    try parseEQuotient <|>
-    try parseERemainder <|>
-    parseECast
+  parseCMultiplicative =
+    try parseCProduct <|>
+    try parseCQuotient <|>
+    try parseCRemainder <|>
+    parseCEast
 
-  parseEAddition = parseBinaryOperator "+" parseEMultiplicative EAddition
+  parseCAddition = parseBinaryOperator "+" parseCMultiplicative CAddition
 
-  parseESubtraction = parseBinaryOperator "-" parseEMultiplicative ESubtraction
+  parseCSubtraction = parseBinaryOperator "-" parseCMultiplicative CSubtraction
 
-  parseEAdditive =
-    try parseEAddition <|>
-    try parseESubtraction <|>
-    parseEMultiplicative
+  parseCAdditive =
+    try parseCAddition <|>
+    try parseCSubtraction <|>
+    parseCMultiplicative
 
-  parseELeftShift = parseBinaryOperator "<<" parseEAdditive ELeftShift
+  parseCLeftShift = parseBinaryOperator "<<" parseCAdditive CLeftShift
 
-  parseERightShift = parseBinaryOperator ">>" parseEAdditive ERightShift
+  parseCRightShift = parseBinaryOperator ">>" parseCAdditive CRightShift
 
-  parseEShift =
-    try parseELeftShift <|>
-    try parseERightShift <|>
-    parseEAdditive
+  parseCShift =
+    try parseCLeftShift <|>
+    try parseCRightShift <|>
+    parseCAdditive
 
-  parseELesser = parseBinaryOperator "<" parseEShift ELesser
+  parseCLesser = parseBinaryOperator "<" parseCShift CLesser
 
-  parseEGreater = parseBinaryOperator ">" parseEShift EGreater
+  parseCGreater = parseBinaryOperator ">" parseCShift CGreater
 
-  parseELesserOrEqual = parseBinaryOperator "<=" parseEShift ELesserOrEqual
+  parseCLesserOrEqual = parseBinaryOperator "<=" parseCShift CLesserOrEqual
 
-  parseEGreaterOrEqual = parseBinaryOperator ">=" parseEShift EGreaterOrEqual
+  parseCGreaterOrEqual = parseBinaryOperator ">=" parseCShift CGreaterOrEqual
 
-  parseERelational =
-    try parseELesser <|>
-    try parseEGreater <|>
-    try parseELesserOrEqual <|>
-    try parseEGreaterOrEqual <|>
-    parseEShift
+  parseCRelational =
+    try parseCLesser <|>
+    try parseCGreater <|>
+    try parseCLesserOrEqual <|>
+    try parseCGreaterOrEqual <|>
+    parseCShift
 
-  parseEEqual = parseBinaryOperator "==" parseERelational EEqual
+  parseCEqual = parseBinaryOperator "==" parseCRelational CEqual
 
-  parseENotEqual = parseBinaryOperator "!=" parseERelational ENotEqual
+  parseCNotEqual = parseBinaryOperator "!=" parseCRelational CNotEqual
 
   parseEquality =
-    try parseEEqual <|>
-    try parseENotEqual <|>
-    parseERelational
+    try parseCEqual <|>
+    try parseCNotEqual <|>
+    parseCRelational
 
-  parseEBitwiseAnd = parseBinaryOperator "&" parseEquality EBitwiseAnd
+  parseCBitwiseAnd = parseBinaryOperator "&" parseEquality CBitwiseAnd
 
-  parseEBitwiseExclusiveOr = parseBinaryOperator "|" parseEBitwiseAnd EBitwiseExclusiveOr
+  parseCBitwiseCxclusiveOr = parseBinaryOperator "|" parseCBitwiseAnd CBitwiseExclusiveOr
 
-  parseEBitwiseInclusiveOr = parseBinaryOperator "|" parseEBitwiseExclusiveOr EBitwiseInclusiveOr
+  parseCBitwiseInclusiveOr = parseBinaryOperator "|" parseCBitwiseCxclusiveOr CBitwiseInclusiveOr
 
-  parseELogicalAnd = parseBinaryOperator "&&" parseEBitwiseInclusiveOr ELogicalAnd
+  parseCLogicalAnd = parseBinaryOperator "&&" parseCBitwiseInclusiveOr CLogicalAnd
 
-  parseELogicalOr = parseBinaryOperator "||" parseELogicalAnd ELogicalOr
+  parseCLogicalOr = parseBinaryOperator "||" parseCLogicalAnd CLogicalOr
 
-  parseEConditional = parseELogicalOr
+  parseCConditional = parseCLogicalOr
 
-  parseEAssignment =
-    parseLeftRecursion parseLeft parseRight EAssignment
+  parseCAssignment =
+    parseLeftRecursion parseLeft parseRight CAssignment
     where
       parseLeft =
         try (
           do
-            left <- parseEConditional
+            left <- parseCConditional
             return left) <|>
-          parseEUnary
+          parseCUnary
       parseRight = do
         op <-
-          parseToken (Token Nothing (TOperator (COperator "="))) <|>
-          parseToken (Token Nothing (TOperator (COperator "*="))) <|>
-          parseToken (Token Nothing (TOperator (COperator "/="))) <|>
-          parseToken (Token Nothing (TOperator (COperator "%="))) <|>
-          parseToken (Token Nothing (TOperator (COperator "+="))) <|>
-          parseToken (Token Nothing (TOperator (COperator "-="))) <|>
-          parseToken (Token Nothing (TOperator (COperator "<<="))) <|>
-          parseToken (Token Nothing (TOperator (COperator ">>="))) <|>
-          parseToken (Token Nothing (TOperator (COperator "&="))) <|>
-          parseToken (Token Nothing (TOperator (COperator "^="))) <|>
-          parseToken (Token Nothing (TOperator (COperator "|=")))
+          parseToken (Token Nothing (COperatorToken "=")) <|>
+          parseToken (Token Nothing (COperatorToken "*=")) <|>
+          parseToken (Token Nothing (COperatorToken "/=")) <|>
+          parseToken (Token Nothing (COperatorToken "%=")) <|>
+          parseToken (Token Nothing (COperatorToken "+=")) <|>
+          parseToken (Token Nothing (COperatorToken "-=")) <|>
+          parseToken (Token Nothing (COperatorToken "<<=")) <|>
+          parseToken (Token Nothing (COperatorToken ">>=")) <|>
+          parseToken (Token Nothing (COperatorToken "&=")) <|>
+          parseToken (Token Nothing (COperatorToken "^=")) <|>
+          parseToken (Token Nothing (COperatorToken "|="))
         expr <- parseLeft
-        return ((tCOperator . tValue) op, expr)
+        return (tValue op, expr)
 
-  parseCExpression = parseEAssignment
+  parseCExpression = parseCAssignment
 
-  parseDeclaration = do
-    spec <- parseDSpecifiers
-    dec <- optionMaybe parseDInitDeclaratorList
-    parseToken (Token Nothing (TPunctuator (CPunctuator ";")))
-    return (DDeclaration spec dec)
+  parseCeclaration = do
+    spec <- parseCSpecifiers
+    dec <- optionMaybe parseCInitDeclaratorList
+    parseToken (Token Nothing (CPunctuatorToken ";"))
+    return (CDeclaration spec dec)
 
-  parseDSpecifiers = do
+  parseCSpecifiers = do
     specifiers <-
       many1 (
-        parseDStorageClassSpecifier <|>
-        parseDTypeSpecifier <|>
-        parseDTypeQualifier)
-    return (DSpecifiers specifiers)
+        parseCStorageClassSpecifier <|>
+        parseCTypeCpecifier <|>
+        parseCTypeQualifier)
+    return (CSpecifiers specifiers)
 
-  parseDInitDeclaratorList =
+  parseCInitDeclaratorList =
     do
-      list <- sepBy1 parseDInitDeclarator (parseToken (Token Nothing (TOperator (COperator ","))))
-      return (DInitDeclaratorList list)
+      list <- sepBy1 parseCInitDeclarator (parseToken (Token Nothing (COperatorToken ",")))
+      return (CInitDeclaratorList list)
       <|>
-    parseDDeclarator
+    parseCDeclarator
 
-  parseDInitDeclarator = 
+  parseCInitDeclarator =
     try (
       do
-        dec <- parseDDeclarator
-        parseToken (Token Nothing (TOperator (COperator "=")))
+        dec <- parseCDeclarator
+        parseToken (Token Nothing (COperatorToken "="))
         expr <- parseCExpression
-        return (DInitDeclarator dec expr)) <|>
-      parseDDeclarator
+        return (CInitDeclarator dec expr)) <|>
+      parseCDeclarator
 
-  parseDStorageClassSpecifier = do
+  parseCStorageClassSpecifier = do
     specifier <-
-      parseToken (Token Nothing (TKeyword (CKeyword "typedef"))) <|>
-      parseToken (Token Nothing (TKeyword (CKeyword "extern"))) <|>
-      parseToken (Token Nothing (TKeyword (CKeyword "static"))) <|>
-      parseToken (Token Nothing (TKeyword (CKeyword "auto"))) <|>
-      parseToken (Token Nothing (TKeyword (CKeyword "register")))
-    return (DStorageClassSpecifier ((tCKeyword . tValue) specifier))
+      parseToken (Token Nothing (CKeywordToken "typedef")) <|>
+      parseToken (Token Nothing (CKeywordToken "extern")) <|>
+      parseToken (Token Nothing (CKeywordToken "static")) <|>
+      parseToken (Token Nothing (CKeywordToken "auto")) <|>
+      parseToken (Token Nothing (CKeywordToken "register"))
+    return (CStorageClassSpecifier (tValue specifier))
 
-  parseDTypeSpecifier = do
+  parseCTypeCpecifier = do
     specifier <-
-      parseToken (Token Nothing (TKeyword (CKeyword "void"))) <|>
-      parseToken (Token Nothing (TKeyword (CKeyword "char"))) <|>
-      parseToken (Token Nothing (TKeyword (CKeyword "short"))) <|>
-      parseToken (Token Nothing (TKeyword (CKeyword "int"))) <|>
-      parseToken (Token Nothing (TKeyword (CKeyword "long"))) <|>
-      parseToken (Token Nothing (TKeyword (CKeyword "float"))) <|>
-      parseToken (Token Nothing (TKeyword (CKeyword "double"))) <|>
-      parseToken (Token Nothing (TKeyword (CKeyword "signed"))) <|>
-      parseToken (Token Nothing (TKeyword (CKeyword "unsigned")))
-    return (DTypeSpecifier ((tCKeyword . tValue) specifier))
+      parseToken (Token Nothing (CKeywordToken "void")) <|>
+      parseToken (Token Nothing (CKeywordToken "char")) <|>
+      parseToken (Token Nothing (CKeywordToken "short")) <|>
+      parseToken (Token Nothing (CKeywordToken "int")) <|>
+      parseToken (Token Nothing (CKeywordToken "long")) <|>
+      parseToken (Token Nothing (CKeywordToken "float")) <|>
+      parseToken (Token Nothing (CKeywordToken "double")) <|>
+      parseToken (Token Nothing (CKeywordToken "signed")) <|>
+      parseToken (Token Nothing (CKeywordToken "unsigned"))
+    return (CTypeSpecifier (tValue specifier))
 
-  parseDTypeQualifier = do
+  parseCTypeQualifier = do
     qualifier <-
-      parseToken (Token Nothing (TKeyword (CKeyword "const"))) <|>
-      parseToken (Token Nothing (TKeyword (CKeyword "volatile")))
-    return (DTypeQualifier ((tCKeyword . tValue) qualifier))
+      parseToken (Token Nothing (CKeywordToken "const")) <|>
+      parseToken (Token Nothing (CKeywordToken "volatile"))
+    return (CTypeQualifier (tValue qualifier))
 
-  parseDDeclarator = do
-    pointer <- optionMaybe parseDPointer
-    dec <- parseDDirectDeclarator
-    return (DDeclarator pointer dec)
+  parseCDeclarator = do
+    pointer <- optionMaybe parseCPointer
+    dec <- parseCDirectDeclarator
+    return (CDeclarator pointer dec)
 
-  parseDDirectDeclarator = parseDDirectDeclaratorFunctionCall
+  parseCDirectDeclarator = parseCDirectDeclaratorFunctionCall
 
-  parseDDirectDeclaratorIdentifier = do
-    expr <- parseEIdentifier
-    return (DDirectDeclaratorIdentifier expr)
+  parseCDirectDeclaratorIdentifier = do
+    expr <- parseCIdentifier
+    return (CDirectDeclaratorIdentifier expr)
 
-  parseDDirectDeclaratorFunctionCall = do
-    parseLeftRecursion parseLeft parseRight DDirectDeclaratorFunctionCall
+  parseCDirectDeclaratorFunctionCall = do
+    parseLeftRecursion parseLeft parseRight CDirectDeclaratorFunctionCall
     where
-      parseLeft = parseDDirectDeclaratorIdentifier
-      parseRight = between (parseToken (Token Nothing (TOperator (COperator "(")))) (parseToken (Token Nothing (TOperator (COperator ")")))) parseDParameterTypeList
+      parseLeft = parseCDirectDeclaratorIdentifier
+      parseRight = between (parseToken (Token Nothing (COperatorToken "("))) (parseToken (Token Nothing (COperatorToken ")"))) parseCParameterTypeList
 
-  parseDPointer = do
-    many1 (parseToken (Token Nothing (TOperator (COperator "*"))))
-    list <- optionMaybe (parseDTypeQualifierList)
-    return (DPointer list)
+  parseCPointer = do
+    many1 (parseToken (Token Nothing (COperatorToken "*")))
+    list <- optionMaybe (parseCTypeQualifierList)
+    return (CPointer list)
 
-  parseDTypeQualifierList = do
-    list <- many1 (parseDTypeQualifier)
-    return (DTypeQualifierList list)
+  parseCTypeQualifierList = do
+    list <- many1 (parseCTypeQualifier)
+    return (CTypeQualifierList list)
 
-  parseDParameterTypeList = parseDParameterList
+  parseCParameterTypeList = parseCParameterList
 
-  parseDParameterList = do
-    list <- many (parseDParameterDeclaration)
-    return (DParameterList list)
+  parseCParameterList = do
+    list <- many (parseCParameterDeclaration)
+    return (CParameterList list)
 
-  parseDParameterDeclaration = do
-    spec <- parseDSpecifiers
-    dec <- parseDDeclarator
-    return (DParameterDeclaration spec dec)
+  parseCParameterDeclaration = do
+    spec <- parseCSpecifiers
+    dec <- parseCDeclarator
+    return (CParameterDeclaration spec dec)
 
-  parseDIdentifierList = do
-    list <- sepBy1 parseEIdentifier (parseToken (Token Nothing (TOperator (COperator ","))))
-    return (DIdentifierList list)
+  parseCIdentifierList = do
+    list <- sepBy1 parseCIdentifier (parseToken (Token Nothing (COperatorToken ",")))
+    return (CIdentifierList list)
 
-  parseSLabeledIdentifier = do
-    expr <- parseEIdentifier
-    parseToken (Token Nothing (TOperator (COperator ":")))
-    stat <- parseStatement
-    return (SLabeledIdentifier expr stat)
+  parseCLabeledIdentifier = do
+    expr <- parseCIdentifier
+    parseToken (Token Nothing (COperatorToken ":"))
+    stat <- parseCStatement
+    return (CLabeledIdentifier expr stat)
 
-  parseSLabeledCase = do
-    parseToken (Token Nothing (TKeyword (CKeyword "case")))
+  parseCLabeledCase = do
+    parseToken (Token Nothing (CKeywordToken "case"))
     expr <- parseCExpression
-    parseToken (Token Nothing (TOperator (COperator ":")))
-    statement <- parseStatement
-    return (SLabeledCase expr statement)
+    parseToken (Token Nothing (COperatorToken ":"))
+    statement <- parseCStatement
+    return (CLabeledCase expr statement)
 
-  parseSLabeledDefault = do
-    parseToken (Token Nothing (TKeyword (CKeyword "default")))
-    parseToken (Token Nothing (TOperator (COperator ":")))
-    statement <- parseStatement
-    return (SLabeledDefault statement)
+  parseCLabeledDefault = do
+    parseToken (Token Nothing (CKeywordToken "default"))
+    parseToken (Token Nothing (COperatorToken ":"))
+    statement <- parseCStatement
+    return (CLabeledDefault statement)
 
-  parseSDeclarationList = do
-    list <- many1 parseDeclaration
-    return (SDeclarationList list)
+  parseCDeclarationList = do
+    list <- many1 parseCeclaration
+    return (CDeclarationList list)
 
-  parseSList = do
-    list <- many1 parseStatement
-    return (SList list)
+  parseCList = do
+    list <- many1 parseCStatement
+    return (CList list)
 
-  parseSCompound = do
-    parseToken (Token Nothing (TPunctuator (CPunctuator "{")))
-    firstList <- optionMaybe parseSDeclarationList
-    secondList <- optionMaybe parseSList
-    parseToken (Token Nothing (TPunctuator (CPunctuator "}")))
-    return (SCompound firstList secondList)
+  parseCCompound = do
+    parseToken (Token Nothing (CPunctuatorToken "{"))
+    firstList <- optionMaybe parseCDeclarationList
+    secondList <- optionMaybe parseCList
+    parseToken (Token Nothing (CPunctuatorToken "}"))
+    return (CCompound firstList secondList)
 
-  parseSCExpression = do
+  parseCCExpression = do
     expr <- optionMaybe parseCExpression
-    parseToken (Token Nothing (TPunctuator (CPunctuator ";")))
-    return (SCExpression expr)
+    parseToken (Token Nothing (CPunctuatorToken ";"))
+    return (CCExpression expr)
 
-  parseSIf = do
-    parseToken (Token Nothing (TKeyword (CKeyword "if")))
-    parseToken (Token Nothing (TOperator (COperator "(")))
+  parseCIf = do
+    parseToken (Token Nothing (CKeywordToken "if"))
+    parseToken (Token Nothing (COperatorToken "("))
     expr <- parseCExpression
-    parseToken (Token Nothing (TOperator (COperator ")")))
-    statement <- parseStatement
-    return (SIf expr statement)
+    parseToken (Token Nothing (COperatorToken ")"))
+    statement <- parseCStatement
+    return (CIf expr statement)
 
-  parseSIfElse = do
-    parseToken (Token Nothing (TKeyword (CKeyword "if")))
-    parseToken (Token Nothing (TOperator (COperator "(")))
+  parseCIfClse = do
+    parseToken (Token Nothing (CKeywordToken "if"))
+    parseToken (Token Nothing (COperatorToken "("))
     expr <- parseCExpression
-    parseToken (Token Nothing (TOperator (COperator ")")))
-    firstStatement <- parseStatement
-    parseToken (Token Nothing (TKeyword (CKeyword "else")))
-    secondStatement <- parseStatement
-    return (SIfElse expr firstStatement secondStatement)
+    parseToken (Token Nothing (COperatorToken ")"))
+    firstCStatement <- parseCStatement
+    parseToken (Token Nothing (CKeywordToken "else"))
+    secondCStatement <- parseCStatement
+    return (CIfElse expr firstCStatement secondCStatement)
 
-  parseSSwitch = do
-    parseToken (Token Nothing (TKeyword (CKeyword "switch")))
-    parseToken (Token Nothing (TOperator (COperator "(")))
+  parseCSwitch = do
+    parseToken (Token Nothing (CKeywordToken "switch"))
+    parseToken (Token Nothing (COperatorToken "("))
     expr <- parseCExpression
-    parseToken (Token Nothing (TOperator (COperator ")")))
-    statement <- parseStatement
-    return (SSwitch expr statement)
+    parseToken (Token Nothing (COperatorToken ")"))
+    statement <- parseCStatement
+    return (CSwitch expr statement)
 
-  parseSWhile = do
-    parseToken (Token Nothing (TKeyword (CKeyword "while")))
-    parseToken (Token Nothing (TOperator (COperator "(")))
+  parseCWhile = do
+    parseToken (Token Nothing (CKeywordToken "while"))
+    parseToken (Token Nothing (COperatorToken "("))
     expr <- parseCExpression
-    parseToken (Token Nothing (TOperator (COperator ")")))
-    statement <- parseStatement
-    return (SWhile expr statement)
+    parseToken (Token Nothing (COperatorToken ")"))
+    statement <- parseCStatement
+    return (CWhile expr statement)
 
-  parseSDo = do
-    parseToken (Token Nothing (TKeyword (CKeyword "do")))
-    statement <- parseStatement
-    parseToken (Token Nothing (TKeyword (CKeyword "while")))
-    parseToken (Token Nothing (TOperator (COperator "(")))
+  parseCDo = do
+    parseToken (Token Nothing (CKeywordToken "do"))
+    statement <- parseCStatement
+    parseToken (Token Nothing (CKeywordToken "while"))
+    parseToken (Token Nothing (COperatorToken "("))
     expr <- parseCExpression
-    parseToken (Token Nothing (TOperator (COperator ")")))
-    parseToken (Token Nothing (TPunctuator (CPunctuator ";")))
-    return (SDo statement expr)
+    parseToken (Token Nothing (COperatorToken ")"))
+    parseToken (Token Nothing (CPunctuatorToken ";"))
+    return (CDo statement expr)
 
-  parseSFor = do
-    parseToken (Token Nothing (TKeyword (CKeyword "for")))
-    parseToken (Token Nothing (TOperator (COperator "(")))
-    firstExpr <- optionMaybe parseCExpression
-    parseToken (Token Nothing (TPunctuator (CPunctuator ";")))
-    secondExpr <- optionMaybe parseCExpression
-    parseToken (Token Nothing (TPunctuator (CPunctuator ";")))
-    thirdExpr <- optionMaybe parseCExpression
-    parseToken (Token Nothing (TOperator (COperator ")")))
-    statement <- parseStatement
-    return (SFor firstExpr secondExpr thirdExpr statement)
+  parseCFor = do
+    parseToken (Token Nothing (CKeywordToken "for"))
+    parseToken (Token Nothing (COperatorToken "("))
+    firstCxpr <- optionMaybe parseCExpression
+    parseToken (Token Nothing (CPunctuatorToken ";"))
+    secondCxpr <- optionMaybe parseCExpression
+    parseToken (Token Nothing (CPunctuatorToken ";"))
+    thirdCxpr <- optionMaybe parseCExpression
+    parseToken (Token Nothing (COperatorToken ")"))
+    statement <- parseCStatement
+    return (CFor firstCxpr secondCxpr thirdCxpr statement)
 
-  parseSGoto = do
-    parseToken (Token Nothing (TKeyword (CKeyword "goto")))
-    identifier <- parseEIdentifier
-    parseToken (Token Nothing (TPunctuator (CPunctuator ";")))
-    return (SGoto identifier)
+  parseCGoto = do
+    parseToken (Token Nothing (CKeywordToken "goto"))
+    identifier <- parseCIdentifier
+    parseToken (Token Nothing (CPunctuatorToken ";"))
+    return (CGoto identifier)
 
-  parseSContinue = do
-    parseToken (Token Nothing (TKeyword (CKeyword "continue")))
-    parseToken (Token Nothing (TPunctuator (CPunctuator ";")))
-    return SContinue
+  parseCContinue = do
+    parseToken (Token Nothing (CKeywordToken "continue"))
+    parseToken (Token Nothing (CPunctuatorToken ";"))
+    return CContinue
 
-  parseSBreak = do
-    parseToken (Token Nothing (TKeyword (CKeyword "break")))
-    parseToken (Token Nothing (TPunctuator (CPunctuator ";")))
-    return SBreak
+  parseCBreak = do
+    parseToken (Token Nothing (CKeywordToken "break"))
+    parseToken (Token Nothing (CPunctuatorToken ";"))
+    return CBreak
 
-  parseSReturn = do
-    parseToken (Token Nothing (TKeyword (CKeyword "return")))
+  parseCReturn = do
+    parseToken (Token Nothing (CKeywordToken "return"))
     expr <- optionMaybe parseCExpression
-    parseToken (Token Nothing (TPunctuator (CPunctuator ";")))
-    return (SReturn expr)
+    parseToken (Token Nothing (CPunctuatorToken ";"))
+    return (CReturn expr)
 
-  parseStatement =
-    try parseSLabeledIdentifier <|>
-    parseSLabeledCase <|>
-    parseSLabeledDefault <|>
-    parseSCompound <|>
-    parseSCExpression <|>
-    try parseSIfElse <|>
-    parseSIf <|>
-    parseSSwitch <|>
-    parseSWhile <|>
-    parseSDo <|>
-    parseSFor <|>
-    parseSGoto <|>
-    parseSContinue <|>
-    parseSBreak <|>
-    parseSReturn
+  parseCStatement =
+    try parseCLabeledIdentifier <|>
+    parseCLabeledCase <|>
+    parseCLabeledDefault <|>
+    parseCCompound <|>
+    parseCCExpression <|>
+    try parseCIfClse <|>
+    parseCIf <|>
+    parseCSwitch <|>
+    parseCWhile <|>
+    parseCDo <|>
+    parseCFor <|>
+    parseCGoto <|>
+    parseCContinue <|>
+    parseCBreak <|>
+    parseCReturn
 
-  parseEDTranslationUnit = do
-    list <- many1 (try parseEDDeclaration <|> try parseEDFunction)
-    return (EDTranslationUnit list)
+  parseCTranslationUnit = do
+    list <- many1 (try parseCDeclaration <|> try parseCFunction)
+    return (CTranslationUnit list)
 
-  parseEDDeclaration = do
-    dec <- parseDeclaration
-    return (EDDeclaration dec)
+  parseCDeclaration = do
+    dec <- parseCeclaration
+    return (CExternalDeclaration dec)
 
-  parseEDFunction = do
-    firstDec <- optionMaybe parseDSpecifiers
-    secondDec <- parseDDeclarator
-    firstStat <- optionMaybe parseSDeclarationList
-    secondStat <- parseSCompound
-    return (EDFunction firstDec secondDec firstStat secondStat)
+  parseCFunction = do
+    firstDec <- optionMaybe parseCSpecifiers
+    secondDec <- parseCDeclarator
+    firstStat <- optionMaybe parseCDeclarationList
+    secondStat <- parseCCompound
+    return (CFunction firstDec secondDec firstStat secondStat)
 
-  parse = Text.Parsec.parse (parseEDTranslationUnit) ""
+  parse = Text.Parsec.parse (parseCTranslationUnit) ""

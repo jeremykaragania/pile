@@ -106,42 +106,42 @@ module Lexer where
   scanCKeyword = do
     sourcePos <- getPosition
     value <- choice (map try (map (P.symbol lexer) (P.reservedNames languageDef)))
-    return (Token (Just sourcePos) (TKeyword (CKeyword value)))
+    return (Token (Just sourcePos) (CKeywordToken value))
 
   scanCIdentifier = do
     sourcePos <- getPosition
     value <- try (P.identifier lexer)
-    return (Token (Just sourcePos) (TIdentifier (CIdentifier value)))
+    return (Token (Just sourcePos) (CIdentifierToken value))
 
   scanCFloatingConstant = do
     sourcePos <- getPosition
     value <- try (P.float lexer)
-    return (Token (Just sourcePos) (TConstant (CFloatingConstant value)))
+    return (Token (Just sourcePos) (CConstantToken (CFloatingConstant value)))
 
   scanCIntegerConstant = do
     sourcePos <- getPosition
     value <- try (P.integer lexer)
-    return (Token (Just sourcePos) (TConstant (CIntegerConstant value)))
+    return (Token (Just sourcePos) (CConstantToken (CIntegerConstant value)))
 
   scanCCharacterConstant = do
     sourcePos <- getPosition
     value <- try (P.charLiteral lexer)
-    return (Token (Just sourcePos) (TConstant (CCharacterConstant value)))
+    return (Token (Just sourcePos) (CConstantToken (CCharacterConstant value)))
 
   scanCStringLiteral = do
     sourcePos <- getPosition
     value <- try (P.stringLiteral lexer)
-    return (Token (Just sourcePos) (TStringLiteral (CStringLiteral value)))
+    return (Token (Just sourcePos) (CStringLiteralToken value))
 
   scanCOperator = do
     sourcePos <- getPosition
     value <- choice (map try (map (P.symbol lexer) (P.reservedOpNames languageDef)))
-    return (Token (Just sourcePos) (TOperator (COperator value)))
+    return (Token (Just sourcePos) (COperatorToken value))
 
   scanCPunctuator = do
     sourcePos <- getPosition
     value <- try (choice (map (P.symbol lexer) (["[", "]", "(", ")", "{", "}", "*", ",", ":", "=", ";", "...", "#"])))
-    return (Token (Just sourcePos) (TPunctuator (CPunctuator value)))
+    return (Token (Just sourcePos) (CPunctuatorToken value))
 
   scanToken =
     scanCKeyword <|>
