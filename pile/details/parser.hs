@@ -488,7 +488,7 @@ module Parser where
     parseCReturn
 
   parseCTranslationUnit = do
-    list <- many1 (try parseCDeclaration <|> try parseCFunction)
+    list <- many1 (try parseCDeclaration <|> parseCFunction)
     return (CTranslationUnit list)
 
   parseCDeclaration = do
