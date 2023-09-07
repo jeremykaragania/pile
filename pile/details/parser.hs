@@ -254,7 +254,7 @@ module Parser where
 
   parseCExpression = parseCAssignment
 
-  parseCeclaration = do
+  parseCDeclaration = do
     spec <- parseCSpecifiers
     dec <- optionMaybe parseCInitDeclaratorList
     parseToken (Token Nothing (CPunctuatorToken ";"))
@@ -373,7 +373,7 @@ module Parser where
     return (CLabeledDefault statement)
 
   parseCDeclarationList = do
-    list <- many1 parseCeclaration
+    list <- many1 parseCDeclaration
     return (CDeclarationList list)
 
   parseCList = do
@@ -488,11 +488,11 @@ module Parser where
     parseCReturn
 
   parseCTranslationUnit = do
-    list <- many1 (try parseCDeclaration <|> parseCFunction)
+    list <- many1 (try parseCExternalDeclaration <|> parseCFunction)
     return (CTranslationUnit list)
 
-  parseCDeclaration = do
-    dec <- parseCeclaration
+  parseCExternalDeclaration = do
+    dec <- parseCDeclaration
     return (CExternalDeclaration dec)
 
   parseCFunction = do
