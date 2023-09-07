@@ -158,7 +158,7 @@ module Syntax where
     IRAshr IRArgument IRArgument |
     IRAnd IRArgument IRArgument |
     IROr IRArgument IRArgument |
-    IRXOr IRArgument IRArgument |
+    IRXor IRArgument IRArgument |
     IRAlloca IRType (Maybe IRArgument) (Maybe Integer) |
     IRLoad IRArgument (Maybe Integer) |
     IRStore IRArgument IRArgument (Maybe Integer) deriving Show
@@ -171,5 +171,4 @@ module Syntax where
     IRFunctionGlobal IRType String [IRArgument] [IRBasicBlock] |
     IRVariableGlobal String IRType deriving Show
 
-  data IRModule =
-    IRModule [IRGlobalValue] deriving Show
+  data IRModule = IRModule [[IRGlobalValue]] deriving Show

@@ -1,4 +1,4 @@
-module CodeGenerator where
+module Generator where
   import Data.Char
   import Data.List
   import Lexer
@@ -12,6 +12,26 @@ module CodeGenerator where
   edDeclarator (CFunction _ a _ _) = a
 
   edSCompound (CFunction _ _ _ a) = a
+
+  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken "int")]) a = IRInteger (value a)
+    where
+      value (CInitDeclarator _ (CConstant (CConstantToken (CIntegerConstant a)))) = a
+      value (CDeclarator _ _) = 0
+
+  generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList [])))) c = c
+
+  generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList (b:bs))))) c = generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList bs)))) (IRVariableGlobal (identifier b) (generateIRType a b) : c)
+    where
+      identifier (CInitDeclarator (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) _) = a
+      identifier (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
+
+  generateIRModule (CTranslationUnit []) a = (IRModule a)
+
+  generateIRModule (CTranslationUnit (a:as)) b = generateIRModule (CTranslationUnit as) (function a : b)
+    where
+      function a = do
+        case a of
+          (CExternalDeclaration _) -> generateIRVariableGlobal a []
 
   generateEConstant (CIntegerConstant a) = "mov r3, #" ++ show a
 
