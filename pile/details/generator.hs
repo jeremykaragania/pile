@@ -13,9 +13,14 @@ module Generator where
 
   edSCompound (CFunction _ _ _ a) = a
 
-  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken "int")]) a = IRInteger (value a)
+  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken a)]) b
+    | a == "float" = IRFloat (value b)
+    | a == "int" = IRInteger ((floor . value) b)
+    | a == "char" = IRInteger ((floor . value) b)
     where
-      value (CInitDeclarator _ (CConstant (CConstantToken (CIntegerConstant a)))) = a
+      value (CInitDeclarator _ (CConstant (CConstantToken (CFloatingConstant a)))) = a
+      value (CInitDeclarator _ (CConstant (CConstantToken (CIntegerConstant a)))) = fromIntegral a
+      value (CInitDeclarator _ (CConstant (CConstantToken (CCharacterConstant a)))) = (fromIntegral . ord) a
       value (CDeclarator _ _) = 0
 
   generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList [])))) c = c
