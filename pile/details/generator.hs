@@ -13,22 +13,37 @@ module Generator where
 
   edSCompound (CFunction _ _ _ a) = a
 
-  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken a)]) b
-    | a == "float" = IRFloat (value b)
-    | a == "int" = IRInteger ((floor . value) b)
-    | a == "char" = IRInteger ((floor . value) b)
-    where
-      value (CInitDeclarator _ (CConstant (CConstantToken (CFloatingConstant a)))) = a
-      value (CInitDeclarator _ (CConstant (CConstantToken (CIntegerConstant a)))) = fromIntegral a
-      value (CInitDeclarator _ (CConstant (CConstantToken (CCharacterConstant a)))) = (fromIntegral . ord) a
-      value (CDeclarator _ _) = 0
+  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken a)]) (Just (CPointer _)) = IRPointer (generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken a)]) Nothing)
+
+  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken "void")]) Nothing = IRVoid
+
+  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken "int")]) Nothing = IRInteger
+
+  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken "float")]) Nothing = IRFloat
+
+  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken "double")]) Nothing = IRDouble
+
+  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken "long")]) Nothing = IRLongDouble
+
+  generateIRConstant (CInitDeclarator _ (CConstant (CConstantToken (CFloatingConstant a)))) = IRFloatingConstant a
+
+  generateIRConstant (CInitDeclarator _ (CConstant (CConstantToken (CIntegerConstant a)))) = IRIntegerConstant a
+
+  generateIRConstant (CInitDeclarator _ (CConstant (CConstantToken (CCharacterConstant a)))) = IRIntegerConstant ((fromIntegral . ord) a)
+
+  generateIRConstant (CDeclarator _ _) = IRIntegerConstant 0
 
   generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList [])))) c = c
 
-  generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList (b:bs))))) c = generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList bs)))) (IRVariableGlobal (identifier b) (generateIRType a b) : c)
+  generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList (b:bs))))) c = generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList bs)))) (IRVariableGlobal (identifier b) (generateIRType a (pointer b)) (generateIRConstant b) : c)
     where
       identifier (CInitDeclarator (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) _) = a
+
       identifier (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
+
+      pointer (CInitDeclarator (CDeclarator a _) _) = a
+
+      pointer (CDeclarator a _) = a
 
   generateIRModule (CTranslationUnit []) a = (IRModule a)
 

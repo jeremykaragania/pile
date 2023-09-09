@@ -1,5 +1,4 @@
 module Syntax where
-
   data CToken =
     CKeywordToken {keyword :: String} |
     CIdentifierToken {identifier :: String} |
@@ -121,20 +120,20 @@ module Syntax where
   data IRType =
     IRVoid |
     IRFunction Bool IRType [IRType] |
-    IRInteger Integer |
-    IRFloat Double |
-    IRDouble Double |
-    IRLongDouble Double |
-    IRPointer Integer |
+    IRInteger |
+    IRFloat |
+    IRDouble |
+    IRLongDouble |
+    IRPointer IRType |
     IRArray Integer IRType |
     IRStructure Bool [IRType] deriving Show
 
   data IRConstant =
-    IRIntegerConstant IRType |
-    IRFloatingConstant IRType |
+    IRIntegerConstant Integer |
+    IRFloatingConstant Double |
     IRNullPointerConstant |
-    IRArrayConstant IRType |
-    IRStructureConstant IRType deriving Show
+    IRArrayConstant [(IRType, IRConstant)] |
+    IRStructureConstant [(IRType, IRConstant)] deriving Show
 
   data IRInstruction =
     IRRet (Maybe IRArgument) |
@@ -169,6 +168,6 @@ module Syntax where
 
   data IRGlobalValue =
     IRFunctionGlobal IRType String [IRArgument] [IRBasicBlock] |
-    IRVariableGlobal String IRType deriving Show
+    IRVariableGlobal String IRType IRConstant deriving Show
 
   data IRModule = IRModule [[IRGlobalValue]] deriving Show
