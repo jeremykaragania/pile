@@ -341,7 +341,7 @@ module Parser where
   parseCParameterTypeList = parseCParameterList
 
   parseCParameterList = do
-    list <- many (parseCParameterDeclaration)
+    list <- sepBy parseCParameterDeclaration (parseToken (Token Nothing (COperatorToken ",")))
     return (CParameterList list)
 
   parseCParameterDeclaration = do

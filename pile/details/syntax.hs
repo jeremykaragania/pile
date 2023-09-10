@@ -126,7 +126,7 @@ module Syntax where
     IRLongDouble |
     IRPointer IRType |
     IRArray Integer IRType |
-    IRStructure Bool [IRType] deriving Show
+    IRStructure Bool [IRType] deriving (Show, Eq)
 
   data IRConstant =
     IRIntegerConstant Integer |
@@ -162,7 +162,7 @@ module Syntax where
     IRLoad IRArgument (Maybe Integer) |
     IRStore IRArgument IRArgument (Maybe Integer) deriving Show
 
-  data IRBasicBlock = IRBasicBlock [((Maybe String), IRInstruction)] deriving Show
+  data IRBasicBlock = IRBasicBlock String [((Maybe String), IRInstruction)] deriving Show
 
   data IRArgument = IRArgument IRType (Maybe String) deriving Show
 

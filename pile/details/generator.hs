@@ -13,37 +13,42 @@ module Generator where
 
   edSCompound (CFunction _ _ _ a) = a
 
-  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken a)]) (Just (CPointer _)) = IRPointer (generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken a)]) Nothing)
-
   generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken "void")]) Nothing = IRVoid
 
   generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken "int")]) Nothing = IRInteger
 
+  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken "char")]) Nothing = IRInteger
+
   generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken "float")]) Nothing = IRFloat
 
-  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken "double")]) Nothing = IRDouble
+  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken a)]) (Just (CPointer _)) = IRPointer (generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken a)]) Nothing)
 
-  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken "long")]) Nothing = IRLongDouble
+  generateIRConstant a b
+    | b == IRFloat = IRFloatingConstant (value a)
+    | otherwise = IRIntegerConstant ((floor . value) a)
+    where
+      value (CConstant (CConstantToken (CFloatingConstant a))) = a
+      value (CConstant (CConstantToken (CIntegerConstant a))) = fromIntegral a
+      value (CConstant (CConstantToken (CCharacterConstant a))) = (fromIntegral . ord) a
+      value _ = 0
 
-  generateIRConstant (CInitDeclarator _ (CConstant (CConstantToken (CFloatingConstant a)))) = IRFloatingConstant a
-
-  generateIRConstant (CInitDeclarator _ (CConstant (CConstantToken (CIntegerConstant a)))) = IRIntegerConstant a
-
-  generateIRConstant (CInitDeclarator _ (CConstant (CConstantToken (CCharacterConstant a)))) = IRIntegerConstant ((fromIntegral . ord) a)
-
-  generateIRConstant (CDeclarator _ _) = IRIntegerConstant 0
+  generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal (generateIRType a (pointer b)) (name b) (map argument (argumentList b)) []]
+    where
+      name (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
+      name (CDeclarator _ (CDirectDeclaratorFunctionCall (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a))) _)) = a
+      pointer (CDeclarator a _) = a
+      argumentList (CDeclarator _ (CDirectDeclaratorFunctionCall _ [CParameterList a])) = a
+      argument (CParameterDeclaration c d) = IRArgument (generateIRType c Nothing) (Just (name d))
 
   generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList [])))) c = c
 
-  generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList (b:bs))))) c = generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList bs)))) (IRVariableGlobal (identifier b) (generateIRType a (pointer b)) (generateIRConstant b) : c)
+  generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList (b:bs))))) c = generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList bs)))) (IRVariableGlobal (name b) (generateIRType a (pointer b)) (generateIRConstant (constant b) (generateIRType a Nothing)) : c)
     where
-      identifier (CInitDeclarator (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) _) = a
-
-      identifier (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
-
+      name (CInitDeclarator (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) _) = a
+      name (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
       pointer (CInitDeclarator (CDeclarator a _) _) = a
-
       pointer (CDeclarator a _) = a
+      constant (CInitDeclarator _ a) = a
 
   generateIRModule (CTranslationUnit []) a = (IRModule a)
 
@@ -51,6 +56,7 @@ module Generator where
     where
       function a = do
         case a of
+          (CFunction _ _ _ _) -> generateIRFunctionGlobal a
           (CExternalDeclaration _) -> generateIRVariableGlobal a []
 
   generateEConstant (CIntegerConstant a) = "mov r3, #" ++ show a
@@ -94,25 +100,15 @@ module Generator where
   generateEDDeclaration a = ((((intercalate "\n") . (map symbol) . dList . edDInitDeclaratorList) a))
     where
       symbol (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a ++ ":"
-
       symbol (CInitDeclarator a (CArithmeticOperator (COperatorToken b, c))) = intercalate "\n" [symbol a, directive c ++ b ++ value c] ++ "\n"
-
       symbol (CInitDeclarator a b) = intercalate "\n" [symbol a, value b] ++ "\n"
-
       directive (CConstant (CConstantToken (CIntegerConstant _))) = ".word "
-
       directive (CConstant (CConstantToken (CFloatingConstant _))) = ".word "
-
       directive (CConstant (CConstantToken (CCharacterConstant _))) = ".byte "
-
       directive (CStringLiteral (CStringLiteralToken _)) = ".ascii "
-
       value (CConstant (CConstantToken (CIntegerConstant a))) = show a
-
       value (CConstant (CConstantToken (CFloatingConstant a))) = show a
-
       value (CConstant (CConstantToken (CCharacterConstant a))) = (show . ord) a
-
       value (CStringLiteral (CStringLiteralToken a)) = "\"" ++ a ++ "\\0\""
 
   generateEDFunction a = intercalate "\n" [
