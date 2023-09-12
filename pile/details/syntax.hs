@@ -125,6 +125,7 @@ module Syntax where
     IRDouble |
     IRLongDouble |
     IRPointer IRType |
+    IRLabel |
     IRArray Integer IRType |
     IRStructure Bool [IRType] deriving (Show, Eq)
 
@@ -136,33 +137,39 @@ module Syntax where
     IRStructureConstant [(IRType, IRConstant)] deriving Show
 
   data IRInstruction =
-    IRRet (Maybe IRArgument) |
-    IRBrConditional IRArgument String String |
+    IRRet (Maybe IRValue) |
+    IRBrConditional IRValue String String |
     IRBRUnconditional String |
-    IRSwitch IRArgument String [(IRConstant, String)] |
-    IRFneg IRArgument |
-    IRAdd IRArgument IRArgument |
-    IRFadd IRArgument IRArgument |
-    IRSub IRArgument IRArgument |
-    IRMul IRArgument IRArgument |
-    IRFMul IRArgument IRArgument |
-    IRUdiv IRArgument IRArgument |
-    IRSdiv IRArgument IRArgument |
-    IRFdiv IRArgument IRArgument |
-    IRUrem IRArgument IRArgument |
-    IRSrem IRArgument IRArgument |
-    IRFrem IRArgument IRArgument |
-    IRShl IRArgument IRArgument |
-    IRLshr IRArgument IRArgument |
-    IRAshr IRArgument IRArgument |
-    IRAnd IRArgument IRArgument |
-    IROr IRArgument IRArgument |
-    IRXor IRArgument IRArgument |
-    IRAlloca IRType (Maybe IRArgument) (Maybe Integer) |
-    IRLoad IRArgument (Maybe Integer) |
-    IRStore IRArgument IRArgument (Maybe Integer) deriving Show
+    IRSwitch IRValue String [(IRConstant, String)] |
+    IRFneg IRValue |
+    IRAdd IRValue IRValue |
+    IRFadd IRValue IRValue |
+    IRSub IRValue IRValue |
+    IRMul IRValue IRValue |
+    IRFMul IRValue IRValue |
+    IRUdiv IRValue IRValue |
+    IRSdiv IRValue IRValue |
+    IRFdiv IRValue IRValue |
+    IRUrem IRValue IRValue |
+    IRSrem IRValue IRValue |
+    IRFrem IRValue IRValue |
+    IRShl IRValue IRValue |
+    IRLshr IRValue IRValue |
+    IRAshr IRValue IRValue |
+    IRAnd IRValue IRValue |
+    IROr IRValue IRValue |
+    IRXor IRValue IRValue |
+    IRAlloca IRType (Maybe IRValue) (Maybe Integer) |
+    IRLoad IRValue (Maybe Integer) |
+    IRStore IRValue IRValue (Maybe Integer) deriving Show
 
-  data IRBasicBlock = IRBasicBlock String [((Maybe String), IRInstruction)] deriving Show
+  data IRBasicBlock = IRBasicBlock String [((Maybe IRLabel), IRInstruction)] deriving Show
+
+  data IRLabel =
+    IRLabelName String |
+    IRLabelNumber Integer deriving Show
+
+  data IRValue = IRValue IRType IRConstant deriving Show
 
   data IRArgument = IRArgument IRType (Maybe String) deriving Show
 

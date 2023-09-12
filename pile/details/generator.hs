@@ -32,15 +32,17 @@ module Generator where
       value (CConstant (CConstantToken (CCharacterConstant a))) = (fromIntegral . ord) a
       value _ = 0
 
-  generateIRBasicBlock (CCompound a b) = [IRBasicBlock "" (zip (repeat Nothing) (map statement (statementList b)))]
+  generateIRBasicBlock (CCompound a b) c = [IRBasicBlock "" (zip (repeat Nothing) (map statement (statementList b)))]
     where
       statementList (Just (CList a)) = a
-      statement (CReturn Nothing) = (IRRet Nothing)
+      statement (CReturn Nothing) = IRRet Nothing
+      statement (CReturn (Just a)) = IRRet (Just (IRValue c (generateIRConstant a c)))
 
   generateIRInstruction (Just (CList a)) = []
 
-  generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal (generateIRType a (pointer b)) (name b) (map argument (argumentList b)) (generateIRBasicBlock c)]
+  generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (generateIRBasicBlock c functionType)]
     where
+      functionType = (generateIRType a (pointer b))
       name (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
       name (CDeclarator _ (CDirectDeclaratorFunctionCall (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a))) _)) = a
       pointer (CDeclarator a _) = a
