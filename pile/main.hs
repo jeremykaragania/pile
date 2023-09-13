@@ -1,24 +1,34 @@
 module Main where
+  import Generator
+  import Lexer
+  import Parser
   import System.Environment
 
-  data Argument =
-    InFile String |
-    OutFile String deriving Show
+  data Options = Options [String] (Maybe String) deriving Show
 
-  parseArgs :: [String] -> [Argument] -> [Argument]
+  inFiles (Options a _) = a
+
+  outFile (Options _ (Just a)) = a
+
+  outFile (Options _ Nothing) = "a.out"
 
   parseArgs [] args = args
 
-  parseArgs [x] args = do
-    parseArgs [] (InFile x : args)
-
-  parseArgs (x:xs) args = do
-    case x of
-      "-o" -> do
-        parseArgs (drop 1 xs) (OutFile (head xs) : args)
-      otherwise -> do
-        parseArgs xs (InFile x : args)
+  parseArgs (a:as) (Options inFiles outFile)
+    | a == "-o" = parseArgs (drop 1 as) (Options inFiles (Just (head as)))
+    | otherwise = parseArgs as (Options (a : inFiles) outFile)
 
   main = do
-    files <- getArgs
+    args <- getArgs
+    let opt = parseArgs args (Options [] Nothing)
+    file <- readFile ((head . inFiles) opt)
+    let tokens = scan file
+    case tokens of
+      Left x -> print x
+      Right x -> do
+        let tree = parse x
+        case tree of
+          Left x -> print x
+          Right x -> do
+            writeFile (outFile opt) (generate x)
     return ()
