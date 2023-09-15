@@ -32,11 +32,15 @@ module Generator where
       value (CConstant (CConstantToken (CCharacterConstant a))) = (fromIntegral . ord) a
       value _ = 0
 
-  generateIRBasicBlock (CCompound a b) c = [IRBasicBlock "" (zip (repeat Nothing) (map statement (statementList b)))]
+  generateIRBasicBlock (CCompound a b) c = [IRBasicBlock "" (declarations ++ statements)]
     where
       statementList (Just (CList a)) = a
       statement (CReturn Nothing) = IRRet Nothing
-      statement (CReturn (Just a)) = IRRet (Just (IRValue c (generateIRConstant a c)))
+      statement (CReturn (Just a)) = IRRet (Just (IRValue (generateIRConstant a c)))
+      statements = zip (repeat Nothing) (map statement (statementList b))
+      declarationList (Just (CDeclarationList a)) = a
+      declaration (CDeclaration a b) = (IRAlloca (generateIRType a Nothing) Nothing Nothing)
+      declarations = zip (repeat Nothing) (map declaration (declarationList a))
 
   generateIRInstruction (Just (CList a)) = []
 
