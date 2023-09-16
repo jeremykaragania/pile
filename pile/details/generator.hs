@@ -34,15 +34,15 @@ module Generator where
 
   generateIRBasicBlock (CCompound a b) c = [IRBasicBlock "" (declarations ++ statements)]
     where
+      declarationList (Just (CDeclarationList a)) = a
+      declarationList Nothing = []
+      declaration (CDeclaration a b) = (IRAlloca (generateIRType a Nothing) Nothing Nothing)
+      declarations = zip (repeat Nothing) (map declaration (declarationList a))
       statementList (Just (CList a)) = a
+      statementList Nothing = []
       statement (CReturn Nothing) = IRRet Nothing
       statement (CReturn (Just a)) = IRRet (Just (IRValue (generateIRConstant a c)))
       statements = zip (repeat Nothing) (map statement (statementList b))
-      declarationList (Just (CDeclarationList a)) = a
-      declaration (CDeclaration a b) = (IRAlloca (generateIRType a Nothing) Nothing Nothing)
-      declarations = zip (repeat Nothing) (map declaration (declarationList a))
-
-  generateIRInstruction (Just (CList a)) = []
 
   generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (generateIRBasicBlock c functionType)]
     where
@@ -62,6 +62,7 @@ module Generator where
       pointer (CInitDeclarator (CDeclarator a _) _) = a
       pointer (CDeclarator a _) = a
       constant (CInitDeclarator _ a) = a
+      constant _ = (CConstant (CConstantToken (CIntegerConstant 0)))
 
   generateIRModule (CTranslationUnit []) a = (IRModule a)
 
