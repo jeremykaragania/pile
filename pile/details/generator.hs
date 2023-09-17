@@ -53,16 +53,10 @@ module Generator where
       argumentList (CDeclarator _ (CDirectDeclaratorFunctionCall _ [CParameterList a])) = a
       argument (CParameterDeclaration c d) = IRArgument (generateIRType c Nothing) (Just (name d))
 
-  generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList [])))) c = c
-
-  generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList (b:bs))))) c = generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList bs)))) (IRVariableGlobal (name b) (generateIRType a (pointer b)) (generateIRConstant (constant b) (generateIRType a Nothing)) : c)
+  generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList b)))) = map variable b
     where
-      name (CInitDeclarator (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) _) = a
-      name (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
-      pointer (CInitDeclarator (CDeclarator a _) _) = a
-      pointer (CDeclarator a _) = a
-      constant (CInitDeclarator _ a) = a
-      constant _ = (CConstant (CConstantToken (CIntegerConstant 0)))
+      variable (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) = IRVariableGlobal d (generateIRType a c) (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0)))(generateIRType a c))
+      variable (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) = IRVariableGlobal d (generateIRType a c) (generateIRConstant e (generateIRType a c))
 
   generateIRModule (CTranslationUnit []) a = (IRModule a)
 
@@ -71,7 +65,7 @@ module Generator where
       function a = do
         case a of
           (CFunction _ _ _ _) -> generateIRFunctionGlobal a
-          (CExternalDeclaration _) -> generateIRVariableGlobal a []
+          (CExternalDeclaration _) -> generateIRVariableGlobal a
 
   generateEConstant (CIntegerConstant a) = "mov r3, #" ++ show a
 
