@@ -36,13 +36,15 @@ module Generator where
     where
       declarationList (Just (CDeclarationList a)) = a
       declarationList Nothing = []
-      declaration (CDeclaration a b) = (IRAlloca (generateIRType a Nothing) Nothing Nothing)
-      declarations = zip (repeat Nothing) (map declaration (declarationList a))
+      declaration (CDeclaration a (Just (CInitDeclaratorList b))) = map (irAlloca a) b
+      irAlloca a (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) = (Nothing, IRAlloca (generateIRType a c) Nothing Nothing)
+      irAlloca a (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) = (Nothing, IRAlloca (generateIRType a c) Nothing Nothing)
+      declarations = map declaration (declarationList a)
       statementList (Just (CList a)) = a
       statementList Nothing = []
       statement (CReturn Nothing) = IRRet Nothing
       statement (CReturn (Just a)) = IRRet (Just (IRValue (generateIRConstant a c)))
-      statements = zip (repeat Nothing) (map statement (statementList b))
+      statements = [zip (repeat Nothing) (map statement (statementList b))]
 
   generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (generateIRBasicBlock c functionType)]
     where
