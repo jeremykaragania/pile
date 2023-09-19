@@ -36,9 +36,11 @@ module Generator where
     where
       declarationList (Just (CDeclarationList a)) = a
       declarationList Nothing = []
-      declaration (CDeclaration a (Just (CInitDeclaratorList b))) = map (irAlloca a) b
+      declaration (CDeclaration a (Just (CInitDeclaratorList b))) = map (irAlloca a) b ++ map (irStore a) b
       irAlloca a (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) = (Nothing, IRAlloca (generateIRType a c) Nothing Nothing)
       irAlloca a (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) = (Nothing, IRAlloca (generateIRType a c) Nothing Nothing)
+      irStore a (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) = (Nothing, IRStore (IRValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0))) (generateIRType a c))) (IRValue IRNullPointerConstant) Nothing)
+      irStore a (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) = (Nothing, IRStore (IRValue (generateIRConstant e (generateIRType a c))) (IRValue IRNullPointerConstant) Nothing)
       declarations = map declaration (declarationList a)
       statementList (Just (CList a)) = a
       statementList Nothing = []
