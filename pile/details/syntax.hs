@@ -177,4 +177,4 @@ module Syntax where
     IRFunctionGlobal IRType String [IRArgument] [IRBasicBlock] |
     IRVariableGlobal String IRType IRConstant deriving Show
 
-  data IRModule = IRModule [[IRGlobalValue]] deriving Show
+  data IRModule = IRModule [IRGlobalValue] deriving Show
