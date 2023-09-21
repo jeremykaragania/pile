@@ -120,7 +120,9 @@ module Syntax where
   data IRType =
     IRVoid |
     IRFunction Bool IRType [IRType] |
+    IRShortInteger|
     IRInteger |
+    IRLongInteger |
     IRFloat |
     IRDouble |
     IRLongDouble |

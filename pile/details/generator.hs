@@ -10,11 +10,23 @@ module Generator where
 
   generateIRType (CSpecifiers a) Nothing
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "void")] = IRVoid
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "short")] = IRShortInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "short")] = IRShortInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "short"), CTypeSpecifier (CKeywordToken "int")] = IRShortInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "short"), CTypeSpecifier (CKeywordToken "int")] = IRShortInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "short")] = IRShortInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "short"), CTypeSpecifier (CKeywordToken "int")] = IRShortInteger
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "int")] = IRInteger
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed")] = IRInteger
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "int")] = IRInteger
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned")] = IRInteger
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "int")] = IRInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "long")] = IRLongInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "long")] = IRLongInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "long"), CTypeSpecifier (CKeywordToken "int")] = IRLongInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "long"), CTypeSpecifier (CKeywordToken "int")] = IRLongInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "long")] = IRLongInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "long"), CTypeSpecifier (CKeywordToken "int")] = IRLongInteger
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "char")] = IRInteger
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "char")] = IRInteger
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "char")] = IRInteger
@@ -70,7 +82,9 @@ module Generator where
     where
       irGlobalValueCode (IRFunctionGlobal c d e f) = [d ++ ":"] ++ map ("\t" ++) ["push {r7}", "bx lr"]
       irGlobalValueCode (IRVariableGlobal c d e) = [c ++ ":", "\t" ++ directive d ++ value e]
-      directive IRInteger = ".word "
+      directive IRShortInteger = ".short "
+      directive IRInteger = ".int "
+      directive IRLongInteger = ".long "
       directive IRFloat = ".float "
       directive IRDouble = ".double "
       directive IRLongDouble = ".double "
