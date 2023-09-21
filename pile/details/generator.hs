@@ -1,22 +1,29 @@
 module Generator where
   import Data.Char
   import Data.List
+  import Data.Set (fromList)
   import Lexer
   import Parser
   import Syntax
 
-  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken "void")]) Nothing = IRVoid
-
-  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken "int")]) Nothing = IRInteger
-
-  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken "char")]) Nothing = IRInteger
-
-  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken "float")]) Nothing = IRFloat
-
   generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken a)]) (Just (CPointer _)) = IRPointer (generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken a)]) Nothing)
 
+  generateIRType (CSpecifiers a) Nothing
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "void")] = IRVoid
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "int")] = IRInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed")] = IRInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "int")] = IRInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned")] = IRInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "int")] = IRInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "char")] = IRInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "char")] = IRInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "char")] = IRInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "float")] = IRFloat
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "double")] = IRDouble
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "long"), CTypeSpecifier (CKeywordToken "double")] = IRLongDouble
+
   generateIRConstant a b
-    | b == IRFloat = IRFloatingConstant (value a)
+    | b == IRFloat || b == IRDouble || b == IRLongDouble = IRFloatingConstant (value a)
     | otherwise = IRIntegerConstant ((floor . value) a)
     where
       value (CConstant (CConstantToken (CFloatingConstant a))) = a
@@ -61,11 +68,13 @@ module Generator where
 
   generateIRModuleCode (IRModule a) = intercalate "\n" (map (intercalate "\n" . irGlobalValueCode) a)
     where
-      irGlobalValueCode (IRFunctionGlobal c d e f) = [d ++ ":", "\tpush {r7}", "\tbx lr"]
+      irGlobalValueCode (IRFunctionGlobal c d e f) = [d ++ ":"] ++ map ("\t" ++) ["push {r7}", "bx lr"]
       irGlobalValueCode (IRVariableGlobal c d e) = [c ++ ":", "\t" ++ directive d ++ value e]
-      directive IRFloat = ".float "
       directive IRInteger = ".word "
-      value (IRFloatingConstant a) = show a
+      directive IRFloat = ".float "
+      directive IRDouble = ".double "
+      directive IRLongDouble = ".double "
       value (IRIntegerConstant a) = show a
+      value (IRFloatingConstant a) = show a
 
   generate a = (generateIRModuleCode . generateIRModule) a

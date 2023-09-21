@@ -5,12 +5,12 @@ module Syntax where
     CConstantToken {constant :: CConstant} |
     CStringLiteralToken {stringLiteral :: String} |
     COperatorToken {operator :: String} |
-    CPunctuatorToken {punctuator :: String} deriving (Show, Eq)
+    CPunctuatorToken {punctuator :: String} deriving (Show, Eq, Ord)
 
   data CConstant =
     CFloatingConstant {floatingConstant :: Double} |
     CIntegerConstant {integerConstant :: Integer} |
-    CCharacterConstant {characterConstant :: Char} deriving (Show, Eq)
+    CCharacterConstant {characterConstant :: Char} deriving (Show, Eq, Ord)
 
   data CExpression =
     CIdentifier CToken |
@@ -50,7 +50,7 @@ module Syntax where
     CLogicalAnd CExpression [CExpression] |
     CLogicalOr CExpression [CExpression] |
     CConditional CExpression CExpression CExpression |
-    CAssignment CExpression [(CToken, CExpression)] deriving Show
+    CAssignment CExpression [(CToken, CExpression)] deriving (Show, Eq, Ord)
 
   data CDeclaration =
     CDeclaration CDeclaration (Maybe CDeclaration) |
@@ -91,7 +91,7 @@ module Syntax where
     CDirectAbstractDeclaratorFunctionCall CDeclaration |
     CTypedefName CExpression |
     CInitializer (Either CExpression CDeclaration) |
-    CInitializerList [CDeclaration] deriving Show
+    CInitializerList [CDeclaration] deriving (Show, Eq, Ord)
 
   data CStatement =
     CLabeledIdentifier CExpression CStatement |
