@@ -165,7 +165,7 @@ module Syntax where
     IRLoad IRValue (Maybe Integer) |
     IRStore IRValue IRValue (Maybe Integer) deriving Show
 
-  data IRBasicBlock = IRBasicBlock String [[((Maybe IRLabel), IRInstruction)]] deriving Show
+  data IRBasicBlock = IRBasicBlock String [((Maybe IRLabel), IRInstruction)] deriving Show
 
   data IRLabel =
     IRLabelName String |
