@@ -171,7 +171,7 @@ module Syntax where
     IRLabelName String |
     IRLabelNumber Integer deriving Show
 
-  data IRValue = IRValue IRConstant deriving Show
+  data IRValue = IRConstantValue IRConstant deriving Show
 
   data IRArgument = IRArgument IRType (Maybe String) deriving Show
 

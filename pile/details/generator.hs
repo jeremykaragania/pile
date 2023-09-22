@@ -50,13 +50,13 @@ module Generator where
       declaration (CDeclaration a (Just (CInitDeclaratorList b))) = map (irAlloca a) b ++ map (irStore a) b
       irAlloca a (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) = (Nothing, IRAlloca (generateIRType a c) Nothing Nothing)
       irAlloca a (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) = (Nothing, IRAlloca (generateIRType a c) Nothing Nothing)
-      irStore a (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) = (Nothing, IRStore (IRValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0))) (generateIRType a c))) (IRValue IRNullPointerConstant) Nothing)
-      irStore a (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) = (Nothing, IRStore (IRValue (generateIRConstant e (generateIRType a c))) (IRValue IRNullPointerConstant) Nothing)
+      irStore a (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) = (Nothing, IRStore (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0))) (generateIRType a c))) (IRConstantValue IRNullPointerConstant) Nothing)
+      irStore a (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) = (Nothing, IRStore (IRConstantValue (generateIRConstant e (generateIRType a c))) (IRConstantValue IRNullPointerConstant) Nothing)
       declarations = concat (map declaration (declarationList a))
       statementList (Just (CList a)) = a
       statementList Nothing = []
       statement (CReturn Nothing) = IRRet Nothing
-      statement (CReturn (Just a)) = IRRet (Just (IRValue (generateIRConstant a c)))
+      statement (CReturn (Just a)) = IRRet (Just (IRConstantValue (generateIRConstant a c)))
       statements = zip (repeat Nothing) (map statement (statementList b))
 
   generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (generateIRBasicBlock c functionType)]
@@ -78,9 +78,17 @@ module Generator where
       cExternalDefinition (CFunction c d e f) = generateIRFunctionGlobal (CFunction c d e f)
       cExternalDefinition (CExternalDeclaration c) = generateIRVariableGlobal (CExternalDeclaration c)
 
+  generateIRBasicBlockCode a = concat (map irBasicBlockCode a)
+    where
+      irBasicBlockCode (IRBasicBlock _ a) = concat (map instruction a)
+      instruction (Nothing, IRRet Nothing) = ["mov r0, r3", "bx lr"]
+      instruction (Nothing, IRRet (Just a)) = ["mov r3, " ++ (value a), "mov r0, r3", "bx lr"]
+      value (IRConstantValue (IRIntegerConstant a)) = show a
+      value (IRConstantValue (IRFloatingConstant a)) = show a
+
   generateIRModuleCode (IRModule a) = intercalate "\n" (map (intercalate "\n" . irGlobalValueCode) a)
     where
-      irGlobalValueCode (IRFunctionGlobal c d e f) = [d ++ ":"] ++ map ("\t" ++) ["push {r7}", "bx lr"]
+      irGlobalValueCode (IRFunctionGlobal c d e f) = [d ++ ":"] ++ map ("\t" ++) (["push {r7}"] ++ generateIRBasicBlockCode f ++  ["bx lr"])
       irGlobalValueCode (IRVariableGlobal c d e) = [c ++ ":", "\t" ++ directive d ++ value e]
       directive IRShortInteger = ".short "
       directive IRInteger = ".int "
