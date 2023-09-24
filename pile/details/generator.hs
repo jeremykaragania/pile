@@ -1,10 +1,17 @@
 module Generator where
+  import Control.Monad.State
   import Data.Char
   import Data.List
+  import Data.Map (Map)
+  import qualified Data.Map as Map
   import Data.Set (fromList)
   import Lexer
   import Parser
   import Syntax
+
+  data GeneratorState = GeneratorState {list :: [(Maybe IRLabel, IRInstruction)], counter :: Integer, table :: Map String IRLabel}
+
+  type GeneratorStateMonad = State GeneratorState
 
   generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken a)]) (Just (CPointer _)) = IRPointer (generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken a)]) Nothing)
 
@@ -43,16 +50,59 @@ module Generator where
       value (CConstant (CConstantToken (CCharacterConstant a))) = (fromIntegral . ord) a
       value _ = 0
 
-  generateIRBasicBlock (CCompound a b) c = [IRBasicBlock "" (declarations ++ statements)]
+  generateIRBasicBlock (CCompound a b) c = [IRBasicBlock "" ((evalState ((declarations . declarationList) a) (GeneratorState [] 0 Map.empty)) ++ statements)]
     where
       declarationList (Just (CDeclarationList a)) = a
       declarationList Nothing = []
-      declaration (CDeclaration a (Just (CInitDeclaratorList b))) = map (irAlloca a) b ++ map (irStore a) b
-      irAlloca a (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) = (Nothing, IRAlloca (generateIRType a c) Nothing Nothing)
-      irAlloca a (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) = (Nothing, IRAlloca (generateIRType a c) Nothing Nothing)
-      irStore a (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) = (Nothing, IRStore (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0))) (generateIRType a c))) (IRConstantValue IRNullPointerConstant) Nothing)
-      irStore a (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) = (Nothing, IRStore (IRConstantValue (generateIRConstant e (generateIRType a c))) (IRConstantValue IRNullPointerConstant) Nothing)
-      declarations = concat (map declaration (declarationList a))
+
+      irAlloca :: CDeclaration -> [CDeclaration] -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
+      irAlloca a [] = do
+        generatorState <- get
+        return (list generatorState)
+
+      irAlloca a (b:bs) = do
+        generatorState <- get
+        let listState = list generatorState
+        let counterState = counter generatorState
+        let tableState = table generatorState
+        case b of
+          (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) -> put (GeneratorState (listState ++ [(Just (IRLabelNumber counterState), IRAlloca (generateIRType a c) Nothing Nothing)]) (counterState + 1) tableState)
+          (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) -> put (GeneratorState (listState ++ [(Just (IRLabelNumber counterState), IRAlloca (generateIRType a c) Nothing Nothing)]) (counterState + 1) tableState)
+        irAlloca a bs
+
+      irStore :: CDeclaration -> [CDeclaration] -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
+      irStore a [] = do
+        generatorState <- get
+        return (list generatorState)
+
+      irStore a (b:bs) = do
+        generatorState <- get
+        let listState = list generatorState
+        let counterState = counter generatorState
+        let tableState = table generatorState
+        case b of
+          (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) -> put (GeneratorState (listState ++ [(Nothing, IRStore (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0))) (generateIRType a c))) (IRConstantValue IRNullPointerConstant) Nothing)]) counterState tableState)
+          (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) -> put (GeneratorState (listState ++ [(Nothing, IRStore (IRConstantValue (generateIRConstant e (generateIRType a c))) (IRConstantValue IRNullPointerConstant) Nothing)]) counterState tableState)
+        irStore a bs
+
+      declarations :: [CDeclaration] -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
+      declarations [] = do
+        generatorState <- get
+        return (list generatorState)
+
+      declarations (a:as) = do
+        generatorState <- get
+        let listState = list generatorState
+        let counterState = counter generatorState
+        let tableState = table generatorState
+        case a of
+          (CDeclaration d (Just (CInitDeclaratorList e))) -> do
+            let irAllocaState = runState (irAlloca d e) (GeneratorState [] counterState tableState)
+            let counterState = (counter . snd) irAllocaState
+            let irStoreState = runState (irStore d e) (GeneratorState [] counterState tableState)
+            put (GeneratorState (listState ++ (fst irAllocaState) ++ (fst irStoreState)) counterState tableState)
+        declarations as
+
       statementList (Just (CList a)) = a
       statementList Nothing = []
       statement (CReturn Nothing) = IRRet Nothing
