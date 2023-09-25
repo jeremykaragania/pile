@@ -13,7 +13,7 @@ module Generator where
 
   type GeneratorStateMonad = State GeneratorState
 
-  generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken a)]) (Just (CPointer _)) = IRPointer (generateIRType (CSpecifiers [CTypeSpecifier (CKeywordToken a)]) Nothing)
+  generateIRType a (Just (CPointer _)) = IRPointer (generateIRType a Nothing)
 
   generateIRType (CSpecifiers a) Nothing
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "void")] = IRVoid
@@ -81,8 +81,8 @@ module Generator where
         let counterState = counter generatorState
         let tableState = table generatorState
         case b of
-          (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) -> put (GeneratorState (listState ++ [(Nothing, IRStore (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0))) (generateIRType a c))) (IRConstantValue IRNullPointerConstant) Nothing)]) counterState tableState)
-          (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) -> put (GeneratorState (listState ++ [(Nothing, IRStore (IRConstantValue (generateIRConstant e (generateIRType a c))) (IRConstantValue IRNullPointerConstant) Nothing)]) counterState tableState)
+          (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) -> put (GeneratorState (listState ++ [(Nothing, IRStore (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0))) (generateIRType a c))) (generateIRType a (Just (CPointer Nothing))) Nothing)]) counterState tableState)
+          (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) -> put (GeneratorState (listState ++ [(Nothing, IRStore (IRConstantValue (generateIRConstant e (generateIRType a c))) (generateIRType a (Just (CPointer Nothing))) Nothing)]) counterState tableState)
         irStore a bs
 
       declarations :: [CDeclaration] -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
