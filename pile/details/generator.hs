@@ -57,50 +57,50 @@ module Generator where
 
       irAlloca :: CDeclaration -> [CDeclaration] -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
       irAlloca a [] = do
-        generatorState <- get
-        return (list generatorState)
+        getState <- get
+        return (list getState)
 
       irAlloca a (b:bs) = do
-        generatorState <- get
-        let listState = list generatorState
-        let counterState = counter generatorState
-        let tableState = table generatorState
+        getState <- get
         case b of
-          (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) -> put (GeneratorState (listState ++ [(Just (IRLabelNumber counterState), IRAlloca (generateIRType a c) Nothing Nothing)]) (counterState + 1) tableState)
-          (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) -> put (GeneratorState (listState ++ [(Just (IRLabelNumber counterState), IRAlloca (generateIRType a c) Nothing Nothing)]) (counterState + 1) tableState)
+          (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) -> do
+            let putTable = Map.insert d (IRLabelNumber (counter getState)) (table getState)
+            put (GeneratorState ((list getState) ++ [(Just (IRLabelNumber (counter getState)), IRAlloca (generateIRType a c) Nothing Nothing)]) ((counter getState) + 1) putTable)
+          (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) -> do
+            let putTable = Map.insert d (IRLabelNumber (counter getState)) (table getState)
+            put (GeneratorState ((list getState) ++ [(Just (IRLabelNumber (counter getState)), IRAlloca (generateIRType a c) Nothing Nothing)]) ((counter getState) + 1) putTable)
         irAlloca a bs
 
       irStore :: CDeclaration -> [CDeclaration] -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
       irStore a [] = do
-        generatorState <- get
-        return (list generatorState)
+        getState <- get
+        return (list getState)
 
       irStore a (b:bs) = do
-        generatorState <- get
-        let listState = list generatorState
-        let counterState = counter generatorState
-        let tableState = table generatorState
+        getState <- get
         case b of
-          (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) -> put (GeneratorState (listState ++ [(Nothing, IRStore (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0))) (generateIRType a c))) (generateIRType a (Just (CPointer Nothing))) Nothing)]) counterState tableState)
-          (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) -> put (GeneratorState (listState ++ [(Nothing, IRStore (IRConstantValue (generateIRConstant e (generateIRType a c))) (generateIRType a (Just (CPointer Nothing))) Nothing)]) counterState tableState)
+          (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) -> do
+            let label = (table getState) Map.! d
+            put (GeneratorState ((list getState) ++ [(Nothing, IRStore (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0))) (generateIRType a c))) (generateIRType a (Just (CPointer Nothing))) label)]) (counter getState) (table getState))
+          (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) -> do
+            let label = (table getState) Map.! d
+            put (GeneratorState ((list getState) ++ [(Nothing, IRStore (IRConstantValue (generateIRConstant e (generateIRType a c))) (generateIRType a (Just (CPointer Nothing))) label)]) (counter getState) (table getState))
         irStore a bs
 
       declarations :: [CDeclaration] -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
       declarations [] = do
-        generatorState <- get
-        return (list generatorState)
+        getState <- get
+        return (list getState)
 
       declarations (a:as) = do
-        generatorState <- get
-        let listState = list generatorState
-        let counterState = counter generatorState
-        let tableState = table generatorState
+        getState <- get
         case a of
           (CDeclaration d (Just (CInitDeclaratorList e))) -> do
-            let irAllocaState = runState (irAlloca d e) (GeneratorState [] counterState tableState)
-            let counterState = (counter . snd) irAllocaState
-            let irStoreState = runState (irStore d e) (GeneratorState [] counterState tableState)
-            put (GeneratorState (listState ++ (fst irAllocaState) ++ (fst irStoreState)) counterState tableState)
+            let irAllocaState = runState (irAlloca d e) (GeneratorState [] (counter getState) (table getState))
+            let putCounter = (counter . snd) irAllocaState
+            let putTable = (table . snd) irAllocaState
+            let irStoreState = runState (irStore d e) (GeneratorState [] putCounter putTable)
+            put (GeneratorState ((list getState) ++ (fst irAllocaState) ++ (fst irStoreState)) putCounter putTable)
         declarations as
 
       statementList (Just (CList a)) = a
