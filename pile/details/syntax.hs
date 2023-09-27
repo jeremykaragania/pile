@@ -50,7 +50,8 @@ module Syntax where
     CLogicalAnd CExpression [CExpression] |
     CLogicalOr CExpression [CExpression] |
     CConditional CExpression CExpression CExpression |
-    CAssignment CExpression [(CToken, CExpression)] deriving (Show, Eq, Ord)
+    CAssignment CExpression [(CToken, CExpression)] |
+    CExpression [CExpression] deriving (Show, Eq, Ord)
 
   data CDeclaration =
     CDeclaration CDeclaration (Maybe CDeclaration) |

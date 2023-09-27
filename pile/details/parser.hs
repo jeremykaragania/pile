@@ -252,7 +252,9 @@ module Parser where
         expr <- parseLeft
         return (tValue op, expr)
 
-  parseCExpression = parseCAssignment
+  parseCExpression = do
+      list <- sepBy1 parseCAssignment (parseToken (Token Nothing (COperatorToken ",")))
+      return (CExpression list)
 
   parseCDeclaration = do
     spec <- parseCSpecifiers

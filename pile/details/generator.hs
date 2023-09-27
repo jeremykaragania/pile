@@ -45,9 +45,9 @@ module Generator where
     | b == IRFloat || b == IRDouble || b == IRLongDouble = IRFloatingConstant (value a)
     | otherwise = IRIntegerConstant ((floor . value) a)
     where
-      value (CConstant (CConstantToken (CFloatingConstant a))) = a
-      value (CConstant (CConstantToken (CIntegerConstant a))) = fromIntegral a
-      value (CConstant (CConstantToken (CCharacterConstant a))) = (fromIntegral . ord) a
+      value (CExpression [CConstant (CConstantToken (CFloatingConstant a))]) = a
+      value (CExpression [CConstant (CConstantToken (CIntegerConstant a))]) = fromIntegral a
+      value (CExpression [CConstant (CConstantToken (CCharacterConstant a))]) = (fromIntegral . ord) a
       value _ = 0
 
   generateIRBasicBlock (CCompound a b) c = evalState irBasicBlock (GeneratorState [] 0 Map.empty)
