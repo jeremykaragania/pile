@@ -45,10 +45,14 @@ module Generator where
     | b == IRFloat || b == IRDouble || b == IRLongDouble = IRFloatingConstant (value a)
     | otherwise = IRIntegerConstant ((floor . value) a)
     where
-      value (CExpression [CConstant (CConstantToken (CFloatingConstant a))]) = a
-      value (CExpression [CConstant (CConstantToken (CIntegerConstant a))]) = fromIntegral a
-      value (CExpression [CConstant (CConstantToken (CCharacterConstant a))]) = (fromIntegral . ord) a
+      value (CConstant (CConstantToken (CFloatingConstant a))) = a
+      value (CConstant (CConstantToken (CIntegerConstant a))) = fromIntegral a
+      value (CConstant (CConstantToken (CCharacterConstant a))) = (fromIntegral . ord) a
       value _ = 0
+
+  generateIRAlloca a b = IRAlloca (generateIRType a b) Nothing Nothing
+
+  generateIRStore a b c d = IRStore (IRConstantValue (generateIRConstant d (generateIRType a b))) (generateIRType a b) c
 
   generateIRBasicBlock (CCompound a b) c = evalState irBasicBlock (GeneratorState [] 0 Map.empty)
     where
@@ -69,19 +73,12 @@ module Generator where
 
       irAlloca a (b:bs) = do
         getState <- get
-        case b of
-          (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) -> do
-            if (Map.notMember d (table getState)) then do
-                let putTable = Map.insert d (IRLabelNumber (counter getState)) (table getState)
-                put (GeneratorState ((list getState) ++ [(Just (IRLabelNumber (counter getState)), IRAlloca (generateIRType a c) Nothing Nothing)]) ((counter getState) + 1) putTable)
-              else do
-                error ""
-          (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) -> do
-            if (Map.notMember d (table getState)) then do
-              let putTable = Map.insert d (IRLabelNumber (counter getState)) (table getState)
-              put (GeneratorState ((list getState) ++ [(Just (IRLabelNumber (counter getState)), IRAlloca (generateIRType a c) Nothing Nothing)]) ((counter getState) + 1) putTable)
-            else do
-              error ""
+        if (Map.notMember (getIdentifier b) (table getState)) then do
+            let instruction = generateIRAlloca a (getPointer b)
+            let putTable = Map.insert (getIdentifier b) (IRLabelNumber (counter getState)) (table getState)
+            put (GeneratorState ((list getState) ++ [(Just (IRLabelNumber (counter getState)), instruction)]) ((counter getState) + 1) putTable)
+          else do
+            error ""
         irAlloca a bs
 
       irStore :: CDeclaration -> [CDeclaration] -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
@@ -91,14 +88,18 @@ module Generator where
 
       irStore a (b:bs) = do
         getState <- get
-        case b of
-          (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) -> do
-            let label = (table getState) Map.! d
-            put (GeneratorState ((list getState) ++ [(Nothing, IRStore (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0))) (generateIRType a c))) (generateIRType a (Just (CPointer Nothing))) label)]) (counter getState) (table getState))
-          (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) -> do
-            let label = (table getState) Map.! d
-            put (GeneratorState ((list getState) ++ [(Nothing, IRStore (IRConstantValue (generateIRConstant e (generateIRType a c))) (generateIRType a (Just (CPointer Nothing))) label)]) (counter getState) (table getState))
+        let instruction = generateIRStore a (getPointer b) ((table getState) Map.! getIdentifier b) (getConstant b)
+        put (GeneratorState ((list getState) ++ [(Nothing, instruction)]) (counter getState) (table getState))
         irStore a bs
+
+      getIdentifier (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
+      getIdentifier (CInitDeclarator (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) _) = a
+
+      getPointer (CDeclarator a _) = a
+      getPointer (CInitDeclarator a _) = getPointer a
+
+      getConstant (CInitDeclarator _ a) = a
+      getConstant (CDeclarator _ _) = CConstant (CConstantToken (CIntegerConstant 0))
 
       declarations :: [CDeclaration] -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
       declarations [] = do
@@ -127,10 +128,9 @@ module Generator where
       statements (a:as) = do
         getState <- get
         case a of
-          (CReturn Nothing) -> do
-            put (GeneratorState ((list getState) ++ [(Nothing, IRRet Nothing)]) (counter getState) (table getState))
-          (CReturn (Just a)) -> do
-            put (GeneratorState ((list getState) ++ [(Nothing, IRRet (Just (IRConstantValue (generateIRConstant a c))))]) (counter getState) (table getState))
+          (CCExpression (Just (CExpression []))) -> put (GeneratorState ((list getState) ++ [(Nothing, IRRet Nothing)]) (counter getState) (table getState))
+          (CReturn Nothing) -> put (GeneratorState ((list getState) ++ [(Nothing, IRRet Nothing)]) (counter getState) (table getState))
+          (CReturn (Just a)) -> put (GeneratorState ((list getState) ++ [(Nothing, IRRet (Just (IRConstantValue (generateIRConstant a c))))]) (counter getState) (table getState))
         statements as
 
   generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (generateIRBasicBlock c functionType)]

@@ -282,7 +282,7 @@ module Parser where
       do
         dec <- parseCDeclarator
         parseToken (Token Nothing (COperatorToken "="))
-        expr <- parseCExpression
+        expr <- parseCAssignment
         return (CInitDeclarator dec expr)) <|>
       parseCDeclarator
 
