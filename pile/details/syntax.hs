@@ -163,8 +163,8 @@ module Syntax where
     IROr IRValue IRValue |
     IRXor IRValue IRValue |
     IRAlloca IRType (Maybe Integer) (Maybe Integer) |
-    IRLoad IRValue (Maybe Integer) |
-    IRStore IRValue IRType IRLabel deriving Show
+    IRLoad IRType IRValue (Maybe Integer) |
+    IRStore IRValue IRType IRLabel (Maybe Integer) deriving Show
 
   data IRBasicBlock = IRBasicBlock String [(Maybe IRLabel, IRInstruction)] deriving Show
 
@@ -172,7 +172,9 @@ module Syntax where
     IRLabelName String |
     IRLabelNumber Integer deriving Show
 
-  data IRValue = IRConstantValue IRConstant deriving Show
+  data IRValue =
+    IRConstantValue IRConstant |
+    IRLabelValue IRLabel deriving Show
 
   data IRArgument = IRArgument IRType (Maybe String) deriving Show
 
