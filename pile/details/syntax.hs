@@ -145,23 +145,24 @@ module Syntax where
     IRBRUnconditional String |
     IRSwitch IRValue String [(IRConstant, String)] |
     IRFneg IRValue |
-    IRAdd IRValue IRValue |
-    IRFadd IRValue IRValue |
-    IRSub IRValue IRValue |
-    IRMul IRValue IRValue |
-    IRFMul IRValue IRValue |
-    IRUdiv IRValue IRValue |
-    IRSdiv IRValue IRValue |
-    IRFdiv IRValue IRValue |
-    IRUrem IRValue IRValue |
-    IRSrem IRValue IRValue |
-    IRFrem IRValue IRValue |
-    IRShl IRValue IRValue |
-    IRLshr IRValue IRValue |
-    IRAshr IRValue IRValue |
-    IRAnd IRValue IRValue |
-    IROr IRValue IRValue |
-    IRXor IRValue IRValue |
+    IRAdd IRType IRValue IRValue |
+    IRFadd IRType IRValue IRValue |
+    IRSub IRType IRValue IRValue |
+    IRFsub IRType IRValue IRValue |
+    IRMul IRType IRValue IRValue |
+    IRFMul IRType IRValue IRValue |
+    IRUdiv IRType IRValue IRValue |
+    IRSdiv IRType IRValue IRValue |
+    IRFdiv IRType IRValue IRValue |
+    IRUrem IRType IRValue IRValue |
+    IRSrem IRType IRValue IRValue |
+    IRFrem IRType IRValue IRValue |
+    IRShl IRType IRValue IRValue |
+    IRLshr IRType IRValue IRValue |
+    IRAshr IRType IRValue IRValue |
+    IRAnd IRType IRValue IRValue |
+    IROr IRType IRValue IRValue |
+    IRXor IRType IRValue IRValue |
     IRAlloca IRType (Maybe Integer) (Maybe Integer) |
     IRLoad IRType IRValue (Maybe Integer) |
     IRStore IRValue IRType IRLabel (Maybe Integer) deriving Show
