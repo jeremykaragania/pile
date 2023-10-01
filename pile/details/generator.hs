@@ -26,26 +26,26 @@ module Generator where
 
   generateIRType (CSpecifiers a) Nothing
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "void")] = IRVoid
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "short")] = IRShortInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "short")] = IRShortInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "short"), CTypeSpecifier (CKeywordToken "int")] = IRShortInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "short"), CTypeSpecifier (CKeywordToken "int")] = IRShortInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "short")] = IRShortInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "short"), CTypeSpecifier (CKeywordToken "int")] = IRShortInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "int")] = IRInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed")] = IRInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "int")] = IRInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned")] = IRInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "int")] = IRInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "long")] = IRLongInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "long")] = IRLongInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "long"), CTypeSpecifier (CKeywordToken "int")] = IRLongInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "long"), CTypeSpecifier (CKeywordToken "int")] = IRLongInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "long")] = IRLongInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "long"), CTypeSpecifier (CKeywordToken "int")] = IRLongInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "char")] = IRInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "char")] = IRInteger
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "char")] = IRInteger
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "short")] = IRShortInteger IRSigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "short")] = IRShortInteger IRSigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "short"), CTypeSpecifier (CKeywordToken "int")] = IRShortInteger IRSigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "short"), CTypeSpecifier (CKeywordToken "int")] = IRShortInteger IRSigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "short")] = IRShortInteger IRUnsigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "short"), CTypeSpecifier (CKeywordToken "int")] = IRShortInteger IRUnsigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "int")] = IRInteger IRSigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed")] = IRInteger IRSigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "int")] = IRInteger IRSigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned")] = IRInteger IRUnsigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "int")] = IRInteger IRUnsigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "long")] = IRLongInteger IRSigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "long")] = IRLongInteger IRSigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "long"), CTypeSpecifier (CKeywordToken "int")] = IRLongInteger IRSigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "long"), CTypeSpecifier (CKeywordToken "int")] = IRLongInteger IRSigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "long")] = IRLongInteger IRUnsigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "long"), CTypeSpecifier (CKeywordToken "int")] = IRLongInteger IRUnsigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "char")] = IRInteger IRSigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "char")] = IRInteger IRSigned
+    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "char")] = IRInteger IRUnsigned
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "float")] = IRFloat
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "double")] = IRDouble
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "long"), CTypeSpecifier (CKeywordToken "double")] = IRLongDouble
@@ -84,15 +84,18 @@ module Generator where
         return (list gotState)
 
       declarations (a:as) = do
-        gotState <- get
-        case a of
-          (CDeclaration d (Just (CInitDeclaratorList e))) -> do
-            let irAllocaState = runState (irAlloca d e) (GeneratorState [] (counter gotState) (table gotState))
-            let putCounter = (counter . snd) irAllocaState
-            let putTable = (table . snd) irAllocaState
-            let irStoreState = runState (irStore d e) (GeneratorState [] putCounter putTable)
-            put (GeneratorState ((list gotState) ++ (fst irAllocaState) ++ (fst irStoreState)) putCounter putTable)
+        declaration a
         declarations as
+
+      declaration :: CDeclaration -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
+      declaration (CDeclaration d (Just (CInitDeclaratorList e))) = do
+        gotState <- get
+        let irAllocaState = runState (irAlloca d e) (GeneratorState [] (counter gotState) (table gotState))
+        let putCounter = (counter . snd) irAllocaState
+        let putTable = (table . snd) irAllocaState
+        let irStoreState = runState (irStore d e) (GeneratorState [] putCounter putTable)
+        put (GeneratorState ((list gotState) ++ (fst irAllocaState) ++ (fst irStoreState)) putCounter putTable)
+        return (list gotState)
 
       irAlloca :: CDeclaration -> [CDeclaration] -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
       irAlloca a [] = do
@@ -130,14 +133,29 @@ module Generator where
 
       statements (a:as) = do
         gotState <- get
-        case a of
-          (CCExpression (Just (CExpression []))) -> put (GeneratorState ((list gotState) ++ [(Nothing, IRRet Nothing)]) (counter gotState) (table gotState))
-          (CCExpression (Just (CExpression a))) -> do
-            let expressionsState = runState (expressions a) (GeneratorState [] (counter gotState) (table gotState))
-            put (GeneratorState ((list gotState) ++ (fst expressionsState)) (counter gotState) (table gotState))
-          (CReturn Nothing) -> put (GeneratorState ((list gotState) ++ [(Nothing, IRRet Nothing)]) (counter gotState) (table gotState))
-          (CReturn (Just a)) -> put (GeneratorState ((list gotState) ++ [(Nothing, IRRet (Just (IRConstantValue (generateIRConstant a c))))]) (counter gotState) (table gotState))
         statements as
+
+      statement :: CStatement -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
+      statement (CCExpression (Just (CExpression []))) = do
+        gotState <- get
+        put (GeneratorState ((list gotState) ++ [(Nothing, IRRet Nothing)]) (counter gotState) (table gotState))
+        return (list gotState)
+
+      statement (CCExpression (Just (CExpression a))) = do
+        gotState <- get
+        let expressionsState = runState (expressions a) (GeneratorState [] (counter gotState) (table gotState))
+        put (GeneratorState ((list gotState) ++ (fst expressionsState)) ((counter . snd) expressionsState) (table gotState))
+        return (list gotState)
+
+      statement (CReturn Nothing) = do
+        gotState <- get
+        put (GeneratorState ((list gotState) ++ [(Nothing, IRRet Nothing)]) (counter gotState) (table gotState))
+        return (list gotState)
+
+      statement (CReturn (Just a)) = do
+        gotState <- get
+        put (GeneratorState ((list gotState) ++ [(Nothing, IRRet (Just (IRConstantValue (generateIRConstant a c))))]) (counter gotState) (table gotState))
+        return (list gotState)
 
       expressions :: [CExpression] -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
       expressions [] = do
@@ -145,12 +163,16 @@ module Generator where
         return (list gotState)
 
       expressions (a:as) = do
-        gotState <- get
-        case a of
-          (CAssignment a b) -> do
-            let cAssignmentState = runState (cAssignment a b) (GeneratorState [] (counter gotState) (table gotState))
-            put (GeneratorState ((list gotState) ++ (fst cAssignmentState)) (counter gotState) (table gotState))
+        expression a
         expressions as
+
+      expression :: CExpression -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
+      expression (CAssignment a b) = do
+        gotState <- get
+        let cAssignmentState = runState (cAssignment a b) (GeneratorState [] (counter gotState) (table gotState))
+        let putCounter = (counter . snd) cAssignmentState
+        put (GeneratorState ((list gotState) ++ (fst cAssignmentState)) (putCounter) (table gotState))
+        return (list gotState)
 
       cAssignment :: CExpression -> [(CToken, CExpression)] -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
       cAssignment a [] = do
@@ -163,7 +185,7 @@ module Generator where
         case (snd b) of
           (CConstant _) -> do
             let instruction = generateIRStore (IRConstantValue (generateIRConstant (snd b) (snd firstSymbol))) (snd firstSymbol) (fst firstSymbol)
-            put (GeneratorState ((list gotState) ++ [(Nothing, instruction)]) (counter gotState) (table gotState))
+            put (GeneratorState ((list gotState) ++ [(Nothing, instruction)]) ((counter gotState) + 1) (table gotState))
           (CIdentifier a) -> do
             let secondSymbol = (table gotState) Map.! (identifier a)
             let firstInstruction = generateIRLoad (snd secondSymbol) (IRLabelValue (fst secondSymbol))
@@ -202,9 +224,9 @@ module Generator where
     where
       irGlobalValueCode (IRFunctionGlobal c d e f) = [d ++ ":"] ++ map ("\t" ++) (["push {r7}"] ++ generateIRBasicBlockCode f ++  ["bx lr"])
       irGlobalValueCode (IRVariableGlobal c d e) = [c ++ ":", "\t" ++ directive d ++ value e]
-      directive IRShortInteger = ".short "
-      directive IRInteger = ".int "
-      directive IRLongInteger = ".long "
+      directive (IRShortInteger _) = ".short "
+      directive (IRInteger _) = ".int "
+      directive (IRLongInteger _) = ".long "
       directive IRFloat = ".float "
       directive IRDouble = ".double "
       directive IRLongDouble = ".double "

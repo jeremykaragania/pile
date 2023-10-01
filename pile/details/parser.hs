@@ -56,7 +56,7 @@ module Parser where
   parseCPrimary =
       parseCIdentifier <|>
       parseCConstant <|>
-      parseCStringLiteral<|>
+      parseCStringLiteral <|>
       parseCParens
 
   parseLeftRecursion parseLeft parseRight a = do
@@ -80,8 +80,8 @@ module Parser where
   parseCArraySubscript =
     parseLeftRecursion parseLeft parseRight CArraySubscript
     where
-      parseLeft = parseCFunctionCall
-      parseRight = between (parseToken (Token Nothing (COperatorToken "["))) (parseToken (Token Nothing (COperatorToken "]"))) parseCPrimary
+      parseLeft = parseCPrimary
+      parseRight = between (parseToken (Token Nothing (COperatorToken "["))) (parseToken (Token Nothing (COperatorToken "]"))) parseCExpression
 
   parseCFunctionCall = do
     parseLeftRecursion parseLeft parseRight CFunctionCall
@@ -210,16 +210,16 @@ module Parser where
 
   parseCNotEqual = parseBinaryOperator "!=" parseCRelational CNotEqual
 
-  parseEquality =
+  parseCEquality =
     try parseCEqual <|>
     try parseCNotEqual <|>
     parseCRelational
 
-  parseCBitwiseAnd = parseBinaryOperator "&" parseEquality CBitwiseAnd
+  parseCBitwiseAnd = parseBinaryOperator "&" parseCEquality CBitwiseAnd
 
-  parseCBitwiseCxclusiveOr = parseBinaryOperator "|" parseCBitwiseAnd CBitwiseExclusiveOr
+  parseCBitwiseCExclusiveOr = parseBinaryOperator "^" parseCBitwiseAnd CBitwiseExclusiveOr
 
-  parseCBitwiseInclusiveOr = parseBinaryOperator "|" parseCBitwiseCxclusiveOr CBitwiseInclusiveOr
+  parseCBitwiseInclusiveOr = parseBinaryOperator "|" parseCBitwiseCExclusiveOr CBitwiseInclusiveOr
 
   parseCLogicalAnd = parseBinaryOperator "&&" parseCBitwiseInclusiveOr CLogicalAnd
 

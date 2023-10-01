@@ -118,12 +118,16 @@ module Syntax where
     CExternalDeclaration CDeclaration |
     CFunction (Maybe CDeclaration) CDeclaration (Maybe CStatement) CStatement deriving Show
 
+  data IRIntegerType =
+    IRSigned |
+    IRUnsigned deriving (Show, Eq)
+
   data IRType =
     IRVoid |
     IRFunction Bool IRType [IRType] |
-    IRShortInteger|
-    IRInteger |
-    IRLongInteger |
+    IRShortInteger IRIntegerType |
+    IRInteger IRIntegerType |
+    IRLongInteger IRIntegerType |
     IRFloat |
     IRDouble |
     IRLongDouble |
@@ -150,7 +154,7 @@ module Syntax where
     IRSub IRType IRValue IRValue |
     IRFsub IRType IRValue IRValue |
     IRMul IRType IRValue IRValue |
-    IRFMul IRType IRValue IRValue |
+    IRFmul IRType IRValue IRValue |
     IRUdiv IRType IRValue IRValue |
     IRSdiv IRType IRValue IRValue |
     IRFdiv IRType IRValue IRValue |

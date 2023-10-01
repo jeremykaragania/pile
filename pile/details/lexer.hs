@@ -6,8 +6,8 @@ module Lexer where
 
   data Token = Token {tPosition :: (Maybe SourcePos), tValue :: CToken} deriving Show
 
-  instance Eq Token 
-    where 
+  instance Eq Token
+    where
       (Token lhsPos lhsVal) == (Token rhsPos rhsVal) = if lhsVal == rhsVal then True else False
 
   languageDef = emptyDef {
@@ -49,8 +49,7 @@ module Lexer where
       "do",
       "if",
       "static",
-      "while"
-    ],
+      "while"],
     P.reservedOpNames = [
       "~",
       "||",
@@ -96,8 +95,7 @@ module Lexer where
       "##",
       "#",
       "!=",
-      "!"
-    ],
+      "!"],
     P.caseSensitive = True
   }
 
