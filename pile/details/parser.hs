@@ -4,33 +4,28 @@ module Parser where
   import Text.Parsec
   import Syntax
 
-  parseToken t =
-    tokenPrim showTok nextPos testTok
+  parseToken t = tokenPrim showTok nextPos testTok
     where
       showTok x = show x
       nextPos pos x xs = pos
       testTok x = if x == t then Just x else Nothing
 
-  parseCToken testTok =
-    tokenPrim showTok nextPos testTok
+  parseCToken testTok = tokenPrim showTok nextPos testTok
     where
       showTok x = show x
       nextPos pos x xs = pos
 
-  parseCIdentifierToken =
-    parseCToken testTok
+  parseCIdentifierToken = parseCToken testTok
     where
       testTok (Token pos (CIdentifierToken x)) = Just (CIdentifierToken x)
       testTok x = Nothing
 
-  parseCConstantToken =
-    parseCToken testTok
+  parseCConstantToken = parseCToken testTok
     where
       testTok (Token pos (CConstantToken x)) = Just (CConstantToken x)
       testTok x = Nothing
 
-  parseCStringLiteralToken =
-    parseCToken testTok
+  parseCStringLiteralToken = parseCToken testTok
     where
       testTok (Token pos (CStringLiteralToken x)) = Just (CStringLiteralToken x)
       testTok x = Nothing
@@ -68,8 +63,7 @@ module Parser where
       return left
 
   parseBinaryOperator :: String -> ParsecT [Token] u Identity CExpression -> (CExpression -> [CExpression] -> CExpression) -> ParsecT [Token] u Identity CExpression
-  parseBinaryOperator a b c = do
-    parseLeftRecursion parseLeft parseRight c
+  parseBinaryOperator a b c = parseLeftRecursion parseLeft parseRight c
     where
       parseLeft = b
       parseRight = do
@@ -77,20 +71,17 @@ module Parser where
         expr <- parseLeft
         return expr
 
-  parseCArraySubscript =
-    parseLeftRecursion parseLeft parseRight CArraySubscript
+  parseCArraySubscript = parseLeftRecursion parseLeft parseRight CArraySubscript
     where
       parseLeft = parseCPrimary
       parseRight = between (parseToken (Token Nothing (COperatorToken "["))) (parseToken (Token Nothing (COperatorToken "]"))) parseCExpression
 
-  parseCFunctionCall = do
-    parseLeftRecursion parseLeft parseRight CFunctionCall
+  parseCFunctionCall = parseLeftRecursion parseLeft parseRight CFunctionCall
     where
       parseLeft = parseCPrimary
       parseRight = between (parseToken (Token Nothing (COperatorToken "("))) (parseToken (Token Nothing (COperatorToken ")"))) (optionMaybe parseCArgumentList)
 
-  parseCStructOrUnionMember = do
-    parseLeftRecursion parseLeft parseRight CStructOrUnionMember
+  parseCStructOrUnionMember = parseLeftRecursion parseLeft parseRight CStructOrUnionMember
     where
       parseLeft = parseCPrimary
       parseRight = do
@@ -227,30 +218,64 @@ module Parser where
 
   parseCConditional = parseCLogicalOr
 
-  parseCAssignment =
-    parseLeftRecursion parseLeft parseRight CAssignment
+  parseCAssignment = chainr1 parseCPrimary operation
     where
-      parseLeft =
-        try (
-          do
-            left <- parseCConditional
-            return left) <|>
-          parseCUnary
-      parseRight = do
-        op <-
-          parseToken (Token Nothing (COperatorToken "=")) <|>
-          parseToken (Token Nothing (COperatorToken "*=")) <|>
-          parseToken (Token Nothing (COperatorToken "/=")) <|>
-          parseToken (Token Nothing (COperatorToken "%=")) <|>
-          parseToken (Token Nothing (COperatorToken "+=")) <|>
-          parseToken (Token Nothing (COperatorToken "-=")) <|>
-          parseToken (Token Nothing (COperatorToken "<<=")) <|>
-          parseToken (Token Nothing (COperatorToken ">>=")) <|>
-          parseToken (Token Nothing (COperatorToken "&=")) <|>
-          parseToken (Token Nothing (COperatorToken "^=")) <|>
-          parseToken (Token Nothing (COperatorToken "|="))
-        expr <- parseLeft
-        return (tValue op, expr)
+      operation =
+        parseCSimpleAssignment <|>
+        parseCProductAssignment <|>
+        parseCQuotientAssignment <|>
+        parseCRemainderAssignment <|>
+        parseCAdditionAssignment <|>
+        parseCSubtractionAssignment <|>
+        parseCLeftShiftAssignment <|>
+        parseCRightShiftAssignment <|>
+        parseCBitwiseAndAssignment <|>
+        parseCBitwiseExclusiveOrAssignment <|>
+        parseCBitwiseInclusiveOrAssignment
+
+  parseCSimpleAssignment = do
+    parseToken (Token Nothing (COperatorToken "="))
+    return CSimpleAssignment
+
+  parseCProductAssignment = do
+    parseToken (Token Nothing (COperatorToken "*="))
+    return CProductAssignment
+
+  parseCQuotientAssignment = do
+    parseToken (Token Nothing (COperatorToken "/="))
+    return CQuotientAssignment
+
+  parseCRemainderAssignment = do
+    parseToken (Token Nothing (COperatorToken "%="))
+    return CRemainderAssignment
+
+  parseCAdditionAssignment = do
+    parseToken (Token Nothing (COperatorToken "+="))
+    return CAdditionAssignment
+
+  parseCSubtractionAssignment = do
+    parseToken (Token Nothing (COperatorToken "-="))
+    return CSubtractionAssignment
+
+  parseCLeftShiftAssignment = do
+    parseToken (Token Nothing (COperatorToken "<<="))
+    return CLeftShiftAssignment
+
+  parseCRightShiftAssignment = do
+    parseToken (Token Nothing (COperatorToken ">>="))
+    return CRightShiftAssignment
+
+  parseCBitwiseAndAssignment = do
+    parseToken (Token Nothing (COperatorToken "&="))
+    return CBitwiseAndAssignment
+
+  parseCBitwiseExclusiveOrAssignment = do
+    parseToken (Token Nothing (COperatorToken "^="))
+    return CBitwiseExclusiveOrAssignment
+
+  parseCBitwiseInclusiveOrAssignment = do
+    parseToken (Token Nothing (COperatorToken "|="))
+    return CBitwiseInclusiveOrAssignment
 
   parseCExpression = do
       list <- sepBy1 parseCAssignment (parseToken (Token Nothing (COperatorToken ",")))
@@ -325,8 +350,7 @@ module Parser where
     expr <- parseCIdentifier
     return (CDirectDeclaratorIdentifier expr)
 
-  parseCDirectDeclaratorFunctionCall = do
-    parseLeftRecursion parseLeft parseRight CDirectDeclaratorFunctionCall
+  parseCDirectDeclaratorFunctionCall = parseLeftRecursion parseLeft parseRight CDirectDeclaratorFunctionCall
     where
       parseLeft = parseCDirectDeclaratorIdentifier
       parseRight = between (parseToken (Token Nothing (COperatorToken "("))) (parseToken (Token Nothing (COperatorToken ")"))) parseCParameterTypeList

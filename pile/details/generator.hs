@@ -132,7 +132,7 @@ module Generator where
         return (list gotState)
 
       statements (a:as) = do
-        gotState <- get
+        statement a
         statements as
 
       statement :: CStatement -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
@@ -167,31 +167,21 @@ module Generator where
         expressions as
 
       expression :: CExpression -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
-      expression (CAssignment a b) = do
+      expression (CIdentifier a) = do
         gotState <- get
-        let cAssignmentState = runState (cAssignment a b) (GeneratorState [] (counter gotState) (table gotState))
-        let putCounter = (counter . snd) cAssignmentState
-        put (GeneratorState ((list gotState) ++ (fst cAssignmentState)) (putCounter) (table gotState))
-        return (list gotState)
+        let symbol = (table gotState) Map.! (identifier a)
+        let instructions = (list gotState) ++ [((Just (IRLabelNumber (counter gotState))), generateIRLoad (snd symbol) (IRLabelValue (fst symbol)))]
+        put (GeneratorState instructions ((counter gotState) + 1) (table gotState))
+        return (instructions)
 
-      cAssignment :: CExpression -> [(CToken, CExpression)] -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
-      cAssignment a [] = do
+      expression (CSimpleAssignment (CIdentifier a) b) = do
         gotState <- get
-        return (list gotState)
-
-      cAssignment (CIdentifier a) (b:bs) = do
-        gotState <- get
-        let firstSymbol = (table gotState) Map.! (identifier a)
-        case (snd b) of
-          (CConstant _) -> do
-            let instruction = generateIRStore (IRConstantValue (generateIRConstant (snd b) (snd firstSymbol))) (snd firstSymbol) (fst firstSymbol)
-            put (GeneratorState ((list gotState) ++ [(Nothing, instruction)]) ((counter gotState) + 1) (table gotState))
-          (CIdentifier a) -> do
-            let secondSymbol = (table gotState) Map.! (identifier a)
-            let firstInstruction = generateIRLoad (snd secondSymbol) (IRLabelValue (fst secondSymbol))
-            let secondInstruction = generateIRStore (IRLabelValue (IRLabelNumber (counter (gotState)))) (snd firstSymbol) (fst firstSymbol)
-            put (GeneratorState ((list gotState) ++ [(Just (IRLabelNumber (counter gotState)), firstInstruction), (Nothing, secondInstruction)]) ((counter gotState) + 1) (table gotState))
-        cAssignment (snd b) (bs)
+        let symbol = (table gotState) Map.! (identifier a)
+        let expressionState = runState (expression b) (GeneratorState [] (counter gotState) (table gotState))
+        let putCounter = (counter . snd) expressionState
+        let instructions = (fst expressionState) ++ [(Nothing, generateIRStore (IRLabelValue (IRLabelNumber (putCounter - 1))) (snd symbol) (fst symbol))]
+        put (GeneratorState (instructions) (putCounter) (table gotState))
+        return (instructions)
 
   generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (generateIRBasicBlock c functionType)]
     where

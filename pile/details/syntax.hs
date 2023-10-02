@@ -13,9 +13,10 @@ module Syntax where
     CCharacterConstant {characterConstant :: Char} deriving (Show, Eq, Ord)
 
   data CExpression =
-    CIdentifier CToken |
-    CConstant CToken |
-    CStringLiteral CToken |
+    CAss CExpression CExpression |
+    CIdentifier {token :: CToken} |
+    CConstant {token :: CToken} |
+    CStringLiteral {token :: CToken} |
     CParens CExpression |
     CArraySubscript CExpression [CExpression] |
     CFunctionCall CExpression [(Maybe CExpression)] |
@@ -51,6 +52,17 @@ module Syntax where
     CLogicalOr CExpression [CExpression] |
     CConditional CExpression CExpression CExpression |
     CAssignment CExpression [(CToken, CExpression)] |
+    CSimpleAssignment CExpression CExpression |
+    CProductAssignment CExpression CExpression |
+    CQuotientAssignment CExpression CExpression |
+    CRemainderAssignment CExpression CExpression |
+    CAdditionAssignment CExpression CExpression |
+    CSubtractionAssignment CExpression CExpression |
+    CLeftShiftAssignment CExpression CExpression |
+    CRightShiftAssignment CExpression CExpression |
+    CBitwiseAndAssignment CExpression CExpression |
+    CBitwiseExclusiveOrAssignment CExpression CExpression |
+    CBitwiseInclusiveOrAssignment CExpression CExpression |
     CExpression [CExpression] deriving (Show, Eq, Ord)
 
   data CDeclaration =
