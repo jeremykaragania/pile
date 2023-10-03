@@ -60,7 +60,7 @@ module Generator where
       value (CExpression [a]) = value a
       value _ = 0
 
-  generateIRAlloca a b = IRAlloca (generateIRType a b) Nothing Nothing
+  generateIRAlloca a = IRAlloca a Nothing Nothing
 
   generateIRStore a b c = IRStore a b c Nothing
 
@@ -105,7 +105,7 @@ module Generator where
       irAlloca a (b:bs) = do
         gotState <- get
         if (Map.notMember (getIdentifier b) (table gotState)) then do
-            let instruction = generateIRAlloca a (getPointer b)
+            let instruction = generateIRAlloca (generateIRType a (getPointer b))
             let putTable = Map.insert (getIdentifier b) (IRLabelNumber (counter gotState), (generateIRType a (getPointer b))) (table gotState)
             put (GeneratorState ((list gotState) ++ [(Just (IRLabelNumber (counter gotState)), instruction)]) ((counter gotState) + 1) putTable)
           else do
@@ -170,8 +170,15 @@ module Generator where
       expression (CIdentifier a) = do
         gotState <- get
         let symbol = (table gotState) Map.! (identifier a)
-        let instructions = (list gotState) ++ [((Just (IRLabelNumber (counter gotState))), generateIRLoad (snd symbol) (IRLabelValue (fst symbol)))]
-        put (GeneratorState instructions ((counter gotState) + 1) (table gotState))
+        let instructions = [((Just (IRLabelNumber (counter gotState))), generateIRLoad (snd symbol) (IRLabelValue (fst symbol)))]
+        put (GeneratorState ((list gotState) ++ instructions) ((counter gotState) + 1) (table gotState))
+        return (instructions)
+
+      expression (CSimpleAssignment (CIdentifier a) (CConstant b)) = do
+        gotState <- get
+        let symbol = (table gotState) Map.! (identifier a)
+        let instructions = (list gotState) ++ [(Just (IRLabelNumber (counter gotState)), generateIRAlloca (snd symbol)), (Nothing, generateIRStore (IRConstantValue (generateIRConstant (CConstant b) (snd symbol))) (snd symbol) (IRLabelNumber (counter gotState))), (Nothing, generateIRStore (IRLabelValue (IRLabelNumber (counter gotState))) (snd symbol) (fst symbol))]
+        put (GeneratorState ((list gotState) ++ instructions) ((counter gotState) + 1) (table gotState))
         return (instructions)
 
       expression (CSimpleAssignment (CIdentifier a) b) = do
