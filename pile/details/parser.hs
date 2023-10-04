@@ -62,14 +62,10 @@ module Parser where
         return (a left right)) <|>
       return left
 
-  parseBinaryOperator :: String -> ParsecT [Token] u Identity CExpression -> (CExpression -> [CExpression] -> CExpression) -> ParsecT [Token] u Identity CExpression
-  parseBinaryOperator a b c = parseLeftRecursion parseLeft parseRight c
-    where
-      parseLeft = b
-      parseRight = do
-        parseToken (Token Nothing (COperatorToken a))
-        expr <- parseLeft
-        return expr
+  parseBinaryOperator :: String -> (CExpression -> CExpression -> CExpression) -> ParsecT [Token] u Identity (CExpression -> CExpression -> CExpression)
+  parseBinaryOperator a b = do
+    parseToken (Token Nothing (COperatorToken a))
+    return b
 
   parseCArraySubscript = parseLeftRecursion parseLeft parseRight CArraySubscript
     where
@@ -150,77 +146,82 @@ module Parser where
     try parseCArithmeticOperator <|>
     parseCPostfix
 
-  parseCEast = parseCUnary
+  parseCCast = parseCUnary
 
-  parseCProduct = parseBinaryOperator "*" parseCEast CProduct
+  parseCProduct = parseBinaryOperator "*" CProduct
 
-  parseCQuotient = parseBinaryOperator "/" parseCEast CQuotient
+  parseCQuotient = parseBinaryOperator "/" CQuotient
 
-  parseCRemainder = parseBinaryOperator "%" parseCEast CRemainder
+  parseCRemainder = parseBinaryOperator "%" CRemainder
 
-  parseCMultiplicative =
-    try parseCProduct <|>
-    try parseCQuotient <|>
-    try parseCRemainder <|>
-    parseCEast
+  parseCMultiplicative = chainl1 parseCCast operator
+    where
+      operator =
+        parseCProduct <|>
+        parseCQuotient <|>
+        parseCRemainder
 
-  parseCAddition = parseBinaryOperator "+" parseCMultiplicative CAddition
+  parseCAddition = parseBinaryOperator "+" CAddition
 
-  parseCSubtraction = parseBinaryOperator "-" parseCMultiplicative CSubtraction
+  parseCSubtraction = parseBinaryOperator "-" CSubtraction
 
-  parseCAdditive =
-    try parseCAddition <|>
-    try parseCSubtraction <|>
-    parseCMultiplicative
+  parseCAdditive = chainl1 parseCMultiplicative operator
+    where
+      operator =
+        parseCAddition <|>
+        parseCSubtraction
 
-  parseCLeftShift = parseBinaryOperator "<<" parseCAdditive CLeftShift
+  parseCLeftShift = parseBinaryOperator "<<" CLeftShift
 
-  parseCRightShift = parseBinaryOperator ">>" parseCAdditive CRightShift
+  parseCRightShift = parseBinaryOperator ">>" CRightShift
 
-  parseCShift =
-    try parseCLeftShift <|>
-    try parseCRightShift <|>
-    parseCAdditive
+  parseCShift = chainl1 parseCAdditive operator
+    where
+      operator =
+        parseCLeftShift <|>
+        parseCRightShift
 
-  parseCLesser = parseBinaryOperator "<" parseCShift CLesser
+  parseCLesser = parseBinaryOperator "<" CLesser
 
-  parseCGreater = parseBinaryOperator ">" parseCShift CGreater
+  parseCGreater = parseBinaryOperator ">" CGreater
 
-  parseCLesserOrEqual = parseBinaryOperator "<=" parseCShift CLesserOrEqual
+  parseCLesserOrEqual = parseBinaryOperator "<=" CLesserOrEqual
 
-  parseCGreaterOrEqual = parseBinaryOperator ">=" parseCShift CGreaterOrEqual
+  parseCGreaterOrEqual = parseBinaryOperator ">=" CGreaterOrEqual
 
-  parseCRelational =
-    try parseCLesser <|>
-    try parseCGreater <|>
-    try parseCLesserOrEqual <|>
-    try parseCGreaterOrEqual <|>
-    parseCShift
+  parseCRelational = chainl1 parseCShift operator
+    where
+      operator =
+        parseCLesser <|>
+        parseCGreater <|>
+        parseCLesserOrEqual <|>
+        parseCGreaterOrEqual
 
-  parseCEqual = parseBinaryOperator "==" parseCRelational CEqual
+  parseCEqual = parseBinaryOperator "==" CEqual
 
-  parseCNotEqual = parseBinaryOperator "!=" parseCRelational CNotEqual
+  parseCNotEqual = parseBinaryOperator "!=" CNotEqual
 
-  parseCEquality =
-    try parseCEqual <|>
-    try parseCNotEqual <|>
-    parseCRelational
+  parseCEquality = chainl1 parseCRelational operator
+    where
+      operator =
+        parseCEqual <|>
+        parseCNotEqual
 
-  parseCBitwiseAnd = parseBinaryOperator "&" parseCEquality CBitwiseAnd
+  parseCBitwiseAnd = chainl1 parseCEquality (parseBinaryOperator "&" CBitwiseAnd)
 
-  parseCBitwiseCExclusiveOr = parseBinaryOperator "^" parseCBitwiseAnd CBitwiseExclusiveOr
+  parseCBitwiseExclusiveOr = chainl1 parseCBitwiseAnd (parseBinaryOperator "^" CBitwiseExclusiveOr)
 
-  parseCBitwiseInclusiveOr = parseBinaryOperator "|" parseCBitwiseCExclusiveOr CBitwiseInclusiveOr
+  parseCBitwiseInclusiveOr = chainl1 parseCBitwiseExclusiveOr (parseBinaryOperator "|" CBitwiseInclusiveOr)
 
-  parseCLogicalAnd = parseBinaryOperator "&&" parseCBitwiseInclusiveOr CLogicalAnd
+  parseCLogicalAnd = chainl1 parseCBitwiseInclusiveOr (parseBinaryOperator "&&" CLogicalAnd)
 
-  parseCLogicalOr = parseBinaryOperator "||" parseCLogicalAnd CLogicalOr
+  parseCLogicalOr = chainl1 parseCLogicalAnd (parseBinaryOperator "||" CLogicalOr)
 
   parseCConditional = parseCLogicalOr
 
-  parseCAssignment = chainr1 parseCPrimary operation
+  parseCAssignment = chainr1 parseCConditional operator
     where
-      operation =
+      operator =
         parseCSimpleAssignment <|>
         parseCProductAssignment <|>
         parseCQuotientAssignment <|>
