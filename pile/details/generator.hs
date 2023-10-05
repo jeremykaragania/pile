@@ -119,7 +119,7 @@ module Generator where
 
       irStore a (b:bs) = do
         gotState <- get
-        let instruction = generateIRStore (IRConstantValue (generateIRConstant (getConstant b) (generateIRType a (getPointer b)))) (generateIRType a (getPointer b)) (fst ((table gotState) Map.! getIdentifier b))
+        let instruction = generateIRStore (generateIRType a (getPointer b)) (IRConstantValue (generateIRConstant (getConstant b) (generateIRType a (getPointer b))))  (fst ((table gotState) Map.! getIdentifier b))
         put (GeneratorState ((list gotState) ++ [(Nothing, instruction)]) (counter gotState) (table gotState))
         irStore a bs
 
@@ -177,7 +177,7 @@ module Generator where
       expression (CSimpleAssignment (CIdentifier a) (CConstant b)) = do
         gotState <- get
         let symbol = (table gotState) Map.! (identifier a)
-        let instructions = (list gotState) ++ [(Just (IRLabelNumber (counter gotState)), generateIRAlloca (snd symbol)), (Nothing, generateIRStore (IRConstantValue (generateIRConstant (CConstant b) (snd symbol))) (snd symbol) (IRLabelNumber (counter gotState))), (Nothing, generateIRStore (IRLabelValue (IRLabelNumber (counter gotState))) (snd symbol) (fst symbol))]
+        let instructions = (list gotState) ++ [(Just (IRLabelNumber (counter gotState)), generateIRAlloca (snd symbol)), (Nothing, generateIRStore (snd symbol) (IRConstantValue (generateIRConstant (CConstant b) (snd symbol))) (IRLabelNumber (counter gotState))), (Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber (counter gotState))) (fst symbol))]
         put (GeneratorState ((list gotState) ++ instructions) ((counter gotState) + 1) (table gotState))
         return (instructions)
 
@@ -186,7 +186,7 @@ module Generator where
         let symbol = (table gotState) Map.! (identifier a)
         let expressionState = runState (expression b) (GeneratorState [] (counter gotState) (table gotState))
         let putCounter = (counter . snd) expressionState
-        let instructions = (fst expressionState) ++ [(Nothing, generateIRStore (IRLabelValue (IRLabelNumber (putCounter - 1))) (snd symbol) (fst symbol))]
+        let instructions = (fst expressionState) ++ [(Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber (putCounter - 1))) (fst symbol))]
         put (GeneratorState (instructions) (putCounter) (table gotState))
         return (instructions)
 
