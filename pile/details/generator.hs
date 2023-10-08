@@ -195,8 +195,8 @@ module Generator where
         let symbol = (table gotState) Map.! (identifier a)
         let expressionState = runState (expression b) (GeneratorState [] (counter gotState) (table gotState))
         let putCounter = (counter . snd) expressionState
-        let instructions = (fst expressionState) ++ [((Just (IRLabelNumber putCounter)), IRAdd (snd symbol) (IRLabelValue (IRLabelNumber (putCounter - 1))) (IRLabelValue (fst symbol))), (Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber (putCounter))) (fst symbol))]
-        put (GeneratorState (instructions) (putCounter + 1) (table gotState))
+        let instructions = (fst expressionState) ++ [(Just (IRLabelNumber putCounter), generateIRLoad (snd symbol) (IRLabelValue (fst symbol))), ((Just (IRLabelNumber (putCounter + 1))), IRAdd (snd symbol) (IRLabelValue (IRLabelNumber (putCounter - 1))) (IRLabelValue (IRLabelNumber putCounter))), (Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber (putCounter + 1))) (fst symbol))]
+        put (GeneratorState (instructions) (putCounter + 2) (table gotState))
         return (instructions)
 
   generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (generateIRBasicBlock c functionType)]
