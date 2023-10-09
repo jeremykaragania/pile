@@ -199,6 +199,15 @@ module Generator where
         put (GeneratorState (instructions) (putCounter + 2) (table gotState))
         return (instructions)
 
+      expression (CSubtractionAssignment (CIdentifier a) b) = do
+        gotState <- get
+        let symbol = (table gotState) Map.! (identifier a)
+        let expressionState = runState (expression b) (GeneratorState [] (counter gotState) (table gotState))
+        let putCounter = (counter . snd) expressionState
+        let instructions = (fst expressionState) ++ [(Just (IRLabelNumber putCounter), generateIRLoad (snd symbol) (IRLabelValue (fst symbol))), ((Just (IRLabelNumber (putCounter + 1))), IRSub(snd symbol) (IRLabelValue (IRLabelNumber (putCounter - 1))) (IRLabelValue (IRLabelNumber putCounter))), (Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber (putCounter + 1))) (fst symbol))]
+        put (GeneratorState (instructions) (putCounter + 2) (table gotState))
+        return (instructions)
+
   generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (generateIRBasicBlock c functionType)]
     where
       functionType = (generateIRType a (pointer b))
