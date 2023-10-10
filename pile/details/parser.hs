@@ -219,64 +219,22 @@ module Parser where
 
   parseCConditional = parseCLogicalOr
 
-  parseCAssignment = chainr1 parseCConditional operator
+  parseCAssignment = chainr1 parseCConditional parseRight
     where
-      operator =
-        parseCSimpleAssignment <|>
-        parseCProductAssignment <|>
-        parseCQuotientAssignment <|>
-        parseCRemainderAssignment <|>
-        parseCAdditionAssignment <|>
-        parseCSubtractionAssignment <|>
-        parseCLeftShiftAssignment <|>
-        parseCRightShiftAssignment <|>
-        parseCBitwiseAndAssignment <|>
-        parseCBitwiseExclusiveOrAssignment <|>
-        parseCBitwiseInclusiveOrAssignment
-
-  parseCSimpleAssignment = do
-    parseToken (Token Nothing (COperatorToken "="))
-    return CSimpleAssignment
-
-  parseCProductAssignment = do
-    parseToken (Token Nothing (COperatorToken "*="))
-    return CProductAssignment
-
-  parseCQuotientAssignment = do
-    parseToken (Token Nothing (COperatorToken "/="))
-    return CQuotientAssignment
-
-  parseCRemainderAssignment = do
-    parseToken (Token Nothing (COperatorToken "%="))
-    return CRemainderAssignment
-
-  parseCAdditionAssignment = do
-    parseToken (Token Nothing (COperatorToken "+="))
-    return CAdditionAssignment
-
-  parseCSubtractionAssignment = do
-    parseToken (Token Nothing (COperatorToken "-="))
-    return CSubtractionAssignment
-
-  parseCLeftShiftAssignment = do
-    parseToken (Token Nothing (COperatorToken "<<="))
-    return CLeftShiftAssignment
-
-  parseCRightShiftAssignment = do
-    parseToken (Token Nothing (COperatorToken ">>="))
-    return CRightShiftAssignment
-
-  parseCBitwiseAndAssignment = do
-    parseToken (Token Nothing (COperatorToken "&="))
-    return CBitwiseAndAssignment
-
-  parseCBitwiseExclusiveOrAssignment = do
-    parseToken (Token Nothing (COperatorToken "^="))
-    return CBitwiseExclusiveOrAssignment
-
-  parseCBitwiseInclusiveOrAssignment = do
-    parseToken (Token Nothing (COperatorToken "|="))
-    return CBitwiseInclusiveOrAssignment
+      parseRight = do
+        op <-
+          parseToken (Token Nothing (COperatorToken "=")) <|>
+          parseToken (Token Nothing (COperatorToken "*=")) <|>
+          parseToken (Token Nothing (COperatorToken "/=")) <|>
+          parseToken (Token Nothing (COperatorToken "%=")) <|>
+          parseToken (Token Nothing (COperatorToken "+=")) <|>
+          parseToken (Token Nothing (COperatorToken "-=")) <|>
+          parseToken (Token Nothing (COperatorToken "<<=")) <|>
+          parseToken (Token Nothing (COperatorToken ">>=")) <|>
+          parseToken (Token Nothing (COperatorToken "&=")) <|>
+          parseToken (Token Nothing (COperatorToken "^=")) <|>
+          parseToken (Token Nothing (COperatorToken "|="))
+        return (CAssignment ((operator . tValue) op))
 
   parseCExpression = do
       list <- sepBy1 parseCAssignment (parseToken (Token Nothing (COperatorToken ",")))

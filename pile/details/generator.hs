@@ -174,14 +174,14 @@ module Generator where
         put (GeneratorState ((list gotState) ++ instructions) ((counter gotState) + 1) (table gotState))
         return (instructions)
 
-      expression (CSimpleAssignment (CIdentifier a) (CConstant b)) = do
+      expression (CAssignment "=" (CIdentifier a) (CConstant b)) = do
         gotState <- get
         let symbol = (table gotState) Map.! (identifier a)
         let instructions = (list gotState) ++ [(Just (IRLabelNumber (counter gotState)), generateIRAlloca (snd symbol)), (Nothing, generateIRStore (snd symbol) (IRConstantValue (generateIRConstant (CConstant b) (snd symbol))) (IRLabelNumber (counter gotState))), (Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber (counter gotState))) (fst symbol))]
         put (GeneratorState ((list gotState) ++ instructions) ((counter gotState) + 1) (table gotState))
         return (instructions)
 
-      expression (CSimpleAssignment (CIdentifier a) b) = do
+      expression (CAssignment "=" (CIdentifier a) b) = do
         gotState <- get
         let symbol = (table gotState) Map.! (identifier a)
         let expressionState = runState (expression b) (GeneratorState [] (counter gotState) (table gotState))
@@ -190,7 +190,7 @@ module Generator where
         put (GeneratorState (instructions) (putCounter) (table gotState))
         return (instructions)
 
-      expression (CAdditionAssignment (CIdentifier a) b) = do
+      expression (CAssignment "+=" (CIdentifier a) b) = do
         gotState <- get
         let symbol = (table gotState) Map.! (identifier a)
         let expressionState = runState (expression b) (GeneratorState [] (counter gotState) (table gotState))
@@ -199,7 +199,7 @@ module Generator where
         put (GeneratorState (instructions) (putCounter + 2) (table gotState))
         return (instructions)
 
-      expression (CSubtractionAssignment (CIdentifier a) b) = do
+      expression (CAssignment "-=" (CIdentifier a) b) = do
         gotState <- get
         let symbol = (table gotState) Map.! (identifier a)
         let expressionState = runState (expression b) (GeneratorState [] (counter gotState) (table gotState))

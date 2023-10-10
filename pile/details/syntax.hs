@@ -51,17 +51,7 @@ module Syntax where
     CLogicalAnd CExpression CExpression |
     CLogicalOr CExpression CExpression |
     CConditional CExpression CExpression CExpression |
-    CSimpleAssignment CExpression CExpression |
-    CProductAssignment CExpression CExpression |
-    CQuotientAssignment CExpression CExpression |
-    CRemainderAssignment CExpression CExpression |
-    CAdditionAssignment CExpression CExpression |
-    CSubtractionAssignment CExpression CExpression |
-    CLeftShiftAssignment CExpression CExpression |
-    CRightShiftAssignment CExpression CExpression |
-    CBitwiseAndAssignment CExpression CExpression |
-    CBitwiseExclusiveOrAssignment CExpression CExpression |
-    CBitwiseInclusiveOrAssignment CExpression CExpression |
+    CAssignment String CExpression CExpression |
     CExpression [CExpression] deriving (Show, Eq, Ord)
 
   data CDeclaration =
