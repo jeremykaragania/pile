@@ -121,7 +121,7 @@ module Syntax where
 
   data IRIntegerType =
     IRSigned |
-    IRUnsigned deriving (Show, Eq)
+    IRUnsigned deriving (Show, Eq, Ord)
 
   data IRType =
     IRVoid |
@@ -135,7 +135,7 @@ module Syntax where
     IRPointer IRType |
     IRLabel |
     IRArray Integer IRType |
-    IRStructure Bool [IRType] deriving (Show, Eq)
+    IRStructure Bool [IRType] deriving (Show, Eq, Ord)
 
   data IRConstant =
     IRIntegerConstant Integer |

@@ -22,6 +22,8 @@ module Generator where
   getConstant (CInitDeclarator _ a) = a
   getConstant (CDeclarator _ _) = CConstant (CConstantToken (CIntegerConstant 0))
 
+  getType (IRLoad a _ _) = a
+
   generateIRType a (Just (CPointer _)) = IRPointer (generateIRType a Nothing)
 
   generateIRType (CSpecifiers a) Nothing
@@ -190,23 +192,19 @@ module Generator where
         put (GeneratorState (instructions) (putCounter) (table gotState))
         return (instructions)
 
-      expression (CAssignment "+=" (CIdentifier a) b) = do
+      expression (CAssignment a (CIdentifier b) c) = do
         gotState <- get
-        let symbol = (table gotState) Map.! (identifier a)
-        let expressionState = runState (expression b) (GeneratorState [] (counter gotState) (table gotState))
+        let symbol = (table gotState) Map.! (identifier b)
+        let expressionState = runState (expression c) (GeneratorState [] (counter gotState) (table gotState))
+        let other = (getType . snd . last . fst) expressionState
         let putCounter = (counter . snd) expressionState
-        let instructions = (fst expressionState) ++ [(Just (IRLabelNumber putCounter), generateIRLoad (snd symbol) (IRLabelValue (fst symbol))), ((Just (IRLabelNumber (putCounter + 1))), IRAdd (snd symbol) (IRLabelValue (IRLabelNumber (putCounter - 1))) (IRLabelValue (IRLabelNumber putCounter))), (Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber (putCounter + 1))) (fst symbol))]
+        let instructions = (fst expressionState) ++ [(Just (IRLabelNumber putCounter), generateIRLoad (snd symbol) (IRLabelValue (fst symbol))), ((Just (IRLabelNumber (putCounter + 1))), (binaryOperator a (fromList [(snd symbol), other])) (snd symbol) (IRLabelValue (IRLabelNumber (putCounter - 1))) (IRLabelValue (IRLabelNumber putCounter))), (Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber (putCounter + 1))) (fst symbol))]
         put (GeneratorState (instructions) (putCounter + 2) (table gotState))
         return (instructions)
 
-      expression (CAssignment "-=" (CIdentifier a) b) = do
-        gotState <- get
-        let symbol = (table gotState) Map.! (identifier a)
-        let expressionState = runState (expression b) (GeneratorState [] (counter gotState) (table gotState))
-        let putCounter = (counter . snd) expressionState
-        let instructions = (fst expressionState) ++ [(Just (IRLabelNumber putCounter), generateIRLoad (snd symbol) (IRLabelValue (fst symbol))), ((Just (IRLabelNumber (putCounter + 1))), IRSub(snd symbol) (IRLabelValue (IRLabelNumber (putCounter - 1))) (IRLabelValue (IRLabelNumber putCounter))), (Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber (putCounter + 1))) (fst symbol))]
-        put (GeneratorState (instructions) (putCounter + 2) (table gotState))
-        return (instructions)
+      binaryOperator a b
+        | a == "+=" = IRAdd
+        | a == "-=" = IRSub
 
   generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (generateIRBasicBlock c functionType)]
     where
