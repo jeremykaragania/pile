@@ -205,6 +205,8 @@ module Generator where
       binaryOperator a b
         | a == "+=" = IRAdd
         | a == "-=" = IRSub
+        | a == "/=" && b == (fromList [IRInteger IRSigned, IRInteger IRSigned]) = IRSdiv
+        | a == "/=" = IRUdiv
 
   generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (generateIRBasicBlock c functionType)]
     where
