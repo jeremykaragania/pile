@@ -4,7 +4,7 @@ module Generator where
   import Data.List
   import Data.Map (Map)
   import qualified Data.Map as Map
-  import Data.Set (fromList)
+  import Data.Set (singleton, fromList)
   import Lexer
   import Parser
   import Syntax
@@ -203,8 +203,11 @@ module Generator where
         return (instructions)
 
       binaryOperator a b
+        | a == "+=" && b == (singleton IRFloat) = IRFadd
         | a == "+=" = IRAdd
+        | a == "-=" && b == (singleton IRFloat) = IRFsub
         | a == "-=" = IRSub
+        | a == "/=" && b == (singleton IRFloat) = IRFdiv
         | a == "/=" && b == (fromList [IRInteger IRSigned, IRInteger IRSigned]) = IRSdiv
         | a == "/=" = IRUdiv
 
