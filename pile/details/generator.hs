@@ -4,7 +4,7 @@ module Generator where
   import Data.List
   import Data.Map (Map)
   import qualified Data.Map as Map
-  import Data.Set (singleton, fromList)
+  import Data.Set (fromList)
   import Lexer
   import Parser
   import Syntax
@@ -198,18 +198,34 @@ module Generator where
         let expressionState = runState (expression c) (GeneratorState [] (counter gotState) (table gotState))
         let other = (getType . snd . last . fst) expressionState
         let putCounter = (counter . snd) expressionState
-        let instructions = (fst expressionState) ++ [(Just (IRLabelNumber putCounter), generateIRLoad (snd symbol) (IRLabelValue (fst symbol))), ((Just (IRLabelNumber (putCounter + 1))), (binaryOperator a (fromList [(snd symbol), other])) (snd symbol) (IRLabelValue (IRLabelNumber (putCounter - 1))) (IRLabelValue (IRLabelNumber putCounter))), (Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber (putCounter + 1))) (fst symbol))]
+        let instructions = (fst expressionState) ++ [(Just (IRLabelNumber putCounter), generateIRLoad (snd symbol) (IRLabelValue (fst symbol))), ((Just (IRLabelNumber (putCounter + 1))), (binaryOperator a other (snd symbol) (IRLabelValue (IRLabelNumber (putCounter - 1))) (IRLabelValue (IRLabelNumber putCounter)))), (Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber (putCounter + 1))) (fst symbol))]
         put (GeneratorState (instructions) (putCounter + 2) (table gotState))
         return (instructions)
 
-      binaryOperator a b
-        | a == "+=" && b == (singleton IRFloat) = IRFadd
-        | a == "+=" = IRAdd
-        | a == "-=" && b == (singleton IRFloat) = IRFsub
-        | a == "-=" = IRSub
-        | a == "/=" && b == (singleton IRFloat) = IRFdiv
-        | a == "/=" && b == (fromList [IRInteger IRSigned, IRInteger IRSigned]) = IRSdiv
-        | a == "/=" = IRUdiv
+      binaryOperator a b c d e
+        | a == "<<=" || a == ">>=" = instruction c e d
+        | otherwise =  instruction c d e
+        where
+          instruction
+            | a == "*=" && b == IRFloat = IRFmul
+            | a == "*=" = IRMul
+            | a == "/=" && b == IRFloat = IRFdiv
+            | a == "/=" && b == IRInteger IRSigned = IRSdiv
+            | a == "/=" = IRUdiv
+            | a == "%=" && b == IRFloat = IRFrem
+            | a == "%=" && b == IRInteger IRSigned = IRSrem
+            | a == "%=" = IRUrem
+            | a == "+=" && b == IRFloat = IRFadd
+            | a == "+=" = IRAdd
+            | a == "-=" && b == IRFloat = IRFsub
+            | a == "-=" = IRSub
+            | a == "<<=" && isIRInteger c && isIRInteger b = IRShl
+            | a == ">>=" && isIRInteger c && isIRInteger b = IRAshr
+            | a == "&=" && isIRInteger c && isIRInteger b = IRAnd
+            | a == "^=" && isIRInteger c && isIRInteger b = IRXor
+            | a == "|=" && isIRInteger c && isIRInteger b = IROr
+
+          isIRInteger a = a == IRInteger IRSigned || a == IRInteger IRUnsigned
 
   generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (generateIRBasicBlock c functionType)]
     where
