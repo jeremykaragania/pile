@@ -170,7 +170,39 @@ module Syntax where
     IRXor IRType IRValue IRValue |
     IRAlloca IRType (Maybe Integer) (Maybe Integer) |
     IRLoad IRType IRValue (Maybe Integer) |
-    IRStore IRType IRValue IRLabel (Maybe Integer) deriving Show
+    IRStore IRType IRValue IRLabel (Maybe Integer) |
+    IRIcmp IRICondition IRType IRValue IRValue |
+    IRFcmp IRFCondition IRType IRValue IRValue deriving Show
+
+  data IRICondition =
+    IRIEq |
+    IRINe |
+    IRIUgt |
+    IRIUge |
+    IRIUlt |
+    IRIUle |
+    IRISgt |
+    IRISge |
+    IRISlt |
+    IRISle deriving Show
+
+  data IRFCondition =
+    IRFFalse |
+    IRFOeq |
+    IRFOgt |
+    IRFOge |
+    IRFOlt |
+    IRFOle |
+    IRFOne |
+    IRFOrd |
+    IRFUeq |
+    IRFUgt |
+    IRFUge |
+    IRFUlt |
+    IRFUle |
+    IRFUne |
+    IRFUno |
+    IRFTrue deriving Show
 
   data IRBasicBlock = IRBasicBlock String [(Maybe IRLabel, IRInstruction)] deriving Show
 
