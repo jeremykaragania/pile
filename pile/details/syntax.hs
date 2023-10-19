@@ -172,7 +172,20 @@ module Syntax where
     IRLoad IRType IRValue (Maybe Integer) |
     IRStore IRType IRValue IRLabel (Maybe Integer) |
     IRIcmp IRICondition IRType IRValue IRValue |
-    IRFcmp IRFCondition IRType IRValue IRValue deriving Show
+    IRFcmp IRFCondition IRType IRValue IRValue |
+    IRTrunc IRType IRValue IRType |
+    IRZext IRType IRValue IRType |
+    IRSext IRType IRValue IRType |
+    IRFptrunc IRType IRValue IRType |
+    IRFpext IRType IRValue IRType |
+    IRFptoui IRType IRValue IRType |
+    IRFptosi IRType IRValue IRType |
+    IRUitofp IRType IRValue IRType |
+    IRSitofp IRType IRValue IRType |
+    IRPtrtoint IRType IRValue IRType |
+    IRInttoptr IRType IRValue IRType |
+    IRBitcast IRType IRValue IRType |
+    IRAddrspacecast IRType IRValue IRType deriving Show
 
   data IRICondition =
     IRIEq |
