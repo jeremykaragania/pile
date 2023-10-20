@@ -22,17 +22,31 @@ module Generator where
   getConstant (CInitDeclarator _ a) = a
   getConstant (CDeclarator _ _) = CConstant (CConstantToken (CIntegerConstant 0))
 
+  getType (IRFmul a _ _) = a
   getType (IRMul a _ _) = a
   getType (IRLoad a _ _) = a
   getType (IRStore a _ _ _) = a
+  getType (IRTrunc _ _ a) = a
+  getType (IRFptosi _ _ a) = a
+  getType (IRSitofp _ _ a) = a
+
+  getOperator a
+    | a == "=" = a
+    | otherwise = init a
 
   isSameType a b
-    | isIRInteger a && isIRInteger b || a == b = (Just b)
+    | isIRShortInteger a && isIRShortInteger b || isIRInteger a && isIRInteger b || isIRLongInteger a && isIRLongInteger b || a == b = Just b
     | otherwise = Nothing
 
-  isIRInteger a = a == IRShortInteger IRSigned || a == IRShortInteger IRUnsigned || a == IRInteger IRSigned || a == IRInteger IRUnsigned || a == IRLongInteger IRSigned || a == IRLongInteger IRUnsigned
+  isIRShortInteger a = a == IRShortInteger IRSigned || a == IRShortInteger IRUnsigned
 
-  isIRFloating a = a == IRFloat || a == IRDouble || a == IRLongDouble
+  isIRInteger a = a == IRInteger IRSigned || a == IRInteger IRUnsigned
+
+  isIRLongInteger a = a == IRLongInteger IRSigned || a == IRLongInteger IRUnsigned
+
+  isIntegral a = isIRShortInteger a || isIRInteger a || isIRLongInteger a
+
+  isFloating a = a == IRFloat || a == IRDouble || a == IRLongDouble
 
   generateIRType a (Just (CPointer _)) = IRPointer (generateIRType a Nothing)
 
@@ -93,7 +107,7 @@ module Generator where
       declarations :: [CDeclaration] -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
       declarations [] = do
         got <- get
-        return (list got)
+        eturn (list got)
 
       declarations (a:as) = do
         declaration a
@@ -116,7 +130,7 @@ module Generator where
 
       irAlloca a (b:bs) = do
         got <- get
-        if (Map.notMember (getIdentifier b) (table got)) then do
+        if Map.notMember (getIdentifier b) (table got) then do
             let instruction = generateIRAlloca (generateIRType a (getPointer b))
             let putTable = Map.insert (getIdentifier b) (IRLabelNumber (counter got), (generateIRType a (getPointer b))) (table got)
             put (GeneratorState ((list got) ++ [(Just (IRLabelNumber (counter got)), instruction)]) ((counter got) + 1) putTable)
@@ -184,7 +198,7 @@ module Generator where
         let symbol = (table got) Map.! (identifier a)
         let instructions = [((Just (IRLabelNumber (counter got))), generateIRLoad (snd symbol) (IRLabelValue (fst symbol)))]
         put (GeneratorState ((list got) ++ instructions) ((counter got) + 1) (table got))
-        return (instructions)
+        return instructions
 
       expression (CProduct a b) = do
         got <- get
@@ -197,26 +211,17 @@ module Generator where
         let symbol = (table got) Map.! (identifier a)
         let instructions = (list got) ++ [(Just (IRLabelNumber (counter got)), generateIRAlloca (snd symbol)), (Nothing, generateIRStore (snd symbol) (IRConstantValue (generateIRConstant (CConstant b) (snd symbol))) (IRLabelNumber (counter got))), (Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber (counter got))) (fst symbol))]
         put (GeneratorState ((list got) ++ instructions) ((counter got) + 1) (table got))
-        return (instructions)
+        return instructions
 
-      expression (CAssignment "=" (CIdentifier a) b) = do
+      expression (CAssignment c (CIdentifier a) b) = do
         got <- get
         let symbol = (table got) Map.! (identifier a)
-        let expr = runState (expression b) (GeneratorState [] (counter got) (table got))
-        let putCounter = (counter . snd) expr
-        let instructions = (fst expr) ++ [(Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber (putCounter - 1))) (fst symbol))]
-        put (GeneratorState (instructions) (putCounter) (table got))
-        return (instructions)
-
-      expression (CAssignment a (CIdentifier b) c) = do
-        got <- get
-        let symbol = (table got) Map.! (identifier b)
-        let expr = runState (expression c) (GeneratorState [] (counter got) (table got))
-        let other = (getType . snd . last . fst) expr
-        let putCounter = (counter . snd) expr
-        let instructions = (fst expr) ++ [(Just (IRLabelNumber putCounter), generateIRLoad (snd symbol) (IRLabelValue (fst symbol))), ((Just (IRLabelNumber (putCounter + 1))), (assignmentInstruction a other (snd symbol) (IRLabelValue (IRLabelNumber (putCounter - 1))) (IRLabelValue (IRLabelNumber putCounter)))), (Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber (putCounter + 1))) (fst symbol))]
-        put (GeneratorState (instructions) (putCounter + 2) (table got))
-        return (instructions)
+        let firstCounter = counter got
+        let binaryExpr = runState (binaryExpression (CIdentifier a) b (getOperator c)) (GeneratorState [] (firstCounter) (table got))
+        let binaryCounter = (counter . snd) binaryExpr
+        let instructions = (fst binaryExpr) ++ [(Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber (binaryCounter - 1))) (fst symbol))]
+        put (GeneratorState (instructions) (binaryCounter) (table got))
+        return instructions
 
       binaryExpression :: CExpression -> CExpression -> String -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
       binaryExpression a b c = do
@@ -227,32 +232,62 @@ module Generator where
         let secondExpr = runState (expression b) (GeneratorState [] (firstCounter) (table got))
         let secondType = ((getType . snd . last . fst) secondExpr)
         let secondCounter = (counter . snd) secondExpr
-        let instructions = (fst firstExpr) ++ (fst secondExpr) ++ [(Just (IRLabelNumber (secondCounter)), (binaryInstruction c firstType secondType) firstType (IRLabelValue (IRLabelNumber (firstCounter - 1))) (IRLabelValue (IRLabelNumber (secondCounter - 1))))]
-        put (GeneratorState ((list got) ++ instructions) (secondCounter + 1) (table got))
-        return (instructions)
+        if c /= "=" then do
+          let castExpr = runState (castExpression (firstType, (IRLabelValue (IRLabelNumber (firstCounter - 1)))) (secondType, (IRLabelValue (IRLabelNumber (secondCounter - 1)))) True) (GeneratorState [] secondCounter (table got))
+          let castType = (getType . snd . last) ((fst firstExpr) ++ (fst secondExpr) ++ (fst castExpr))
+          let castCounter = (counter . snd) castExpr
+          let other = otherExpression (firstType, firstCounter) (secondType, secondCounter) (castType, castCounter)
+          let instructions = (fst firstExpr) ++ (fst secondExpr) ++ (fst castExpr) ++ [(Just (IRLabelNumber (castCounter)), (binaryInstruction c (fst other) castType) castType (IRLabelValue (IRLabelNumber ((snd other) - 1))) (IRLabelValue (IRLabelNumber (castCounter - 1))))]
+          put (GeneratorState ((list got) ++ instructions) (castCounter + 1) (table got))
+          return instructions
+        else do
+          let castExpr = runState (castExpression (firstType, (IRLabelValue (IRLabelNumber (firstCounter - 1)))) (secondType, (IRLabelValue (IRLabelNumber (secondCounter - 1)))) False) (GeneratorState [] secondCounter (table got))
+          let castCounter = (counter . snd) castExpr
+          put (GeneratorState ((list got) ++ (fst secondExpr) ++ (fst castExpr)) (castCounter) (table got))
+          return ((fst secondExpr) ++ (fst castExpr))
+        where
+          otherExpression a b c
+            | fst a == fst c = a
+            | fst b == fst c = b
+
+      castExpression :: (IRType, IRValue) -> (IRType, IRValue) -> Bool -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
+      castExpression a b c = do
+        if isSameType (fst a) (fst b) == Nothing then do
+          got <- get
+          let instructions = [(Just (IRLabelNumber (counter got)), castInstruction a b c)]
+          put (GeneratorState ((list got) ++ instructions) ((counter got) + 1) (table got))
+          return instructions
+        else
+          return []
+
+      castInstruction a b c
+        | isIntegral (fst a) && isFloating (fst b) && c = IRSitofp (fst a) (snd a) (fst b)
+        | isFloating (fst a) && isIntegral (fst b) && c = IRSitofp (fst b) (snd b) (fst a)
+        | isIntegral (fst a) && isFloating (fst b) && not c = IRFptosi (fst b) (snd b) (fst a)
+        | isFloating (fst a) && isIntegral (fst b) && not c = IRSitofp (fst b) (snd b) (fst a)
 
       binaryInstruction a b c
-        | a == "*" && (isIRInteger <$> (isSameType b c)) == Just True = IRMul
-        | a == "*" && (isIRFloating <$> (isSameType b c)) == Just True = IRFmul
-        | a == "/" && (isIRFloating <$> (isSameType b c)) == Just True = IRFdiv
+        | a == "*" && (isIntegral <$> (isSameType b c)) == Just True = IRMul
+        | a == "*" && (isFloating <$> (isSameType b c)) == Just True = IRFmul
+        | a == "/" && (isFloating <$> (isSameType b c)) == Just True = IRFdiv
         | a == "/" && isSameType b c == Just (IRInteger IRUnsigned) = IRUdiv
         | a == "/" && isSameType b c == Just (IRInteger IRSigned) = IRSdiv
         | a == "%" && isSameType b c /= Just (IRInteger IRUnsigned) = IRUrem
         | a == "%" && isSameType b c == Just (IRInteger IRSigned) = IRSrem
-        | a == "%" && (isIRFloating <$> (isSameType b c)) == Just True = IRFrem
-        | a == "+" && (isIRInteger <$> (isSameType b c)) == Just True = IRAdd
-        | a == "+" && (isIRFloating <$> (isSameType b c)) == Just True = IRFadd
-        | a == "-" && (isIRInteger <$> (isSameType b c)) == Just True = IRSub
-        | a == "-" && (isIRFloating <$> (isSameType b c)) == Just True = IRFsub
-        | a == "<<" && (isIRInteger <$> (isSameType b c)) == Just True = IRShl
-        | a == ">>" && (isIRInteger <$> (isSameType b c)) == Just True = IRAshr
-        | a == "&" && (isIRInteger <$> (isSameType b c)) == Just True = IRAnd
-        | a == "^" && (isIRInteger <$> (isSameType b c)) == Just True = IRXor
-        | a == "|" && (isIRInteger <$> (isSameType b c)) == Just True = IROr
+        | a == "%" && (isFloating <$> (isSameType b c)) == Just True = IRFrem
+        | a == "+" && (isIntegral <$> (isSameType b c)) == Just True = IRAdd
+        | a == "+" && (isFloating <$> (isSameType b c)) == Just True = IRFadd
+        | a == "-" && (isIntegral <$> (isSameType b c)) == Just True = IRSub
+        | a == "-" && (isFloating <$> (isSameType b c)) == Just True = IRFsub
+        | a == "<<" && (isIntegral <$> (isSameType b c)) == Just True = IRShl
+        | a == ">>" && (isIntegral <$> (isSameType b c)) == Just True = IRAshr
+        | a == "&" && (isIntegral <$> (isSameType b c)) == Just True = IRAnd
+        | a == "^" && (isIntegral <$> (isSameType b c)) == Just True = IRXor
+        | a == "|" && (isIntegral <$> (isSameType b c)) == Just True = IROr
 
       assignmentInstruction a b c d e
-        | a == "<<=" || a == ">>=" = (binaryInstruction (init a) b c) c e d
-        | otherwise = (binaryInstruction (init a) b c) c d e
+        | a == "<<=" || a == ">>=" = (binaryInstruction (getOperator a) b c) c e d
+        | otherwise = (binaryInstruction (getOperator a) b c) c d e
 
   generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (generateIRBasicBlock c functionType)]
     where
