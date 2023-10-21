@@ -148,11 +148,11 @@ module Parser where
 
   parseCCast = parseCUnary
 
-  parseCProduct = parseBinaryOperator "*" CProduct
+  parseCProduct = parseBinaryOperator "*" (CBinary "*")
 
-  parseCQuotient = parseBinaryOperator "/" CQuotient
+  parseCQuotient = parseBinaryOperator "/" (CBinary "/")
 
-  parseCRemainder = parseBinaryOperator "%" CRemainder
+  parseCRemainder = parseBinaryOperator "%" (CBinary "%")
 
   parseCMultiplicative = chainl1 parseCCast operator
     where
@@ -161,9 +161,9 @@ module Parser where
         parseCQuotient <|>
         parseCRemainder
 
-  parseCAddition = parseBinaryOperator "+" CAddition
+  parseCAddition = parseBinaryOperator "+" (CBinary "+")
 
-  parseCSubtraction = parseBinaryOperator "-" CSubtraction
+  parseCSubtraction = parseBinaryOperator "-" (CBinary "-")
 
   parseCAdditive = chainl1 parseCMultiplicative operator
     where
@@ -171,9 +171,9 @@ module Parser where
         parseCAddition <|>
         parseCSubtraction
 
-  parseCLeftShift = parseBinaryOperator "<<" CLeftShift
+  parseCLeftShift = parseBinaryOperator "<<" (CBinary "<<")
 
-  parseCRightShift = parseBinaryOperator ">>" CRightShift
+  parseCRightShift = parseBinaryOperator ">>" (CBinary ">>")
 
   parseCShift = chainl1 parseCAdditive operator
     where
@@ -181,13 +181,13 @@ module Parser where
         parseCLeftShift <|>
         parseCRightShift
 
-  parseCLesser = parseBinaryOperator "<" CLesser
+  parseCLesser = parseBinaryOperator "<" (CBinary "<")
 
-  parseCGreater = parseBinaryOperator ">" CGreater
+  parseCGreater = parseBinaryOperator ">" (CBinary ">")
 
-  parseCLesserOrEqual = parseBinaryOperator "<=" CLesserOrEqual
+  parseCLesserOrEqual = parseBinaryOperator "<=" (CBinary "<=")
 
-  parseCGreaterOrEqual = parseBinaryOperator ">=" CGreaterOrEqual
+  parseCGreaterOrEqual = parseBinaryOperator ">=" (CBinary ">=")
 
   parseCRelational = chainl1 parseCShift operator
     where
@@ -197,9 +197,9 @@ module Parser where
         parseCLesserOrEqual <|>
         parseCGreaterOrEqual
 
-  parseCEqual = parseBinaryOperator "==" CEqual
+  parseCEqual = parseBinaryOperator "==" (CBinary "==")
 
-  parseCNotEqual = parseBinaryOperator "!=" CNotEqual
+  parseCNotEqual = parseBinaryOperator "!=" (CBinary "!=")
 
   parseCEquality = chainl1 parseCRelational operator
     where
@@ -207,15 +207,15 @@ module Parser where
         parseCEqual <|>
         parseCNotEqual
 
-  parseCBitwiseAnd = chainl1 parseCEquality (parseBinaryOperator "&" CBitwiseAnd)
+  parseCBitwiseAnd = chainl1 parseCEquality (parseBinaryOperator "&" (CBinary "&"))
 
-  parseCBitwiseExclusiveOr = chainl1 parseCBitwiseAnd (parseBinaryOperator "^" CBitwiseExclusiveOr)
+  parseCBitwiseExclusiveOr = chainl1 parseCBitwiseAnd (parseBinaryOperator "^" (CBinary "^"))
 
-  parseCBitwiseInclusiveOr = chainl1 parseCBitwiseExclusiveOr (parseBinaryOperator "|" CBitwiseInclusiveOr)
+  parseCBitwiseInclusiveOr = chainl1 parseCBitwiseExclusiveOr (parseBinaryOperator "|" (CBinary "|"))
 
-  parseCLogicalAnd = chainl1 parseCBitwiseInclusiveOr (parseBinaryOperator "&&" CLogicalAnd)
+  parseCLogicalAnd = chainl1 parseCBitwiseInclusiveOr (parseBinaryOperator "&&" (CBinary "&&"))
 
-  parseCLogicalOr = chainl1 parseCLogicalAnd (parseBinaryOperator "||" CLogicalOr)
+  parseCLogicalOr = chainl1 parseCLogicalAnd (parseBinaryOperator "||" (CBinary "||"))
 
   parseCConditional = parseCLogicalOr
 

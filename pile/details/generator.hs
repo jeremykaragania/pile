@@ -22,13 +22,37 @@ module Generator where
   getConstant (CInitDeclarator _ a) = a
   getConstant (CDeclarator _ _) = CConstant (CConstantToken (CIntegerConstant 0))
 
-  getType (IRFmul a _ _) = a
+  getType (IRAdd a _ _) = a
+  getType (IRFadd a _ _) = a
+  getType (IRSub a _ _) = a
+  getType (IRFsub a _ _) = a
   getType (IRMul a _ _) = a
+  getType (IRFmul a _ _) = a
+  getType (IRUdiv a _ _) = a
+  getType (IRSdiv a _ _) = a
+  getType (IRFdiv a _ _) = a
+  getType (IRUrem a _ _) = a
+  getType (IRSrem a _ _) = a
+  getType (IRFrem a _ _) = a
+  getType (IRShl a _ _) = a
+  getType (IRLshr a _ _) = a
+  getType (IRAshr a _ _) = a
+  getType (IRAnd a _ _) = a
+  getType (IROr a _ _) = a
+  getType (IRXor a _ _) = a
   getType (IRLoad a _ _) = a
   getType (IRStore a _ _ _) = a
-  getType (IRTrunc _ _ a) = a
+  getType (IRSext _ _ a) = a
+  getType (IRFptrunc _ _ a) = a
+  getType (IRFpext _ _ a) = a
+  getType (IRFptoui _ _ a) = a
   getType (IRFptosi _ _ a) = a
+  getType (IRUitofp _ _ a) = a
   getType (IRSitofp _ _ a) = a
+  getType (IRPtrtoint _ _ a) = a
+  getType (IRInttoptr _ _ a) = a
+  getType (IRBitcast _ _ a) = a
+  getType (IRAddrspacecast _ _ a) = a
 
   getOperator a
     | a == "=" = a
@@ -107,7 +131,7 @@ module Generator where
       declarations :: [CDeclaration] -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
       declarations [] = do
         got <- get
-        eturn (list got)
+        return (list got)
 
       declarations (a:as) = do
         declaration a
@@ -200,10 +224,11 @@ module Generator where
         put (GeneratorState ((list got) ++ instructions) ((counter got) + 1) (table got))
         return instructions
 
-      expression (CProduct a b) = do
+      expression (CBinary a b c) = do
         got <- get
-        let expr = runState (binaryExpression a b "*") (GeneratorState [] (counter got) (table got))
-        put (GeneratorState ((list got) ++ (fst expr)) ((counter . snd) expr) ((table . snd) expr))
+        let expr = runState (binaryExpression b c a) (GeneratorState [] (counter got) (table got))
+        let instructions = fst expr
+        put (GeneratorState ((list got) ++ instructions) ((counter . snd) expr) ((table . snd) expr))
         return (fst expr)
 
       expression (CAssignment "=" (CIdentifier a) (CConstant b)) = do
@@ -213,14 +238,12 @@ module Generator where
         put (GeneratorState ((list got) ++ instructions) ((counter got) + 1) (table got))
         return instructions
 
-      expression (CAssignment c (CIdentifier a) b) = do
+      expression (CAssignment a (CIdentifier b) c) = do
         got <- get
-        let symbol = (table got) Map.! (identifier a)
-        let firstCounter = counter got
-        let binaryExpr = runState (binaryExpression (CIdentifier a) b (getOperator c)) (GeneratorState [] (firstCounter) (table got))
-        let binaryCounter = (counter . snd) binaryExpr
-        let instructions = (fst binaryExpr) ++ [(Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber (binaryCounter - 1))) (fst symbol))]
-        put (GeneratorState (instructions) (binaryCounter) (table got))
+        let symbol = (table got) Map.! (identifier b)
+        let expr = runState (binaryExpression (CIdentifier b) c (getOperator a)) (GeneratorState [] (counter got) (table got))
+        let instructions = (fst expr) ++ [(Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber (((counter . snd) expr) - 1))) (fst symbol))]
+        put (GeneratorState ((list got) ++ instructions) ((counter . snd) expr) ((table . snd) expr))
         return instructions
 
       binaryExpression :: CExpression -> CExpression -> String -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
@@ -229,10 +252,19 @@ module Generator where
         let firstExpr = runState (expression a) (GeneratorState [] (counter got) (table got))
         let firstType = ((getType . snd . last . fst) firstExpr)
         let firstCounter = (counter . snd) firstExpr
-        let secondExpr = runState (expression b) (GeneratorState [] (firstCounter) (table got))
-        let secondType = ((getType . snd . last . fst) secondExpr)
-        let secondCounter = (counter . snd) secondExpr
-        if c /= "=" then do
+        if c == "=" then do
+          let secondExpr = runState (expression b) (GeneratorState [] (counter got) (table got))
+          let secondType = ((getType . snd . last . fst) secondExpr)
+          let secondCounter = (counter . snd) secondExpr
+          let castExpr = runState (castExpression (firstType, (IRLabelValue (IRLabelNumber (secondCounter - 1)))) (secondType, (IRLabelValue (IRLabelNumber (secondCounter - 1)))) False) (GeneratorState [] secondCounter (table got))
+          let castCounter = (counter . snd) castExpr
+          let instructions = (fst secondExpr) ++ (fst castExpr)
+          put (GeneratorState ((list got) ++ instructions) (castCounter) (table got))
+          return instructions
+        else do
+          let secondExpr = runState (expression b) (GeneratorState [] (firstCounter) (table got))
+          let secondType = ((getType . snd . last . fst) secondExpr)
+          let secondCounter = (counter . snd) secondExpr
           let castExpr = runState (castExpression (firstType, (IRLabelValue (IRLabelNumber (firstCounter - 1)))) (secondType, (IRLabelValue (IRLabelNumber (secondCounter - 1)))) True) (GeneratorState [] secondCounter (table got))
           let castType = (getType . snd . last) ((fst firstExpr) ++ (fst secondExpr) ++ (fst castExpr))
           let castCounter = (counter . snd) castExpr
@@ -240,11 +272,6 @@ module Generator where
           let instructions = (fst firstExpr) ++ (fst secondExpr) ++ (fst castExpr) ++ [(Just (IRLabelNumber (castCounter)), (binaryInstruction c (fst other) castType) castType (IRLabelValue (IRLabelNumber ((snd other) - 1))) (IRLabelValue (IRLabelNumber (castCounter - 1))))]
           put (GeneratorState ((list got) ++ instructions) (castCounter + 1) (table got))
           return instructions
-        else do
-          let castExpr = runState (castExpression (firstType, (IRLabelValue (IRLabelNumber (firstCounter - 1)))) (secondType, (IRLabelValue (IRLabelNumber (secondCounter - 1)))) False) (GeneratorState [] secondCounter (table got))
-          let castCounter = (counter . snd) castExpr
-          put (GeneratorState ((list got) ++ (fst secondExpr) ++ (fst castExpr)) (castCounter) (table got))
-          return ((fst secondExpr) ++ (fst castExpr))
         where
           otherExpression a b c
             | fst a == fst c = a
@@ -261,6 +288,18 @@ module Generator where
           return []
 
       castInstruction a b c
+        | isIRShortInteger (fst a) && isIRInteger (fst b) && c = IRSext (fst a) (snd a) (fst b)
+        | isIRShortInteger (fst a) && isIRInteger (fst b) && not c = IRTrunc (fst b) (snd b) (fst b)
+        | isIRShortInteger (fst a) && isIRLongInteger (fst b) && c = IRSext (fst a) (snd a) (fst b)
+        | isIRShortInteger (fst a) && isIRLongInteger (fst b) && not c = IRTrunc (fst b) (snd b) (fst b)
+        | isIRInteger (fst a) && isIRShortInteger (fst b) && c = IRSext (fst b) (snd b) (fst a)
+        | isIRInteger (fst a) && isIRShortInteger (fst b) && not c = IRTrunc (fst a) (snd a) (fst b)
+        | isIRInteger (fst a) && isIRLongInteger (fst b) && c = IRSext (fst a) (snd a) (fst b)
+        | isIRInteger (fst a) && isIRLongInteger (fst b) && not c = IRTrunc (fst b) (snd b) (fst a)
+        | isIRLongInteger (fst a) && isIRShortInteger (fst b) && c = IRSext (fst b) (snd b) (fst a)
+        | isIRLongInteger (fst a) && isIRShortInteger (fst b) && not c = IRTrunc (fst a) (snd a) (fst b)
+        | isIRLongInteger (fst a) && isIRInteger (fst b) && c = IRSext (fst b) (snd b) (fst a)
+        | isIRLongInteger (fst a) && isIRInteger (fst b) && not c = IRTrunc (fst a) (snd a) (fst b)
         | isIntegral (fst a) && isFloating (fst b) && c = IRSitofp (fst a) (snd a) (fst b)
         | isFloating (fst a) && isIntegral (fst b) && c = IRSitofp (fst b) (snd b) (fst a)
         | isIntegral (fst a) && isFloating (fst b) && not c = IRFptosi (fst b) (snd b) (fst a)

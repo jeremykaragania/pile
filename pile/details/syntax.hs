@@ -32,24 +32,7 @@ module Syntax where
     CSizeofEUnary CExpression |
     CSizeofTypeName CDeclaration |
     CCast CDeclaration CExpression |
-    CProduct CExpression CExpression |
-    CQuotient CExpression CExpression |
-    CRemainder CExpression CExpression |
-    CAddition CExpression CExpression |
-    CSubtraction CExpression CExpression |
-    CLeftShift CExpression CExpression |
-    CRightShift CExpression CExpression |
-    CLesser CExpression CExpression |
-    CGreater CExpression CExpression |
-    CLesserOrEqual CExpression CExpression |
-    CGreaterOrEqual CExpression CExpression |
-    CEqual CExpression CExpression |
-    CNotEqual CExpression CExpression |
-    CBitwiseAnd CExpression CExpression |
-    CBitwiseExclusiveOr CExpression CExpression |
-    CBitwiseInclusiveOr CExpression CExpression |
-    CLogicalAnd CExpression CExpression |
-    CLogicalOr CExpression CExpression |
+    CBinary String CExpression CExpression |
     CConditional CExpression CExpression CExpression |
     CAssignment String CExpression CExpression |
     CExpression [CExpression] deriving (Show, Eq, Ord)
