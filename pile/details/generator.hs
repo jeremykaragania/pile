@@ -72,9 +72,21 @@ module Generator where
 
   isFloating a = a == IRFloat || a == IRDouble || a == IRLongDouble
 
-  generateIRType a (Just (CPointer _)) = IRPointer (generateIRType a Nothing)
+  typeFromCConstant (CFloatingConstant _ Nothing) = IRDouble
+  typeFromCConstant (CFloatingConstant _ (Just a))
+    | toLower a == 'f' = IRFloat
+    | toLower a == 'l' = IRLongDouble
 
-  generateIRType (CSpecifiers a) Nothing
+  typeFromCConstant (CIntegerConstant _ Nothing) = IRInteger IRSigned
+  typeFromCConstant (CIntegerConstant _ (Just (a, Nothing)))
+    | toLower a == 'u' = IRInteger IRUnsigned
+    | toLower a == 'l' = IRLongInteger IRSigned
+
+  typeFromCConstant (CIntegerConstant _ (Just (a, Just b))) = IRLongInteger IRUnsigned
+
+  typeFromCSpecifiers a (Just (CPointer _)) = IRPointer (typeFromCSpecifiers a Nothing)
+
+  typeFromCSpecifiers (CSpecifiers a) Nothing
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "void")] = IRVoid
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "short")] = IRShortInteger IRSigned
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "short")] = IRShortInteger IRSigned
@@ -155,8 +167,8 @@ module Generator where
       irAlloca a (b:bs) = do
         got <- get
         if Map.notMember (getIdentifier b) (table got) then do
-            let instruction = generateIRAlloca (generateIRType a (getPointer b))
-            let putTable = Map.insert (getIdentifier b) (IRLabelNumber (counter got), (generateIRType a (getPointer b))) (table got)
+            let instruction = generateIRAlloca (typeFromCSpecifiers a (getPointer b))
+            let putTable = Map.insert (getIdentifier b) (IRLabelNumber (counter got), (typeFromCSpecifiers a (getPointer b))) (table got)
             put (GeneratorState ((list got) ++ [(Just (IRLabelNumber (counter got)), instruction)]) ((counter got) + 1) putTable)
           else do
             error ""
@@ -169,7 +181,7 @@ module Generator where
 
       irStore a (b:bs) = do
         got <- get
-        let instruction = generateIRStore (generateIRType a (getPointer b)) (IRConstantValue (generateIRConstant (getConstant b) (generateIRType a (getPointer b))))  (fst ((table got) Map.! getIdentifier b))
+        let instruction = generateIRStore (typeFromCSpecifiers a (getPointer b)) (IRConstantValue (generateIRConstant (getConstant b) (typeFromCSpecifiers a (getPointer b))))  (fst ((table got) Map.! getIdentifier b))
         put (GeneratorState ((list got) ++ [(Nothing, instruction)]) (counter got) (table got))
         irStore a bs
 
@@ -224,19 +236,18 @@ module Generator where
         put (GeneratorState ((list got) ++ instructions) ((counter got) + 1) (table got))
         return instructions
 
+      expression (CConstant a) = do
+        got <- get
+        let instructions = (list got) ++ [(Just (IRLabelNumber (counter got)), generateIRAlloca (IRFloat)), (Nothing, generateIRStore ((typeFromCConstant . constant) a) (IRConstantValue (generateIRConstant (CConstant a) ((typeFromCConstant . constant) a))) (IRLabelNumber (counter got)))]
+        put (GeneratorState ((list got) ++ instructions) ((counter got) + 1) (table got))
+        return instructions
+
       expression (CBinary a b c) = do
         got <- get
         let expr = runState (binaryExpression b c a) (GeneratorState [] (counter got) (table got))
         let instructions = fst expr
         put (GeneratorState ((list got) ++ instructions) ((counter . snd) expr) ((table . snd) expr))
         return (fst expr)
-
-      expression (CAssignment "=" (CIdentifier a) (CConstant b)) = do
-        got <- get
-        let symbol = (table got) Map.! (identifier a)
-        let instructions = (list got) ++ [(Just (IRLabelNumber (counter got)), generateIRAlloca (snd symbol)), (Nothing, generateIRStore (snd symbol) (IRConstantValue (generateIRConstant (CConstant b) (snd symbol))) (IRLabelNumber (counter got))), (Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber (counter got))) (fst symbol))]
-        put (GeneratorState ((list got) ++ instructions) ((counter got) + 1) (table got))
-        return instructions
 
       expression (CAssignment a (CIdentifier b) c) = do
         got <- get
@@ -300,6 +311,18 @@ module Generator where
         | isIRLongInteger (fst a) && isIRShortInteger (fst b) && not c = IRTrunc (fst a) (snd a) (fst b)
         | isIRLongInteger (fst a) && isIRInteger (fst b) && c = IRSext (fst b) (snd b) (fst a)
         | isIRLongInteger (fst a) && isIRInteger (fst b) && not c = IRTrunc (fst a) (snd a) (fst b)
+        | (fst a) == IRFloat && (fst b) == IRDouble && c = IRFpext (fst a) (snd a) (fst b)
+        | (fst a) == IRFloat && (fst b) == IRDouble && not c = IRFptrunc (fst b) (snd b) (fst a)
+        | (fst a) == IRFloat && (fst b) == IRLongDouble && c = IRFpext (fst a) (snd a) (fst b)
+        | (fst a) == IRFloat && (fst b) == IRLongDouble && not c = IRFptrunc (fst b) (snd b) (fst a)
+        | (fst a) == IRDouble && (fst b) == IRFloat && c = IRFpext (fst b) (snd b) (fst a)
+        | (fst a) == IRDouble && (fst b) == IRFloat && not c = IRFptrunc (fst a) (snd a) (fst b)
+        | (fst a) == IRDouble && (fst b) == IRLongDouble && c = IRFpext (fst a) (snd a) (fst b)
+        | (fst a) == IRDouble && (fst b) == IRLongDouble && not c = IRFptrunc (fst b) (snd b) (fst a)
+        | (fst a) == IRLongDouble && (fst b) == IRFloat && c = IRFpext (fst b) (snd b) (fst a)
+        | (fst a) == IRLongDouble && (fst b) == IRFloat && not c = IRFptrunc (fst a) (snd a) (fst b)
+        | (fst a) == IRLongDouble && (fst b) == IRDouble && c = IRFpext (fst b) (snd b) (fst a)
+        | (fst a) == IRLongDouble && (fst b) == IRDouble && not c = IRFptrunc (fst a) (snd a) (fst b)
         | isIntegral (fst a) && isFloating (fst b) && c = IRSitofp (fst a) (snd a) (fst b)
         | isFloating (fst a) && isIntegral (fst b) && c = IRSitofp (fst b) (snd b) (fst a)
         | isIntegral (fst a) && isFloating (fst b) && not c = IRFptosi (fst b) (snd b) (fst a)
@@ -330,17 +353,17 @@ module Generator where
 
   generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (generateIRBasicBlock c functionType)]
     where
-      functionType = (generateIRType a (pointer b))
+      functionType = (typeFromCSpecifiers a (pointer b))
       name (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
       name (CDeclarator _ (CDirectDeclaratorFunctionCall (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a))) _)) = a
       pointer (CDeclarator a _) = a
       argumentList (CDeclarator _ (CDirectDeclaratorFunctionCall _ [CParameterList a])) = a
-      argument (CParameterDeclaration c d) = IRArgument (generateIRType c Nothing) (Just (name d))
+      argument (CParameterDeclaration c d) = IRArgument (typeFromCSpecifiers c Nothing) (Just (name d))
 
   generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList b)))) = map variable b
     where
-      variable (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) = IRVariableGlobal d (generateIRType a c) (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (generateIRType a c))
-      variable (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) = IRVariableGlobal d (generateIRType a c) (generateIRConstant e (generateIRType a c))
+      variable (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) = IRVariableGlobal d (typeFromCSpecifiers a c) (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (typeFromCSpecifiers a c))
+      variable (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) = IRVariableGlobal d (typeFromCSpecifiers a c) (generateIRConstant e (typeFromCSpecifiers a c))
 
   generateIRModule (CTranslationUnit a) = IRModule (concat (map cExternalDefinition a))
     where
