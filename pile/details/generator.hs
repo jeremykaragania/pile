@@ -20,7 +20,7 @@ module Generator where
   getPointer (CInitDeclarator a _) = getPointer a
 
   getConstant (CInitDeclarator _ a) = a
-  getConstant (CDeclarator _ _) = CConstant (CConstantToken (CIntegerConstant 0))
+  getConstant (CDeclarator _ _) = CConstant (CConstantToken (CIntegerConstant 0 Nothing))
 
   getType (IRAdd a _ _) = a
   getType (IRFadd a _ _) = a
@@ -104,8 +104,8 @@ module Generator where
     | b == IRFloat || b == IRDouble || b == IRLongDouble = IRFloatingConstant (value a)
     | otherwise = IRIntegerConstant ((floor . value) a)
     where
-      value (CConstant (CConstantToken (CFloatingConstant a))) = a
-      value (CConstant (CConstantToken (CIntegerConstant a))) = fromIntegral a
+      value (CConstant (CConstantToken (CFloatingConstant a _))) = a
+      value (CConstant (CConstantToken (CIntegerConstant a _))) = fromIntegral a
       value (CConstant (CConstantToken (CCharacterConstant a))) = (fromIntegral . ord) a
       value (CExpression [a]) = value a
       value _ = 0
@@ -339,7 +339,7 @@ module Generator where
 
   generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList b)))) = map variable b
     where
-      variable (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) = IRVariableGlobal d (generateIRType a c) (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0)))(generateIRType a c))
+      variable (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) = IRVariableGlobal d (generateIRType a c) (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (generateIRType a c))
       variable (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) = IRVariableGlobal d (generateIRType a c) (generateIRConstant e (generateIRType a c))
 
   generateIRModule (CTranslationUnit a) = IRModule (concat (map cExternalDefinition a))

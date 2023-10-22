@@ -8,9 +8,9 @@ module Syntax where
     CPunctuatorToken {punctuator :: String} deriving (Show, Eq, Ord)
 
   data CConstant =
-    CFloatingConstant {floatingConstant :: Double} |
-    CIntegerConstant {integerConstant :: Integer} |
-    CCharacterConstant {characterConstant :: Char} deriving (Show, Eq, Ord)
+    CFloatingConstant Double (Maybe Char) |
+    CIntegerConstant Integer (Maybe (Char, (Maybe Char))) |
+    CCharacterConstant Char deriving (Show, Eq, Ord)
 
   data CExpression =
     CAss CExpression CExpression |

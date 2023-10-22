@@ -114,12 +114,21 @@ module Lexer where
   scanCFloatingConstant = do
     sourcePos <- getPosition
     value <- try (P.float lexer)
-    return (Token (Just sourcePos) (CConstantToken (CFloatingConstant value)))
+    suffix <- optionMaybe (oneOf "flFL")
+    return (Token (Just sourcePos) (CConstantToken (CFloatingConstant value suffix)))
 
   scanCIntegerConstant = do
     sourcePos <- getPosition
     value <- try (P.integer lexer)
-    return (Token (Just sourcePos) (CConstantToken (CIntegerConstant value)))
+    suffix <- optionMaybe ((integerSuffix unsignedSuffix longSuffix) <|> (integerSuffix longSuffix unsignedSuffix))
+    return (Token (Just sourcePos) (CConstantToken (CIntegerConstant value suffix)))
+    where
+      integerSuffix a b = do
+        firstSuffix <- a
+        secondSuffix <- optionMaybe b
+        return (firstSuffix, secondSuffix)
+      unsignedSuffix = oneOf "uU"
+      longSuffix = oneOf "lL"
 
   scanCCharacterConstant = do
     sourcePos <- getPosition
