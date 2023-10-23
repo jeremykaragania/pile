@@ -1,12 +1,10 @@
 module Generator where
   import Control.Monad.State
-  import Data.Char
-  import Data.List
+  import Data.Char (toLower, ord)
+  import Data.List (intercalate)
   import Data.Map (Map)
   import qualified Data.Map as Map
   import Data.Set (fromList)
-  import Lexer
-  import Parser
   import Syntax
 
   data GeneratorState = GeneratorState {list :: [(Maybe IRLabel, IRInstruction)], counter :: Integer, table :: Map String (IRLabel, IRType)}
@@ -42,6 +40,8 @@ module Generator where
   getType (IRXor a _ _) = a
   getType (IRLoad a _ _) = a
   getType (IRStore a _ _ _) = a
+  getType (IRIcmp _ _ _ _) = IRInteger IRSigned
+  getType (IRFcmp _ _ _ _) = IRInteger IRSigned
   getType (IRSext _ _ a) = a
   getType (IRFptrunc _ _ a) = a
   getType (IRFpext _ _ a) = a
@@ -61,6 +61,10 @@ module Generator where
   isSameType a b
     | isIRShortInteger a && isIRShortInteger b || isIRInteger a && isIRInteger b || isIRLongInteger a && isIRLongInteger b || a == b = Just b
     | otherwise = Nothing
+
+  isIRSigned a = a == IRShortInteger IRSigned || a == IRInteger IRSigned || a == IRLongInteger IRSigned
+
+  isIRUnsigned a = a == IRShortInteger IRUnsigned || a == IRInteger IRUnsigned || a == IRLongInteger IRUnsigned
 
   isIRShortInteger a = a == IRShortInteger IRSigned || a == IRShortInteger IRUnsigned
 
@@ -198,6 +202,20 @@ module Generator where
         statements as
 
       statement :: CStatement -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
+      statement (CList a) = do
+        got <- get
+        let stat = runState (statements a) (GeneratorState [] (counter got) (table got))
+        put (GeneratorState ((list got) ++ (fst stat)) ((counter . snd) stat) (table got))
+        return (fst stat)
+
+      statement (CCompound a Nothing) = return []
+
+      statement (CCompound a (Just b)) = do
+        got <- get
+        let stat = runState (statement b) (GeneratorState [] (counter got) (table got))
+        put (GeneratorState ((list got) ++ (fst stat)) ((counter . snd) stat) (table got))
+        return (fst stat)
+
       statement (CCExpression (Just (CExpression []))) = do
         got <- get
         put (GeneratorState ((list got) ++ [(Nothing, IRRet Nothing)]) (counter got) (table got))
@@ -205,8 +223,8 @@ module Generator where
 
       statement (CCExpression (Just (CExpression a))) = do
         got <- get
-        let expressionsState = runState (expressions a) (GeneratorState [] (counter got) (table got))
-        put (GeneratorState ((list got) ++ (fst expressionsState)) ((counter . snd) expressionsState) (table got))
+        let expr = runState (expressions a) (GeneratorState [] (counter got) (table got))
+        put (GeneratorState ((list got) ++ (fst expr)) ((counter . snd) expr) (table got))
         return (list got)
 
       statement (CReturn Nothing) = do
@@ -279,14 +297,14 @@ module Generator where
           let castExpr = runState (castExpression (firstType, (IRLabelValue (IRLabelNumber (firstCounter - 1)))) (secondType, (IRLabelValue (IRLabelNumber (secondCounter - 1)))) True) (GeneratorState [] secondCounter (table got))
           let castType = (getType . snd . last) ((fst firstExpr) ++ (fst secondExpr) ++ (fst castExpr))
           let castCounter = (counter . snd) castExpr
-          let other = otherExpression (firstType, firstCounter) (secondType, secondCounter) (castType, castCounter)
-          let instructions = (fst firstExpr) ++ (fst secondExpr) ++ (fst castExpr) ++ [(Just (IRLabelNumber (castCounter)), (binaryInstruction c (fst other) castType) castType (IRLabelValue (IRLabelNumber ((snd other) - 1))) (IRLabelValue (IRLabelNumber (castCounter - 1))))]
+          let bin = binaryExpression (firstType, firstCounter) (secondType, secondCounter) (castType, castCounter)
+          let instructions = (fst firstExpr) ++ (fst secondExpr) ++ (fst castExpr) ++ [(Just (IRLabelNumber (castCounter)), bin)]
           put (GeneratorState ((list got) ++ instructions) (castCounter + 1) (table got))
           return instructions
         where
-          otherExpression a b c
-            | fst a == fst c = a
-            | fst b == fst c = b
+          binaryExpression d e f
+            | fst d == fst f = (binaryInstruction c (fst d) (fst f)) (fst f) (IRLabelValue (IRLabelNumber ((snd d) - 1))) (IRLabelValue (IRLabelNumber ((snd f) - 1)))
+            | fst e == fst f = (binaryInstruction c (fst e) (fst f)) (fst f) (IRLabelValue (IRLabelNumber ((snd f) - 1))) (IRLabelValue (IRLabelNumber ((snd e) - 1)))
 
       castExpression :: (IRType, IRValue) -> (IRType, IRValue) -> Bool -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
       castExpression a b c = do
@@ -332,10 +350,10 @@ module Generator where
         | a == "*" && (isIntegral <$> (isSameType b c)) == Just True = IRMul
         | a == "*" && (isFloating <$> (isSameType b c)) == Just True = IRFmul
         | a == "/" && (isFloating <$> (isSameType b c)) == Just True = IRFdiv
-        | a == "/" && isSameType b c == Just (IRInteger IRUnsigned) = IRUdiv
-        | a == "/" && isSameType b c == Just (IRInteger IRSigned) = IRSdiv
-        | a == "%" && isSameType b c /= Just (IRInteger IRUnsigned) = IRUrem
-        | a == "%" && isSameType b c == Just (IRInteger IRSigned) = IRSrem
+        | a == "/" && (isIRUnsigned <$> (isSameType b c)) == Just True = IRUdiv
+        | a == "/" && (isIRSigned <$> (isSameType b c)) == Just True = IRSdiv
+        | a == "%" && (isIRUnsigned <$> (isSameType b c)) == Just True = IRUrem
+        | a == "%" && (isIRSigned <$> (isSameType b c)) == Just True = IRSrem
         | a == "%" && (isFloating <$> (isSameType b c)) == Just True = IRFrem
         | a == "+" && (isIntegral <$> (isSameType b c)) == Just True = IRAdd
         | a == "+" && (isFloating <$> (isSameType b c)) == Just True = IRFadd
@@ -343,6 +361,22 @@ module Generator where
         | a == "-" && (isFloating <$> (isSameType b c)) == Just True = IRFsub
         | a == "<<" && (isIntegral <$> (isSameType b c)) == Just True = IRShl
         | a == ">>" && (isIntegral <$> (isSameType b c)) == Just True = IRAshr
+        | a == "<" && (isIRUnsigned <$> (isSameType b c)) == Just True = IRIcmp IRIUlt
+        | a == "<" && (isIRSigned <$> (isSameType b c)) == Just True = IRIcmp IRISlt
+        | a == "<" && (isFloating <$> (isSameType b c)) == Just True = IRFcmp IRFOlt
+        | a == ">" && (isIRUnsigned <$> (isSameType b c)) == Just True = IRIcmp IRIUgt
+        | a == ">" && (isIRSigned <$> (isSameType b c)) == Just True = IRIcmp IRISgt
+        | a == ">" && (isFloating <$> (isSameType b c)) == Just True = IRFcmp IRFOgt
+        | a == "<=" && (isIRUnsigned <$> (isSameType b c)) == Just True = IRIcmp IRIUle
+        | a == "<=" && (isIRSigned <$> (isSameType b c)) == Just True = IRIcmp IRISle
+        | a == "<=" && (isFloating <$> (isSameType b c)) == Just True = IRFcmp IRFOle
+        | a == ">=" && (isIRUnsigned <$> (isSameType b c)) == Just True = IRIcmp IRIUge
+        | a == ">=" && (isIRSigned <$> (isSameType b c)) == Just True = IRIcmp IRISge
+        | a == ">=" && (isFloating <$> (isSameType b c)) == Just True = IRFcmp IRFOge
+        | a == "==" && (isIntegral <$> (isSameType b c)) == Just True = IRIcmp IRIEq
+        | a == "==" && (isFloating <$> (isSameType b c)) == Just True = IRFcmp IRFOeq
+        | a == "!=" && (isIntegral <$> (isSameType b c)) == Just True = IRIcmp IRINe
+        | a == "!=" && (isFloating <$> (isSameType b c)) == Just True = IRFcmp IRFOne
         | a == "&" && (isIntegral <$> (isSameType b c)) == Just True = IRAnd
         | a == "^" && (isIntegral <$> (isSameType b c)) == Just True = IRXor
         | a == "|" && (isIntegral <$> (isSameType b c)) == Just True = IROr
