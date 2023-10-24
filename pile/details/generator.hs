@@ -256,7 +256,7 @@ module Generator where
 
       expression (CConstant a) = do
         got <- get
-        let instructions = (list got) ++ [(Just (IRLabelNumber (counter got)), generateIRAlloca (IRFloat)), (Nothing, generateIRStore ((typeFromCConstant . constant) a) (IRConstantValue (generateIRConstant (CConstant a) ((typeFromCConstant . constant) a))) (IRLabelNumber (counter got)))]
+        let instructions = (list got) ++ [(Just (IRLabelNumber (counter got)), generateIRAlloca ((typeFromCConstant . constant) a)), (Nothing, generateIRStore ((typeFromCConstant . constant) a) (IRConstantValue (generateIRConstant (CConstant a) ((typeFromCConstant . constant) a))) (IRLabelNumber (counter got)))]
         put (GeneratorState ((list got) ++ instructions) ((counter got) + 1) (table got))
         return instructions
 
