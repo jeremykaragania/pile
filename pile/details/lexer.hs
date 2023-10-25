@@ -113,9 +113,25 @@ module Lexer where
 
   scanCFloatingConstant = do
     sourcePos <- getPosition
-    value <- try (P.float lexer)
+    value <- try fractionalConstant
     suffix <- optionMaybe (oneOf "flFL")
     return (Token (Just sourcePos) (CConstantToken (CFloatingConstant value suffix)))
+    where
+      fractionalConstant =
+        do
+          first <- many1 digit
+          char '.'
+          second <- many digit
+          return (read ((value first) ++ "." ++ (value second)) :: Double)
+          <|>
+        do
+          first <- many digit
+          char '.'
+          second <- many1 digit
+          return (read ((value first) ++ "." ++ (value second)) :: Double)
+        where
+          value [] = "0"
+          value a = a
 
   scanCIntegerConstant = do
     sourcePos <- getPosition
