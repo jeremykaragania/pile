@@ -95,12 +95,12 @@ module Syntax where
     CGoto CExpression |
     CContinue |
     CBreak |
-    CReturn (Maybe CExpression) deriving Show
+    CReturn (Maybe CExpression) deriving (Show, Eq)
 
   data CExternalDefinition =
     CTranslationUnit [CExternalDefinition] |
     CExternalDeclaration CDeclaration |
-    CFunction (Maybe CDeclaration) CDeclaration (Maybe CStatement) CStatement deriving Show
+    CFunction (Maybe CDeclaration) CDeclaration (Maybe CStatement) CStatement deriving (Show, Eq)
 
   data IRIntegerType =
     IRSigned |
@@ -125,7 +125,7 @@ module Syntax where
     IRFloatingConstant Double |
     IRNullPointerConstant |
     IRArrayConstant [(IRType, IRConstant)] |
-    IRStructureConstant [(IRType, IRConstant)] deriving Show
+    IRStructureConstant [(IRType, IRConstant)] deriving (Show, Eq)
 
   data IRInstruction =
     IRRet (Maybe IRValue) |
@@ -168,7 +168,7 @@ module Syntax where
     IRPtrtoint IRType IRValue IRType |
     IRInttoptr IRType IRValue IRType |
     IRBitcast IRType IRValue IRType |
-    IRAddrspacecast IRType IRValue IRType deriving Show
+    IRAddrspacecast IRType IRValue IRType deriving (Show, Eq)
 
   data IRICondition =
     IRIEq |
@@ -180,7 +180,7 @@ module Syntax where
     IRISgt |
     IRISge |
     IRISlt |
-    IRISle deriving Show
+    IRISle deriving (Show, Eq)
 
   data IRFCondition =
     IRFFalse |
@@ -198,22 +198,22 @@ module Syntax where
     IRFUle |
     IRFUne |
     IRFUno |
-    IRFTrue deriving Show
+    IRFTrue deriving (Show, Eq)
 
-  data IRBasicBlock = IRBasicBlock String [(Maybe IRLabel, IRInstruction)] deriving Show
+  data IRBasicBlock = IRBasicBlock IRLabel [(Maybe IRLabel, IRInstruction)] deriving (Show, Eq)
 
   data IRLabel =
     IRLabelName String |
-    IRLabelNumber Integer deriving Show
+    IRLabelNumber Integer deriving (Show, Eq)
 
   data IRValue =
     IRConstantValue IRConstant |
-    IRLabelValue IRLabel deriving Show
+    IRLabelValue IRLabel deriving (Show, Eq)
 
-  data IRArgument = IRArgument IRType (Maybe String) deriving Show
+  data IRArgument = IRArgument IRType (Maybe String) deriving (Show, Eq)
 
   data IRGlobalValue =
     IRFunctionGlobal IRType String [IRArgument] [IRBasicBlock] |
-    IRVariableGlobal String IRType IRConstant deriving Show
+    IRVariableGlobal String IRType IRConstant deriving (Show, Eq)
 
-  data IRModule = IRModule [IRGlobalValue] deriving Show
+  data IRModule = IRModule [IRGlobalValue] deriving (Show, Eq)
