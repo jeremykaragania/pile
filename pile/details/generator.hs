@@ -132,15 +132,13 @@ module Generator where
 
   generateIRLoad a b = IRLoad a b Nothing
 
-  generateIRBasicBlock (CCompound a b) c = evalState irBasicBlock (GeneratorState [] 1 Map.empty)
+  generateIRBasicBlock :: CStatement -> IRType -> GeneratorStateMonad IRBasicBlock
+  generateIRBasicBlock (CCompound a b) c = do
+    got <- get
+    let dec = runState ((declarations . declarationList) a) got
+    let stat = runState ((statements . statementList) b) (snd dec)
+    return (IRBasicBlock (IRLabelNumber 0) (fst stat))
     where
-      irBasicBlock :: GeneratorStateMonad [IRBasicBlock]
-      irBasicBlock = do
-        got <- get
-        let dec = runState ((declarations . declarationList) a) got
-        let stat = runState ((statements . statementList) b) (snd dec)
-        return [IRBasicBlock "" (fst stat)]
-
       declarationList (Just (CDeclarationList a)) = a
       declarationList Nothing = []
 
@@ -279,7 +277,7 @@ module Generator where
       binaryExpression a b c = do
         got <- get
         let firstExpr = runState (expression a) (GeneratorState [] (counter got) (table got))
-        let firstType = ((getType . snd . last . fst) firstExpr)
+        let firstType = (getType . snd . last . fst) firstExpr
         let firstCounter = (counter . snd) firstExpr
         if c == "=" then do
           let secondExpr = runState (expression b) (GeneratorState [] (counter got) (table got))
@@ -385,8 +383,14 @@ module Generator where
         | a == "<<=" || a == ">>=" = (binaryInstruction (getOperator a) b c) c e d
         | otherwise = (binaryInstruction (getOperator a) b c) c d e
 
-  generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (generateIRBasicBlock c functionType)]
+  generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (evalState basicBlocks (GeneratorState [] 1 Map.empty))]
     where
+      basicBlocks :: GeneratorStateMonad [IRBasicBlock]
+      basicBlocks = do
+        got <- get
+        let block = runState (generateIRBasicBlock c functionType) got
+        return ([fst block])
+
       functionType = (typeFromCSpecifiers a (pointer b))
       name (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
       name (CDeclarator _ (CDirectDeclaratorFunctionCall (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a))) _)) = a
