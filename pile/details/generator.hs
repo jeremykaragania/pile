@@ -216,7 +216,7 @@ module Generator where
 
       statement (CCExpression (Just (CExpression []))) = do
         got <- get
-        put (GeneratorState ((list got) ++ [(Nothing, IRRet Nothing)]) (counter got) (table got))
+        put (GeneratorState ((list got) ++ [(Nothing, IRTerminator (IRRet Nothing))]) (counter got) (table got))
         return (list got)
 
       statement (CCExpression (Just (CExpression a))) = do
@@ -227,12 +227,12 @@ module Generator where
 
       statement (CReturn Nothing) = do
         got <- get
-        put (GeneratorState ((list got) ++ [(Nothing, IRRet Nothing)]) (counter got) (table got))
+        put (GeneratorState ((list got) ++ [(Nothing, IRTerminator (IRRet Nothing))]) (counter got) (table got))
         return (list got)
 
       statement (CReturn (Just a)) = do
         got <- get
-        put (GeneratorState ((list got) ++ [(Nothing, IRRet (Just (IRConstantValue (generateIRConstant a c))))]) (counter got) (table got))
+        put (GeneratorState ((list got) ++ [(Nothing, IRTerminator (IRRet (Just (IRConstantValue (generateIRConstant a c)))))]) (counter got) (table got))
         return (list got)
 
       expressions :: [CExpression] -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
@@ -411,8 +411,8 @@ module Generator where
   generateIRBasicBlockCode a = concat (map irBasicBlockCode a)
     where
       irBasicBlockCode (IRBasicBlock _ a) = concat (map instruction a)
-      instruction (Nothing, IRRet Nothing) = ["mov r0, r3", "bx lr"]
-      instruction (Nothing, IRRet (Just a)) = ["mov r3, " ++ (value a), "mov r0, r3", "bx lr"]
+      instruction (Nothing, IRTerminator (IRRet Nothing)) = ["mov r0, r3", "bx lr"]
+      instruction (Nothing, IRTerminator (IRRet (Just a))) = ["mov r3, " ++ (value a), "mov r0, r3", "bx lr"]
       value (IRConstantValue (IRIntegerConstant a)) = show a
       value (IRConstantValue (IRFloatingConstant a)) = show a
 
