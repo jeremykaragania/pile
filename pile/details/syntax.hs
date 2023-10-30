@@ -127,14 +127,11 @@ module Syntax where
     IRArrayConstant [(IRType, IRConstant)] |
     IRStructureConstant [(IRType, IRConstant)] deriving (Show, Eq)
 
-  data IRTerminator =
-    IRRet (Maybe IRValue) |
-    IRBrConditional IRValue String String |
-    IRBRUnconditional String |
-    IRSwitch IRValue String [(IRConstant, String)] deriving (Show, Eq)
-
   data IRInstruction =
-    IRTerminator IRTerminator |
+    IRRet (Maybe IRValue) |
+    IRBrConditional IRType IRValue IRValue IRValue |
+    IRBrUnconditional IRValue |
+    IRSwitch IRValue String [(IRConstant, String)] |
     IRFneg IRValue |
     IRAdd IRType IRValue IRValue |
     IRFadd IRType IRValue IRValue |
