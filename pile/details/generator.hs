@@ -133,10 +133,9 @@ module Generator where
   generateIRLoad a b = IRLoad a b Nothing
 
   generateIRBasicBlock :: CStatement -> IRType -> GeneratorStateMonad IRBasicBlock
-  generateIRBasicBlock (CCompound a b) c = do
+  generateIRBasicBlock a c = do
     got <- get
-    let dec = runState ((declarations . declarationList) a) got
-    let stat = runState ((statements . statementList) b) (snd dec)
+    let stat = runState (statement a) got
     return (IRBasicBlock (IRLabelNumber 0) (fst stat))
     where
       declarationList (Just (CDeclarationList a)) = a
@@ -208,9 +207,10 @@ module Generator where
 
       statement (CCompound a Nothing) = return []
 
-      statement (CCompound a (Just b)) = do
+      statement (CCompound a b) = do
         got <- get
-        let stat = runState (statement b) (GeneratorState [] (counter got) (table got))
+        let dec = runState ((declarations . declarationList) a) (GeneratorState [] (counter got) (table got))
+        let stat = runState ((statements . statementList) b) (snd dec)
         put (GeneratorState ((list got) ++ (fst stat)) ((counter . snd) stat) (table got))
         return (fst stat)
 
@@ -383,14 +383,8 @@ module Generator where
         | a == "<<=" || a == ">>=" = (binaryInstruction (getOperator a) b c) c e d
         | otherwise = (binaryInstruction (getOperator a) b c) c d e
 
-  generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (evalState basicBlocks (GeneratorState [] 1 Map.empty))]
+  generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) ([evalState (generateIRBasicBlock c functionType) (GeneratorState [] 1 Map.empty)])]
     where
-      basicBlocks :: GeneratorStateMonad [IRBasicBlock]
-      basicBlocks = do
-        got <- get
-        let block = runState (generateIRBasicBlock c functionType) got
-        return ([fst block])
-
       functionType = (typeFromCSpecifiers a (pointer b))
       name (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
       name (CDeclarator _ (CDirectDeclaratorFunctionCall (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a))) _)) = a
