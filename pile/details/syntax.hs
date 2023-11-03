@@ -213,7 +213,7 @@ module Syntax where
   data IRArgument = IRArgument IRType (Maybe String) deriving (Show, Eq)
 
   data IRGlobalValue =
-    IRFunctionGlobal IRType String [IRArgument] [IRBasicBlock] |
+    IRFunctionGlobal IRType String [IRArgument] [[(Maybe IRLabel, IRInstruction)]] |
     IRVariableGlobal String IRType IRConstant deriving (Show, Eq)
 
   data IRModule = IRModule [IRGlobalValue] deriving (Show, Eq)
