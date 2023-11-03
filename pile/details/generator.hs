@@ -227,6 +227,36 @@ module Generator where
         put (GeneratorState (blocks got) ((list got) ++ (fst expr)) ((counter . snd) expr) (table got))
         return (list got)
 
+      statement (CIf (CExpression a) b) = do
+        got <- get
+        let expr = runState (expressions a) (GeneratorState [] [] (counter got) (table got))
+        let exprType = (getType . snd . last . fst) expr
+        let exprCounter = (counter . snd) expr
+        let stat = runState (statement b) (GeneratorState [] (list got) (exprCounter + 2) (table got))
+        let statCounter = (counter . snd) stat
+        let cmp = ((Just (IRLabelNumber exprCounter)), comparisonInstruction (exprType, exprCounter))
+        let firstBr = (Nothing, IRBrConditional ((getType . snd) cmp) (IRLabelValue (IRLabelNumber exprCounter)) (IRLabelValue (IRLabelNumber (exprCounter + 1))) (IRLabelValue (IRLabelNumber (statCounter + 1))))
+        let secondBr = (Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (statCounter + 1))))
+        let putBlocks = [(list got) ++ (fst expr) ++ [cmp] ++ [firstBr]] ++ [(fst stat) ++ [secondBr]]
+        put (GeneratorState ((blocks got) ++ putBlocks) [] (statCounter + 2) (table got))
+        return (list got)
+        where
+          comparisonInstruction a
+            | (isIntegral . fst) a = IRIcmp IRINe (fst a) (IRLabelValue (IRLabelNumber ((snd a) - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
+            | (isFloating . fst) a = IRFcmp IRFOne (fst a) (IRLabelValue (IRLabelNumber ((snd a) - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
+
+      statement (CReturn Nothing) = do
+        got <- get
+        let instructions = ((list got) ++ [(Nothing, IRRet Nothing)])
+        put (GeneratorState (blocks got) instructions (counter got) (table got))
+        return instructions
+
+      statement (CReturn (Just a)) = do
+        got <- get
+        let instructions = ((list got) ++ [(Nothing, IRRet (Just (IRConstantValue (generateIRConstant a c))))])
+        put (GeneratorState (blocks got) instructions (counter got) (table got))
+        return instructions
+
       expressions :: [CExpression] -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
       expressions [] = do
         got <- get
