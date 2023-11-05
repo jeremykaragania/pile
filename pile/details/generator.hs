@@ -196,7 +196,9 @@ module Generator where
         return (list got)
 
       statements (a:as) = do
-        statement a
+        got <- get
+        let stat = runState (statement a) (GeneratorState [] (list got) (counter got) (table got))
+        put (GeneratorState ((blocks got) ++ ((blocks . snd) stat)) ((list . snd) stat) ((counter . snd) stat) (table got))
         statements as
 
       statement :: CStatement -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
@@ -210,10 +212,10 @@ module Generator where
 
       statement (CCompound a b) = do
         got <- get
-        let dec = runState ((declarations . declarationList) a) (GeneratorState [] [] (counter got) (table got))
+        let dec = runState ((declarations . declarationList) a) (GeneratorState [] (list got) (counter got) (table got))
         let stat = runState ((statements . statementList) b) (GeneratorState [] ((list . snd) dec) ((counter . snd) dec) ((table . snd) dec))
         let instructions = (list got) ++ (fst dec) ++ (fst stat)
-        put (GeneratorState ((blocks got) ++ ((blocks . snd) stat)) instructions ((counter . snd) stat) (table got))
+        put (GeneratorState ((blocks got) ++ ((blocks . snd) stat)) [] ((counter . snd) stat) ((table . snd) stat))
         return instructions
 
       statement (CCExpression (Just (CExpression []))) = do
@@ -232,28 +234,31 @@ module Generator where
         let expr = runState (expressions a) (GeneratorState [] [] (counter got) (table got))
         let exprType = (getType . snd . last . fst) expr
         let exprCounter = (counter . snd) expr
-        let stat = runState (statement b) (GeneratorState [] (list got) (exprCounter + 2) (table got))
+        let stat = runState (statement b) (GeneratorState [] [] (exprCounter + 2) (table got))
         let statCounter = (counter . snd) stat
         let cmp = ((Just (IRLabelNumber exprCounter)), comparisonInstruction (exprType, exprCounter))
         let firstBr = (Nothing, IRBrConditional ((getType . snd) cmp) (IRLabelValue (IRLabelNumber exprCounter)) (IRLabelValue (IRLabelNumber (exprCounter + 1))) (IRLabelValue (IRLabelNumber (statCounter + 1))))
         let secondBr = (Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (statCounter + 1))))
-        let putBlocks = [(list got) ++ (fst expr) ++ [cmp] ++ [firstBr]] ++ [(fst stat) ++ [secondBr]]
-        put (GeneratorState ((blocks got) ++ putBlocks) [] (statCounter + 2) (table got))
+        let statBlocks = ((nonEmpty . blocks . snd) stat)
+        let putBlocks = [(list got) ++ (fst expr) ++ [cmp] ++ [firstBr]] ++ ((init statBlocks) ++ [(last  statBlocks) ++ [secondBr]])
+        put (GeneratorState (putBlocks) [] (statCounter + 2) (table got))
         return (list got)
         where
           comparisonInstruction a
             | (isIntegral . fst) a = IRIcmp IRINe (fst a) (IRLabelValue (IRLabelNumber ((snd a) - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
             | (isFloating . fst) a = IRFcmp IRFOne (fst a) (IRLabelValue (IRLabelNumber ((snd a) - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
+          nonEmpty [] = [[]]
+          nonEmpty a = a
 
       statement (CReturn Nothing) = do
         got <- get
-        let instructions = ((list got) ++ [(Nothing, IRRet Nothing)])
+        let instructions = (list got) ++ [(Nothing, IRRet Nothing)]
         put (GeneratorState (blocks got) instructions (counter got) (table got))
         return instructions
 
       statement (CReturn (Just a)) = do
         got <- get
-        let instructions = ((list got) ++ [(Nothing, IRRet (Just (IRConstantValue (generateIRConstant a c))))])
+        let instructions = (list got) ++ [(Nothing, IRRet (Just (IRConstantValue (generateIRConstant a c))))]
         put (GeneratorState (blocks got) instructions (counter got) (table got))
         return instructions
 
