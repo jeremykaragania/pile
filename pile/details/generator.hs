@@ -7,7 +7,7 @@ module Generator where
   import Data.Set (fromList)
   import Syntax
 
-  data GeneratorState = GeneratorState {blocks :: [[(Maybe IRLabel, IRInstruction)]], list :: [(Maybe IRLabel, IRInstruction)], counter :: Integer, table :: Map String (IRLabel, IRType)}
+  data GeneratorState = GeneratorState {blocks :: [IRBasicBlock], list :: [(Maybe IRLabel, IRInstruction)], counter :: Integer, table :: Map String (IRLabel, IRType)}
 
   type GeneratorStateMonad = State GeneratorState
 
@@ -57,6 +57,8 @@ module Generator where
   getOperator a
     | a == "=" = a
     | otherwise = init a
+
+  getList (IRBasicBlock _ a) = a
 
   isSameType a b
     | isIRShortInteger a && isIRShortInteger b || isIRInteger a && isIRInteger b || isIRLongInteger a && isIRLongInteger b || a == b = Just b
@@ -132,7 +134,7 @@ module Generator where
 
   generateIRLoad a b = IRLoad a b Nothing
 
-  generateIRBasicBlocks :: CStatement -> IRType -> GeneratorStateMonad [[(Maybe IRLabel, IRInstruction)]]
+  generateIRBasicBlocks :: CStatement -> IRType -> GeneratorStateMonad [IRBasicBlock]
   generateIRBasicBlocks a c = do
     got <- get
     let stat = runState (statement a) got
@@ -186,7 +188,7 @@ module Generator where
       statements :: [CStatement] -> GeneratorStateMonad ()
       statements [] = do
         got <- get
-        put (GeneratorState ((blocks got) ++ [list got]) [] (counter got) (table got))
+        put (GeneratorState ((blocks got) ++ [(IRBasicBlock (IRLabelNumber ((counter got) - ((toInteger . length . list) got))) (list got))]) [] (counter got) (table got))
         return ()
 
       statements (a:as) = do
@@ -234,14 +236,15 @@ module Generator where
         let firstBr = (Nothing, IRBrConditional ((getType . snd) cmp) (IRLabelValue (IRLabelNumber exprCounter)) (IRLabelValue (IRLabelNumber (exprCounter + 1))) (IRLabelValue (IRLabelNumber (statCounter + 1))))
         let secondBr = (Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (statCounter + 1))))
         let statBlocks = ((nonEmpty . blocks . snd) stat)
-        let putBlocks = [(list got) ++ ((list . snd) expr) ++ [cmp] ++ [firstBr]] ++ ((init statBlocks) ++ [(last  statBlocks) ++ [secondBr]])
+        let firstList = ((list got) ++ ((list . snd) expr) ++ [cmp] ++ [firstBr])
+        let putBlocks = [IRBasicBlock (IRLabelNumber ((counter got) - ((toInteger . length . list) got))) firstList] ++ (init statBlocks) ++ [IRBasicBlock (IRLabelNumber (statCounter - 1)) (((getList . last) statBlocks) ++ [secondBr])]
         put (GeneratorState (putBlocks) [] (statCounter + 2) (table got))
         return ()
         where
           comparisonInstruction a
             | (isIntegral . fst) a = IRIcmp IRINe (fst a) (IRLabelValue (IRLabelNumber ((snd a) - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
             | (isFloating . fst) a = IRFcmp IRFOne (fst a) (IRLabelValue (IRLabelNumber ((snd a) - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
-          nonEmpty [] = [[]]
+          nonEmpty [] = [IRBasicBlock (IRLabelNumber 0) []]
           nonEmpty a = a
 
       statement (CReturn Nothing) = do
@@ -425,7 +428,7 @@ module Generator where
 
   generateIRBasicBlockCode a = concat (map irBasicBlockCode a)
     where
-      irBasicBlockCode a = concat (map instruction a)
+      irBasicBlockCode (IRBasicBlock _ a) = concat (map instruction a)
       instruction (Nothing, IRRet Nothing) = ["mov r0, r3", "bx lr"]
       instruction (Nothing, IRRet (Just a)) = ["mov r3, " ++ (value a), "mov r0, r3", "bx lr"]
       value (IRConstantValue (IRIntegerConstant a)) = show a
