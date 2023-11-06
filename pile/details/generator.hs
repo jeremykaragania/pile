@@ -63,8 +63,6 @@ module Generator where
     | a == "=" = a
     | otherwise = init a
 
-  getList (IRBasicBlock _ a) = a
-
   isSameType a b
     | isIRShortInteger a && isIRShortInteger b || isIRInteger a && isIRInteger b || isIRLongInteger a && isIRLongInteger b || a == b = Just b
     | otherwise = Nothing
@@ -237,23 +235,14 @@ module Generator where
 
       statement (CIf (CExpression a) b) = do
         got <- get
-        let expr = execState (expressions a) (GeneratorState [] [] (counter got) (table got))
-        let exprType = (getType . snd . last . list) expr
-        let stat = execState (statement b) (GeneratorState [] [] ((counter expr) + 2) (table got))
-        let cmp = ((Just (IRLabelNumber (counter expr))), comparisonInstruction (exprType, (counter expr)))
-        let firstBr = (Nothing, IRBrConditional ((getType . snd) cmp) (IRLabelValue (IRLabelNumber (counter expr))) (IRLabelValue (IRLabelNumber ((counter expr) + 1))) (IRLabelValue (IRLabelNumber (counter stat))))
-        let secondBr = (Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (counter stat))))
-        let statBlocks = ((nonEmpty . blocks) stat)
-        let firstList = ((list got) ++ (list expr) ++ [cmp] ++ [firstBr])
-        let secondList = (init statBlocks) ++ [(last statBlocks) ++ [secondBr]]
-        let putBlocks = [firstList] ++ secondList
-        put (GeneratorState (putBlocks) [] ((counter stat) + 1) (table got))
+        let ifHead = execState (selectionHead (CExpression a) b) (GeneratorState [] (list got) (counter got) (table got))
+        let ifBody = execState (statement b) (GeneratorState [] [] (counter ifHead) (table got))
+        let ifBodyBlocks = ((nonEmpty . blocks) ifBody)
+        let br = (Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter ifBody)))))
+        let putBlocks = (blocks ifHead) ++ (init ifBodyBlocks) ++ [(last ifBodyBlocks) ++ [br]]
+        put (GeneratorState (putBlocks) [] ((counter ifBody) + 1) (table got))
         return ()
         where
-          -- Different comparison instructions are used depending on argument type.
-          comparisonInstruction a
-            | (isIntegral . fst) a = IRIcmp IRINe (fst a) (IRLabelValue (IRLabelNumber ((snd a) - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
-            | (isFloating . fst) a = IRFcmp IRFOne (fst a) (IRLabelValue (IRLabelNumber ((snd a) - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
           -- Allows usage of partial list operation functions.
           nonEmpty [] = [[]]
           nonEmpty a = a
@@ -269,6 +258,23 @@ module Generator where
         let instructions = (list got) ++ [(Nothing, IRRet (Just (IRConstantValue (generateIRConstant a b))))]
         put (GeneratorState (blocks got) instructions (counter got) (table got))
         return ()
+
+      selectionHead :: CExpression -> CStatement -> GeneratorStateMonad ()
+      selectionHead (CExpression a) b = do
+        got <- get
+        let expr = execState (expressions a) (GeneratorState [] [] (counter got) (table got))
+        let exprType = (getType . snd . last . list) expr
+        let stat = execState (statement b) (GeneratorState [] [] ((counter expr) + 1) (table got))
+        let cmp = ((Just (IRLabelNumber (counter expr))), comparisonInstruction (exprType, (counter expr)))
+        let firstBr = (Nothing, IRBrConditional ((getType . snd) cmp) (IRLabelValue (IRLabelNumber (counter expr))) (IRLabelValue (IRLabelNumber ((counter expr) + 1))) (IRLabelValue (IRLabelNumber ((counter stat) + 1))))
+        let putBlocks = [((list got) ++ (list expr) ++ [cmp] ++ [firstBr])]
+        put (GeneratorState (putBlocks) [] ((counter expr) + 2) (table got))
+        return ()
+        where
+          -- Different comparison instructions are used depending on argument type.
+          comparisonInstruction a
+            | (isIntegral . fst) a = IRIcmp IRINe (fst a) (IRLabelValue (IRLabelNumber ((snd a) - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
+            | (isFloating . fst) a = IRFcmp IRFOne (fst a) (IRLabelValue (IRLabelNumber ((snd a) - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
 
       {-
         The last instruction of a generated expression will contain the resulting value of that expression. This makes it
