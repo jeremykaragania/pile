@@ -12,7 +12,7 @@ module Generator where
     instructions (list), an accumulator (counter) for unnamed temporaries, and a lookup table (table) which associates an
     identifier key with a label and type.
   -}
-  data GeneratorState = GeneratorState {blocks :: [IRBasicBlock], list :: [(Maybe IRLabel, IRInstruction)], counter :: Integer, table :: Map String (IRLabel, IRType)}
+  data GeneratorState = GeneratorState {blocks :: [[(Maybe IRLabel, IRInstruction)]], list :: [(Maybe IRLabel, IRInstruction)], counter :: Integer, table :: Map String (IRLabel, IRType)}
 
   type GeneratorStateMonad = State GeneratorState
 
@@ -148,7 +148,7 @@ module Generator where
   generateIRBasicBlocks a b = do
     got <- get
     let stat = execState (statement a) got
-    return (blocks stat)
+    return (fst (execState ((numberBlocks . blocks) stat) ([], 0)))
     where
       declarationList (Just (CDeclarationList a)) = a
       declarationList Nothing = []
@@ -198,7 +198,7 @@ module Generator where
       statements :: [CStatement] -> GeneratorStateMonad ()
       statements [] = do
         got <- get
-        put (GeneratorState ((blocks got) ++ [(IRBasicBlock (IRLabelNumber ((counter got) - ((toInteger . length . list) got))) (list got))]) [] (counter got) (table got))
+        put (GeneratorState ((blocks got) ++ [list got]) [] (counter got) (table got))
         return ()
 
       statements (a:as) = do
@@ -241,13 +241,13 @@ module Generator where
         let exprType = (getType . snd . last . list) expr
         let stat = execState (statement b) (GeneratorState [] [] ((counter expr) + 2) (table got))
         let cmp = ((Just (IRLabelNumber (counter expr))), comparisonInstruction (exprType, (counter expr)))
-        let firstBr = (Nothing, IRBrConditional ((getType . snd) cmp) (IRLabelValue (IRLabelNumber (counter expr))) (IRLabelValue (IRLabelNumber ((counter expr) + 1))) (IRLabelValue (IRLabelNumber ((counter stat) + 1))))
-        let secondBr = (Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter stat) + 1))))
+        let firstBr = (Nothing, IRBrConditional ((getType . snd) cmp) (IRLabelValue (IRLabelNumber (counter expr))) (IRLabelValue (IRLabelNumber ((counter expr) + 1))) (IRLabelValue (IRLabelNumber (counter stat))))
+        let secondBr = (Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (counter stat))))
         let statBlocks = ((nonEmpty . blocks) stat)
         let firstList = ((list got) ++ (list expr) ++ [cmp] ++ [firstBr])
-        let secondList = (((getList . last) statBlocks) ++ [secondBr])
-        let putBlocks = [IRBasicBlock (IRLabelNumber ((counter got) - ((toInteger . length . list) got))) firstList] ++ (init statBlocks) ++ [IRBasicBlock (IRLabelNumber ((counter stat) - 1)) secondList]
-        put (GeneratorState (putBlocks) [] ((counter stat) + 2) (table got))
+        let secondList = (init statBlocks) ++ [(last statBlocks) ++ [secondBr]]
+        let putBlocks = [firstList] ++ secondList
+        put (GeneratorState (putBlocks) [] ((counter stat) + 1) (table got))
         return ()
         where
           -- Different comparison instructions are used depending on argument type.
@@ -255,7 +255,7 @@ module Generator where
             | (isIntegral . fst) a = IRIcmp IRINe (fst a) (IRLabelValue (IRLabelNumber ((snd a) - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
             | (isFloating . fst) a = IRFcmp IRFOne (fst a) (IRLabelValue (IRLabelNumber ((snd a) - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
           -- Allows usage of partial list operation functions.
-          nonEmpty [] = [IRBasicBlock (IRLabelNumber 0) []]
+          nonEmpty [] = [[]]
           nonEmpty a = a
 
       statement (CReturn Nothing) = do
@@ -274,10 +274,8 @@ module Generator where
         The last instruction of a generated expression will contain the resulting value of that expression. This makes it
         easier to get the resulting type of an expression after generation.
       -}
-      expressions :: [CExpression] -> GeneratorStateMonad [(Maybe IRLabel, IRInstruction)]
-      expressions [] = do
-        got <- get
-        return (list got)
+      expressions :: [CExpression] -> GeneratorStateMonad ()
+      expressions [] = return()
 
       expressions (a:as) = do
         expression a
@@ -431,6 +429,24 @@ module Generator where
       assignmentInstruction a b c d e
         | a == "<<=" || a == ">>=" = (binaryInstruction (getOperator a) b c) c e d
         | otherwise = (binaryInstruction (getOperator a) b c) c d e
+
+      {-
+        It is hard to number blocks as they are being generated because there is not enough context. Therefore, block
+        numbering is the last step. A block number can be calculated by counting the past numbered instructions in past blocks.
+        The state tracks the list of blocks which have been numbered and the count of past numbered instructions.
+      -}
+      numberBlocks :: [[(Maybe IRLabel, IRInstruction)]] -> State ([IRBasicBlock], Integer) ()
+      numberBlocks [] = return ()
+
+      numberBlocks (a:as) = do
+        got <- get
+        let present = ((toInteger . length . filter numbered) a)
+        let past = (snd got)
+        put (((fst got) ++ [IRBasicBlock (IRLabelNumber past) a], present + past + 1))
+        numberBlocks as
+        where
+          numbered (Nothing, _) = False
+          numbered _ = True
 
   generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (evalState (generateIRBasicBlocks c functionType) (GeneratorState [] [] 1 Map.empty))]
     where
