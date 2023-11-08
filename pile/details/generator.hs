@@ -199,7 +199,7 @@ module Generator where
       statements :: [CStatement] -> GeneratorStateMonad ()
       statements [] = do
         got <- get
-        put (GeneratorState ((blocks got) ++ [list got]) [] (counter got) (table got))
+        put (GeneratorState ((blocks got) ++ [list got]) [] ((counter got) + 1) (table got))
 
       statements (a:as) = do
         got <- get
@@ -208,6 +208,7 @@ module Generator where
         statements as
 
       statement :: CStatement -> GeneratorStateMonad ()
+
       statement (CList a) = do
         got <- get
         let stat = execState (statements a) (GeneratorState [] [] (counter got) (table got))
@@ -232,22 +233,22 @@ module Generator where
       statement (CIf (CExpression a) b) = do
         got <- get
         let ifHead = execState (selectionHead (CExpression a) b) (GeneratorState [] (list got) (counter got) (table got))
-        let ifBody = execState (statement b) (GeneratorState [] [] (counter ifHead) (table got))
+        let ifBody = execState (statement b) (GeneratorState [] [] ((counter ifHead) + 1) (table got))
         let ifBodyBlocks = ((nonEmpty . blocks) ifBody)
         let ifBr = (Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (counter ifBody))))
         let putBlocks = (blocks ifHead) ++ (init ifBodyBlocks) ++ [(last ifBodyBlocks) ++ [ifBr]]
-        put (GeneratorState putBlocks [] ((counter ifBody) + 1) (table got))
+        put (GeneratorState putBlocks [] (counter ifBody) (table got))
 
       statement (CIfElse (CExpression a) b c) = do
         got <- get
         let ifHead = execState (selectionHead (CExpression a) b) (GeneratorState [] (list got) (counter got) (table got))
-        let ifBody = execState (statement b) (GeneratorState [] [] (counter ifHead) (table got))
+        let ifBody = execState (statement b) (GeneratorState [] [] ((counter ifHead) + 1) (table got))
         let ifBodyBlocks = ((nonEmpty . blocks) ifBody)
-        let elseBody = execState (statement c) (GeneratorState [] [] ((counter ifBody) + 1) (table got))
+        let elseBody = execState (statement c) (GeneratorState [] [] ((counter ifBody)) (table got))
         let elseBodyBlocks = ((nonEmpty . blocks) elseBody)
-        let elseBr = (Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (counter elseBody))))
+        let elseBr = (Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter elseBody) - 1))))
         let putBlocks = (blocks ifHead) ++ (init ifBodyBlocks) ++ [(last ifBodyBlocks) ++ [elseBr]] ++ (init elseBodyBlocks) ++ [(last elseBodyBlocks) ++ [elseBr]]
-        put (GeneratorState putBlocks [] ((counter elseBody) + 1) (table got))
+        put (GeneratorState putBlocks [] ((counter elseBody)) (table got))
 
       statement (CReturn Nothing) = do
         got <- get
@@ -269,11 +270,11 @@ module Generator where
         got <- get
         let expr = execState (expressions a) (GeneratorState [] [] (counter got) (table got))
         let exprType = (getType . snd . last . list) expr
-        let stat = execState (statement b) (GeneratorState [] [] ((counter expr) + 1) (table got))
         let cmp = ((Just (IRLabelNumber (counter expr))), comparisonInstruction (exprType, (counter expr)))
-        let firstBr = (Nothing, IRBrConditional ((getType . snd) cmp) (IRLabelValue (IRLabelNumber (counter expr))) (IRLabelValue (IRLabelNumber ((counter expr) + 1))) (IRLabelValue (IRLabelNumber ((counter stat) + 1))))
-        let putBlocks = [((list got) ++ (list expr) ++ [cmp] ++ [firstBr])]
-        put (GeneratorState (putBlocks) [] ((counter expr) + 2) (table got))
+        let stat = execState (statement b) (GeneratorState [] [] ((counter expr) + 1) (table got))
+        let firstBr = (Nothing, IRBrConditional ((getType . snd) cmp) (IRLabelValue (IRLabelNumber (counter expr))) (IRLabelValue (IRLabelNumber ((counter expr) + 1))) (IRLabelValue (IRLabelNumber ((counter stat)))))
+        let putBlocks = [(list got) ++ (list expr) ++ [cmp] ++ [firstBr]]
+        put (GeneratorState (putBlocks) [] ((counter expr) + 1) (table got))
         where
           -- Different comparison instructions are used depending on argument type.
           comparisonInstruction a
@@ -285,7 +286,7 @@ module Generator where
         easier to get the resulting type of an expression after generation.
       -}
       expressions :: [CExpression] -> GeneratorStateMonad ()
-      expressions [] = return()
+      expressions [] = return ()
 
       expressions (a:as) = do
         expression a

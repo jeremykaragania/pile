@@ -13,7 +13,6 @@ module Syntax where
     CCharacterConstant Char deriving (Show, Eq, Ord)
 
   data CExpression =
-    CAss CExpression CExpression |
     CIdentifier {token :: CToken} |
     CConstant {token :: CToken} |
     CStringLiteral {token :: CToken} |
@@ -131,7 +130,7 @@ module Syntax where
     IRRet (Maybe IRValue) |
     IRBrConditional IRType IRValue IRValue IRValue |
     IRBrUnconditional IRValue |
-    IRSwitch IRValue String [(IRConstant, String)] |
+    IRSwitch IRValue [IRLabel] |
     IRFneg IRValue |
     IRAdd IRType IRValue IRValue |
     IRFadd IRType IRValue IRValue |
