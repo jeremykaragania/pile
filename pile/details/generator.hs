@@ -208,7 +208,6 @@ module Generator where
         statements as
 
       statement :: CStatement -> GeneratorStateMonad ()
-
       statement (CList a) = do
         got <- get
         let stat = execState (statements a) (GeneratorState [] [] (counter got) (table got))
@@ -280,6 +279,21 @@ module Generator where
           comparisonInstruction a
             | (isIntegral . fst) a = IRIcmp IRINe (fst a) (IRLabelValue (IRLabelNumber ((snd a) - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
             | (isFloating . fst) a = IRFcmp IRFOne (fst a) (IRLabelValue (IRLabelNumber ((snd a) - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
+
+      switchBody :: [CStatement] -> GeneratorStateMonad ()
+      switchBody [] = do
+        got <- get
+        put (GeneratorState ((blocks got) ++ [list got]) [] ((counter got) + 1) (table got))
+
+      switchBody (a:as) = do
+        got <- get
+        let stat = execState (statement a) (GeneratorState [] (list got) (counter got) (table got))
+        let switchBr = (Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter stat) - 1))))
+        let other = (Nothing, IRRet Nothing)
+        let statBlocks = (nonEmpty . blocks) stat
+        let putBlocks = (blocks got) ++ (init statBlocks) ++ [(last statBlocks) ++ [switchBr]]
+        put (GeneratorState (putBlocks) [] (counter stat) (table got))
+        switchBody as
 
       {-
         The last instruction of a generated expression will contain the resulting value of that expression. This makes it
