@@ -217,8 +217,7 @@ module Generator where
         got <- get
         let dec = execState ((declarations . declarationList) a) (GeneratorState [] (list got) (counter got) (table got))
         let stat = execState ((statements . statementList) b) (GeneratorState [] (list dec) (counter dec) (table dec))
-        let instructions = (list got) ++ (list dec) ++ (list stat)
-        put (GeneratorState ((blocks got) ++ (blocks stat)) [] (counter stat) (table stat))
+        put (GeneratorState ((blocks got) ++ (blocks stat)) (list stat) (counter stat) (table stat))
 
       statement (CCExpression (Just (CExpression []))) = do
         got <- get
@@ -231,19 +230,19 @@ module Generator where
 
       statement (CIf (CExpression a) b) = do
         got <- get
-        let ifHead = execState (selectionHead (CExpression a) b) (GeneratorState [] (list got) (counter got) (table got))
-        let ifBody = execState (statement b) (GeneratorState [] [] ((counter ifHead) + 1) (table got))
-        let ifBodyBlocks = ((nonEmpty . blocks) ifBody)
-        let ifBr = (Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (counter ifBody))))
+        let ifHead = execState (selectionHead (CExpression a) (compound b)) (GeneratorState [] (list got) (counter got) (table got))
+        let ifBody = execState ((statement . compound) b) (GeneratorState [] [] ((counter ifHead) + 1) (table got))
+        let ifBodyBlocks = (nonEmpty . blocks) ifBody
+        let ifBr = (Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter ifBody) - 1))))
         let putBlocks = (blocks ifHead) ++ (init ifBodyBlocks) ++ [(last ifBodyBlocks) ++ [ifBr]]
         put (GeneratorState putBlocks [] (counter ifBody) (table got))
 
       statement (CIfElse (CExpression a) b c) = do
         got <- get
-        let ifHead = execState (selectionHead (CExpression a) b) (GeneratorState [] (list got) (counter got) (table got))
-        let ifBody = execState (statement b) (GeneratorState [] [] ((counter ifHead) + 1) (table got))
+        let ifHead = execState (selectionHead (CExpression a) (compound b)) (GeneratorState [] (list got) (counter got) (table got))
+        let ifBody = execState ((statement . compound) b) (GeneratorState [] [] ((counter ifHead) + 1) (table got))
         let ifBodyBlocks = ((nonEmpty . blocks) ifBody)
-        let elseBody = execState (statement c) (GeneratorState [] [] ((counter ifBody)) (table got))
+        let elseBody = execState ((statement . compound) c) (GeneratorState [] [] ((counter ifBody)) (table got))
         let elseBodyBlocks = ((nonEmpty . blocks) elseBody)
         let elseBr = (Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter elseBody) - 1))))
         let putBlocks = (blocks ifHead) ++ (init ifBodyBlocks) ++ [(last ifBodyBlocks) ++ [elseBr]] ++ (init elseBodyBlocks) ++ [(last elseBodyBlocks) ++ [elseBr]]
@@ -446,6 +445,9 @@ module Generator where
       assignmentInstruction a b c d e
         | a == "<<=" || a == ">>=" = (binaryInstruction (getOperator a) b c) c e d
         | otherwise = (binaryInstruction (getOperator a) b c) c d e
+
+      compound (CCompound a b) = CCompound a b
+      compound a = CCompound Nothing (Just (CList [a]))
 
       {-
         It is hard to number blocks as they are being generated because there is not enough context. Therefore, block
