@@ -130,7 +130,7 @@ module Syntax where
     IRRet (Maybe IRValue) |
     IRBrConditional IRType IRValue IRValue IRValue |
     IRBrUnconditional IRValue |
-    IRSwitch IRValue [IRLabel] |
+    IRSwitch IRType IRValue IRLabel [(IRType, IRConstant, IRLabel)] |
     IRFneg IRValue |
     IRAdd IRType IRValue IRValue |
     IRFadd IRType IRValue IRValue |

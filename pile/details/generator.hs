@@ -80,10 +80,6 @@ module Generator where
 
   isFloating a = a == IRFloat || a == IRDouble || a == IRLongDouble
 
-  -- Allows usage of partial list operation functions.
-  nonEmpty [] = [[]]
-  nonEmpty a = a
-
   typeFromCConstant (CFloatingConstant _ Nothing) = IRDouble
   typeFromCConstant (CFloatingConstant _ (Just a))
     | toLower a == 'f' = IRFloat
@@ -124,6 +120,8 @@ module Generator where
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "float")] = IRFloat
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "double")] = IRDouble
     | fromList a == fromList [CTypeSpecifier (CKeywordToken "long"), CTypeSpecifier (CKeywordToken "double")] = IRLongDouble
+
+  statementFromCCompound(CCompound a b) = b
 
   generateIRConstant a b
     | b == IRFloat || b == IRDouble || b == IRLongDouble = IRFloatingConstant (value a)
@@ -207,6 +205,13 @@ module Generator where
         statements as
 
       statement :: CStatement -> GeneratorStateMonad ()
+      statement (CLabeledCase a b) = do
+        got <- get
+        let stat = execState ((statement . compound) b) (GeneratorState [[]] (counter got) (table got))
+        let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter stat)))))]
+        let putBlocks = appendBlocks (blocks stat) [switchBr, []]
+        put (GeneratorState putBlocks ((counter stat) + 1) (table stat))
+
       statement (CList a) = do
         got <- get
         let stat = execState (statements a) (GeneratorState [[]] (counter got) (table got))
@@ -230,22 +235,34 @@ module Generator where
       statement (CIf (CExpression a) b) = do
         got <- get
         let ifHead = execState (selectionHead (CExpression a) (compound b)) (GeneratorState [] (counter got) (table got))
-        let ifBody = execState ((statement . compound) b) (GeneratorState [] ((counter ifHead)) (table got))
-        let ifBodyBlocks = (nonEmpty . blocks) ifBody
+        let ifBody = execState ((statement . compound) b) (GeneratorState [[]] ((counter ifHead)) (table got))
         let ifBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter ifBody)))))]
-        let putBlocks = (blocks ifHead) ++ appendBlocks ifBodyBlocks [ifBr, []]
+        let putBlocks = (blocks ifHead) ++ appendBlocks (blocks ifBody) [ifBr, []]
         put (GeneratorState putBlocks ((counter ifBody) + 1) (table got))
 
       statement (CIfElse (CExpression a) b c) = do
         got <- get
         let ifHead = execState (selectionHead (CExpression a) (compound b)) (GeneratorState [] (counter got) (table got))
-        let ifBody = execState ((statement . compound) b) (GeneratorState [] ((counter ifHead)) (table got))
-        let ifBodyBlocks = ((nonEmpty . blocks) ifBody)
-        let elseBody = execState ((statement . compound) c) (GeneratorState [] ((counter ifBody) + 1) (table got))
-        let elseBodyBlocks = ((nonEmpty . blocks) elseBody)
+        let ifBody = execState ((statement . compound) b) (GeneratorState [[]] ((counter ifHead)) (table got))
+        let elseBody = execState ((statement . compound) c) (GeneratorState [[]] ((counter ifBody) + 1) (table got))
         let elseBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter elseBody)))))]
-        let putBlocks = (blocks ifHead) ++ appendBlocks ifBodyBlocks (appendBlocks [elseBr, []] (appendBlocks elseBodyBlocks [elseBr, []]))
+        let putBlocks = (blocks ifHead) ++ appendBlocks (blocks ifBody) (appendBlocks [elseBr, []] (appendBlocks (blocks elseBody) [elseBr, []]))
         put (GeneratorState putBlocks ((counter elseBody) + 1) (table got))
+
+      statement (CSwitch (CExpression a) b) = do
+        got <- get
+        let splitStat = (CCompound Nothing . Just . CList . splitLabeled . statementList . statementFromCCompound . compound) b
+        let switchBody = execState ((statement splitStat)) (GeneratorState [[], []] ((counter got) + 1) (table got))
+        let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter switchBody)))))]
+        let putBlocks = appendBlocks (blocks switchBody) [switchBr, []]
+        put (GeneratorState putBlocks ((counter switchBody) + 1) (table got))
+        where
+          splitLabeled [] = []
+          splitLabeled (a:as)
+            | isLabeled a  = a:as
+            | otherwise = splitLabeled as
+          isLabeled (CLabeledCase _ _) = True
+          isLabeled _ = False
 
       statement (CReturn Nothing) = do
         got <- get
@@ -277,19 +294,6 @@ module Generator where
           comparisonInstruction a
             | (isIntegral . fst) a = IRIcmp IRINe (fst a) (IRLabelValue (IRLabelNumber ((snd a) - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
             | (isFloating . fst) a = IRFcmp IRFOne (fst a) (IRLabelValue (IRLabelNumber ((snd a) - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
-
-      switchBody :: [CStatement] -> GeneratorStateMonad ()
-      switchBody [] = return ()
-
-      switchBody (a:as) = do
-        got <- get
-        let stat = execState (statement a) (GeneratorState [[]] (counter got) (table got))
-        let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter stat) - 1))))]
-        let other = (Nothing, IRRet Nothing)
-        let statBlocks = (nonEmpty . blocks) stat
-        let putBlocks = appendBlocks (blocks got) (appendBlocks statBlocks [switchBr])
-        put (GeneratorState putBlocks (counter stat) (table got))
-        switchBody as
 
       {-
         The last instruction of a generated expression will contain the resulting value of that expression. This makes it

@@ -346,7 +346,7 @@ module Parser where
 
   parseCLabeledCase = do
     parseToken (Token Nothing (CKeywordToken "case"))
-    expr <- parseCExpression
+    expr <- parseCConditional
     parseToken (Token Nothing (COperatorToken ":"))
     statement <- parseCStatement
     return (CLabeledCase expr statement)
