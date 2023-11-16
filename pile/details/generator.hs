@@ -206,11 +206,10 @@ module Generator where
 
       statement :: CStatement -> GeneratorStateMonad ()
       statement (CLabeledCase a b) = do
-        got <- get
-        let stat = execState ((statement . compound) b) (GeneratorState [[]] (counter got) (table got))
-        let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter stat)))))]
-        let putBlocks = appendBlocks (blocks stat) [switchBr, []]
-        put (GeneratorState putBlocks ((counter stat) + 1) (table stat))
+        labeled b
+
+      statement (CLabeledDefault a) = do
+        labeled a
 
       statement (CList a) = do
         got <- get
@@ -262,6 +261,7 @@ module Generator where
             | isLabeled a  = a:as
             | otherwise = splitLabeled as
           isLabeled (CLabeledCase _ _) = True
+          isLabeled (CLabeledDefault _) = True
           isLabeled _ = False
 
       statement (CReturn Nothing) = do
@@ -273,6 +273,14 @@ module Generator where
         got <- get
         let putBlocks = [[(Nothing, IRRet (Just (IRConstantValue (generateIRConstant a b))))]]
         put (GeneratorState putBlocks (counter got) (table got))
+
+      labeled :: CStatement -> GeneratorStateMonad ()
+      labeled a = do
+        got <- get
+        let stat = execState ((statement . compound) a) (GeneratorState [[]] (counter got) (table got))
+        let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter stat)))))]
+        let putBlocks = appendBlocks (blocks stat) [switchBr, []]
+        put (GeneratorState putBlocks ((counter stat) + 1) (table stat))
 
       {-
         All selection statements consist of an expression (a), and at least one body (b) which is a compound statement.
