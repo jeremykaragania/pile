@@ -251,10 +251,11 @@ module Generator where
       statement (CSwitch (CExpression a) b) = do
         got <- get
         let splitStat = (CCompound Nothing . Just . CList . splitLabeled . statementList . statementFromCCompound . compound) b
-        let switchBody = execState ((statement splitStat)) (GeneratorState [[], []] ((counter got) + 1) (table got))
-        let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter switchBody)))))]
-        let putBlocks = appendBlocks (blocks switchBody) [switchBr, []]
-        put (GeneratorState putBlocks ((counter switchBody) + 1) (table got))
+        let stat = execState ((switchStatement . splitLabeled . statementList . statementFromCCompound . compound) b) (GeneratorState [[], []] ((counter got) + 1) (table got), [])
+        let switch = [(Nothing, IRSwitch IRVoid (IRLabelValue (IRLabelNumber (-1))) (IRLabelNumber ((fromIntegral . length) (snd stat))) (snd stat))]
+        let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (((counter . fst) stat)))))]
+        let putBlocks = appendBlocks [switch] (appendBlocks ((blocks . fst) stat) [switchBr, []])
+        put (GeneratorState putBlocks (((counter . fst) stat) + 1) (table got))
         where
           splitLabeled [] = []
           splitLabeled (a:as)
@@ -281,6 +282,20 @@ module Generator where
         let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter stat)))))]
         let putBlocks = appendBlocks (blocks stat) [switchBr, []]
         put (GeneratorState putBlocks ((counter stat) + 1) (table stat))
+
+      switchStatement :: [CStatement] -> State (GeneratorState, [(IRType, IRConstant, IRLabel)]) ()
+      switchStatement [] = return ()
+
+      switchStatement (a:as) = do
+        got <- get
+        let stat = execState (statement a) (GeneratorState [] ((counter . fst) got) ((table . fst) got))
+        case a of
+          CLabeledCase a b -> do
+            let switchConstant = (constant . token) a
+            let switchType = typeFromCConstant switchConstant
+            put ((GeneratorState (appendBlocks ((blocks . fst) got) (blocks stat)) (counter stat) (table stat), snd got ++ [(switchType, generateIRConstant a switchType, IRLabelNumber (((counter . fst) got) - 1))]))
+            switchStatement as
+          otherwise -> switchStatement as
 
       {-
         All selection statements consist of an expression (a), and at least one body (b) which is a compound statement.
