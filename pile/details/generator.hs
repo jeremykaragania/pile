@@ -179,8 +179,7 @@ module Generator where
             let putTable = Map.insert (getIdentifier b) (IRLabelNumber (counter got), (typeFromCSpecifiers a (getPointer b))) (table got)
             let putBlocks = [[(Just (IRLabelNumber (counter got)), instruction)]]
             put (GeneratorState putBlocks ((counter got) + 1) putTable)
-          else do
-            error ""
+          else error ""
         irAlloca a bs
 
       irStore :: CDeclaration -> [CDeclaration] -> GeneratorStateMonad ()
@@ -251,11 +250,15 @@ module Generator where
       statement (CSwitch (CExpression a) b) = do
         got <- get
         let splitStat = (CCompound Nothing . Just . CList . splitLabeled . statementList . statementFromCCompound . compound) b
-        let stat = execState ((switchStatement . splitLabeled . statementList . statementFromCCompound . compound) b) (GeneratorState [[], []] ((counter got) + 1) (table got), [])
-        let switch = [(Nothing, IRSwitch IRVoid (IRLabelValue (IRLabelNumber (-1))) (IRLabelNumber ((fromIntegral . length) (snd stat))) (snd stat))]
-        let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (((counter . fst) stat)))))]
-        let putBlocks = appendBlocks [switch] (appendBlocks ((blocks . fst) stat) [switchBr, []])
-        put (GeneratorState putBlocks (((counter . fst) stat) + 1) (table got))
+        let expr = execState (expressions a) (GeneratorState [[]] (counter got) (table got))
+        let exprType = (getType . snd . last . concat . blocks) expr
+        if (isIntegral exprType) then do
+          let stat = execState ((switchStatement . splitLabeled . statementList . statementFromCCompound . compound) b) (GeneratorState [[], []] ((counter got) + 1) (table got), [])
+          let switch = [(Nothing, IRSwitch exprType (IRLabelValue (IRLabelNumber (-1))) (IRLabelNumber ((fromIntegral . length) (snd stat))) (snd stat))]
+          let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (((counter . fst) stat)))))]
+          let putBlocks = appendBlocks (blocks expr) (appendBlocks [switch] (appendBlocks ((blocks . fst) stat) [switchBr, []]))
+          put (GeneratorState putBlocks (((counter . fst) stat) + 1) (table got))
+        else error ""
         where
           splitLabeled [] = []
           splitLabeled (a:as)
