@@ -42,8 +42,8 @@ module Generator where
   getType (IRAnd a _ _) = a
   getType (IROr a _ _) = a
   getType (IRXor a _ _) = a
-  getType (IRLoad a _ _) = a
-  getType (IRStore a _ _ _) = a
+  getType (IRLoad a _) = a
+  getType (IRStore a _ _) = a
   getType (IRIcmp _ _ _ _) = IRInteger IRSigned
   getType (IRFcmp _ _ _ _) = IRInteger IRSigned
   getType (IRSext _ _ a) = a
@@ -133,12 +133,6 @@ module Generator where
       value (CExpression [a]) = value a
       value _ = 0
 
-  generateIRAlloca a = IRAlloca a Nothing Nothing
-
-  generateIRStore a b c = IRStore a b c Nothing
-
-  generateIRLoad a b = IRLoad a b Nothing
-
   {-
     generateIRBasicBlocks is used for the generation of basic blocks, which are just instruction lists, from a function body,
     which is just a compound statement. It receives a compound statement (a), and the return type of the function (b).
@@ -175,7 +169,7 @@ module Generator where
       irAlloca a (b:bs) = do
         got <- get
         if Map.notMember (getIdentifier b) (table got) then do
-            let instruction = generateIRAlloca (typeFromCSpecifiers a (getPointer b))
+            let instruction = IRAlloca (typeFromCSpecifiers a (getPointer b))
             let putTable = Map.insert (getIdentifier b) (IRLabelNumber (counter got), (typeFromCSpecifiers a (getPointer b))) (table got)
             let putBlocks = [[(Just (IRLabelNumber (counter got)), instruction)]]
             put (GeneratorState putBlocks ((counter got) + 1) putTable)
@@ -187,7 +181,7 @@ module Generator where
 
       irStore a (b:bs) = do
         got <- get
-        let putBlocks = [[(Nothing, generateIRStore (typeFromCSpecifiers a (getPointer b)) (IRConstantValue (generateIRConstant (getConstant b) (typeFromCSpecifiers a (getPointer b)))) (fst ((table got) Map.! getIdentifier b)))]]
+        let putBlocks = [[(Nothing, IRStore (typeFromCSpecifiers a (getPointer b)) (IRConstantValue (generateIRConstant (getConstant b) (typeFromCSpecifiers a (getPointer b)))) (fst ((table got) Map.! getIdentifier b)))]]
         put (GeneratorState putBlocks (counter got) (table got))
         irStore a bs
 
@@ -343,12 +337,12 @@ module Generator where
       expression (CIdentifier a) = do
         got <- get
         let symbol = (table got) Map.! (identifier a)
-        let putBlocks = [[((Just (IRLabelNumber (counter got))), generateIRLoad (snd symbol) (IRLabelValue (fst symbol)))]]
+        let putBlocks = [[((Just (IRLabelNumber (counter got))), IRLoad (snd symbol) (IRLabelValue (fst symbol)))]]
         put (GeneratorState putBlocks ((counter got) + 1) (table got))
 
       expression (CConstant a) = do
         got <- get
-        let putBlocks = [[(Just (IRLabelNumber (counter got)), generateIRAlloca ((typeFromCConstant . constant) a)), (Nothing, generateIRStore ((typeFromCConstant . constant) a) (IRConstantValue (generateIRConstant (CConstant a) ((typeFromCConstant . constant) a))) (IRLabelNumber (counter got)))]]
+        let putBlocks = [[(Just (IRLabelNumber (counter got)), IRAlloca ((typeFromCConstant . constant) a)), (Nothing, IRStore ((typeFromCConstant . constant) a) (IRConstantValue (generateIRConstant (CConstant a) ((typeFromCConstant . constant) a))) (IRLabelNumber (counter got)))]]
         put (GeneratorState putBlocks ((counter got) + 1) (table got))
 
       expression (CBinary a b c) = do
@@ -360,7 +354,7 @@ module Generator where
         got <- get
         let symbol = (table got) Map.! (identifier b)
         let expr = execState (binaryExpression (CIdentifier b) c (getOperator a)) (GeneratorState [] (counter got) (table got))
-        let putBlocks = appendBlocks (blocks expr) [[(Nothing, generateIRStore (snd symbol) (IRLabelValue (IRLabelNumber ((counter expr) - 1))) (fst symbol))]]
+        let putBlocks = appendBlocks (blocks expr) [[(Nothing, IRStore (snd symbol) (IRLabelValue (IRLabelNumber ((counter expr) - 1))) (fst symbol))]]
         put (GeneratorState putBlocks (counter expr) (table expr))
 
       binaryExpression :: CExpression -> CExpression -> String -> GeneratorStateMonad ()

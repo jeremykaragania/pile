@@ -150,9 +150,9 @@ module Syntax where
     IRAnd IRType IRValue IRValue |
     IROr IRType IRValue IRValue |
     IRXor IRType IRValue IRValue |
-    IRAlloca IRType (Maybe Integer) (Maybe Integer) |
-    IRLoad IRType IRValue (Maybe Integer) |
-    IRStore IRType IRValue IRLabel (Maybe Integer) |
+    IRAlloca IRType |
+    IRLoad IRType IRValue |
+    IRStore IRType IRValue IRLabel |
     IRIcmp IRICondition IRType IRValue IRValue |
     IRFcmp IRFCondition IRType IRValue IRValue |
     IRTrunc IRType IRValue IRType |
