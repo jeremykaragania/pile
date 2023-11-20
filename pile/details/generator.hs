@@ -253,8 +253,8 @@ module Generator where
         let expr = execState (expressions a) (GeneratorState [[]] (counter got) (table got))
         let exprType = (getType . snd . last . concat . blocks) expr
         if (isIntegral exprType) then do
-          let stat = execState ((switchStatement . splitLabeled . statementList . statementFromCCompound . compound) b) (GeneratorState [[], []] ((counter got) + 1) (table got), [])
-          let switch = [(Nothing, IRSwitch exprType (IRLabelValue (IRLabelNumber (-1))) (IRLabelNumber ((fromIntegral . length) (snd stat))) (snd stat))]
+          let stat = execState ((switchStatement . splitLabeled . statementList . statementFromCCompound . compound) b) (GeneratorState [[], []] ((counter expr) + 1) (table got), ([], []))
+          let switch = [(Nothing, IRSwitch exprType (IRLabelNumber ((fromIntegral . length) ((snd . snd) stat))) (IRLabelNumber (labeledDefault ((fst . snd) stat) ((counter . fst) stat))) ((snd . snd) stat))]
           let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (((counter . fst) stat)))))]
           let putBlocks = appendBlocks (blocks expr) (appendBlocks [switch] (appendBlocks ((blocks . fst) stat) [switchBr, []]))
           put (GeneratorState putBlocks (((counter . fst) stat) + 1) (table got))
@@ -267,6 +267,10 @@ module Generator where
           isLabeled (CLabeledCase _ _) = True
           isLabeled (CLabeledDefault _) = True
           isLabeled _ = False
+          -- Decides whether to use the explicit (a) or implicit (b) default label.
+          labeledDefault [a] b = a
+          labeledDefault [] b = b
+          labeledDefault _ _ = error ""
 
       statement (CReturn Nothing) = do
         got <- get
@@ -286,17 +290,20 @@ module Generator where
         let putBlocks = appendBlocks (blocks stat) [switchBr, []]
         put (GeneratorState putBlocks ((counter stat) + 1) (table stat))
 
-      switchStatement :: [CStatement] -> State (GeneratorState, [(IRType, IRConstant, IRLabel)]) ()
+      switchStatement :: [CStatement] -> State (GeneratorState, ([Integer], [(IRType, IRConstant, IRLabel)])) ()
       switchStatement [] = return ()
 
       switchStatement (a:as) = do
         got <- get
         let stat = execState (statement a) (GeneratorState [] ((counter . fst) got) ((table . fst) got))
         case a of
-          CLabeledCase a b -> do
+          CLabeledCase a _ -> do
             let switchConstant = (constant . token) a
             let switchType = typeFromCConstant switchConstant
-            put ((GeneratorState (appendBlocks ((blocks . fst) got) (blocks stat)) (counter stat) (table stat), snd got ++ [(switchType, generateIRConstant a switchType, IRLabelNumber (((counter . fst) got) - 1))]))
+            put ((GeneratorState (appendBlocks ((blocks . fst) got) (blocks stat)) (counter stat) (table stat), ((fst . snd) got, (snd . snd) got ++ [(switchType, generateIRConstant a switchType, IRLabelNumber (((counter . fst) got) - 1))])))
+            switchStatement as
+          CLabeledDefault _ -> do
+            put ((GeneratorState (appendBlocks ((blocks . fst) got) (blocks stat)) (counter stat) (table stat), ((fst . snd) got ++ [((counter . fst) got) - 1], (snd . snd) got)))
             switchStatement as
           otherwise -> switchStatement as
 
