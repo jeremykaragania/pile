@@ -247,8 +247,8 @@ module Generator where
         let expr = execState (expressions a) (GeneratorState [[]] (counter got) (table got))
         let exprType = (getType . snd . last . concat . blocks) expr
         if (isIntegral exprType) then do
-          let stat = execState ((switchStatement . splitLabeled . statementList . statementFromCCompound . compound) b) (GeneratorState [[], []] ((counter expr) + 1) (table got), ([], []))
-          let switch = [(Nothing, IRSwitch exprType (IRLabelNumber ((fromIntegral . length) ((snd . snd) stat))) (IRLabelNumber (labeledDefault ((fst . snd) stat) ((counter . fst) stat))) ((snd . snd) stat))]
+          let stat = execState ((switchStatement . splitLabeled . statementList . statementFromCCompound . compound) b) (GeneratorState [[], []] ((counter expr) + 1) (table got), ([(counter . fst) stat], []))
+          let switch = [(Nothing, IRSwitch exprType (IRLabelNumber ((fromIntegral . length) ((snd . snd) stat))) (IRLabelNumber (labeledDefault ((fst . snd) stat))) ((snd . snd) stat))]
           let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (((counter . fst) stat)))))]
           let putBlocks = appendBlocks (blocks expr) (appendBlocks [switch] (appendBlocks ((blocks . fst) stat) [switchBr, []]))
           put (GeneratorState putBlocks (((counter . fst) stat) + 1) (table got))
@@ -262,9 +262,9 @@ module Generator where
           isLabeled (CLabeledDefault _) = True
           isLabeled _ = False
           -- Decides whether to use the explicit (a) or implicit (b) default label.
-          labeledDefault [a] b = a
-          labeledDefault [] b = b
-          labeledDefault _ _ = error ""
+          labeledDefault [a] = a
+          labeledDefault [a, b] = b
+          labeledDefault _ = error ""
 
       statement (CReturn Nothing) = do
         got <- get
