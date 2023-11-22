@@ -247,11 +247,11 @@ module Generator where
         let expr = execState (expressions a) (GeneratorState [[]] (counter got) (table got) (context got))
         let exprType = (getType . snd . last . concat . blocks) expr
         if (isIntegral exprType) then do
-          let stat = execState ((switchStatement . splitLabeled . statementList . statementFromCCompound . compound) b) (GeneratorState [[], []] ((counter expr) + 1) (table got) (context got), ([(counter . fst) stat], []))
+          let stat = execState ((switchStatement . splitLabeled . statementList . statementFromCCompound . compound) b) (GeneratorState [[], []] ((counter expr) + 1) (table got) (Just ((counter . fst) stat)), ([(counter . fst) stat], []))
           let switch = [(Nothing, IRSwitch exprType (IRLabelNumber ((fromIntegral . length) ((snd . snd) stat))) (IRLabelNumber (labeledDefault ((fst . snd) stat))) ((snd . snd) stat))]
           let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (((counter . fst) stat)))))]
           let putBlocks = appendBlocks (blocks expr) (appendBlocks [switch] (appendBlocks ((blocks . fst) stat) [switchBr, []]))
-          put (GeneratorState putBlocks (((counter . fst) stat) + 1) (table got) ((context . fst) stat))
+          put (GeneratorState putBlocks (((counter . fst) stat) + 1) (table got) Nothing)
         else error ""
         where
           splitLabeled [] = []
@@ -275,6 +275,14 @@ module Generator where
         got <- get
         let putBlocks = [[(Nothing, IRRet (Just (IRConstantValue (generateIRConstant a b))))]]
         put (GeneratorState putBlocks (counter got) (table got) (context got))
+
+      statement (CBreak) = do
+        got <- get
+        case (context got) of
+          Just a -> do
+            let br = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (a))))]]
+            put (GeneratorState br (counter got) (table got) (context got))
+          otherwise -> error ""
 
       labeled :: CStatement -> GeneratorStateMonad ()
       labeled a = do
