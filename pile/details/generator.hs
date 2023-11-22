@@ -9,7 +9,8 @@ module Generator where
 
   {-
     GeneratorState carries state between generators. A GeneratorState carries past basic blocks (blocks), an accumulator
-    (counter) for unnamed temporaries, and a lookup table (table) which associates an identifier key with a label and type.
+    (counter) for unnamed temporaries, a lookup table (table) which associates an identifier key with a label and type, and a
+    context for break and continue statements (context) which carries the integer label number for the branch.
   -}
   data GeneratorState = GeneratorState {blocks :: [[(Maybe IRLabel, IRInstruction)]], counter :: Integer, table :: Map String (IRLabel, IRType), context :: (Maybe Integer)}
 
@@ -156,12 +157,10 @@ module Generator where
       declaration :: CDeclaration -> GeneratorStateMonad ()
       declaration (CDeclaration d (Just (CInitDeclaratorList e))) = do
         got <- get
-        let irAllocaState = execState (irAlloca d e) (GeneratorState [] (counter got) (table got) (context got))
-        let putCounter = counter irAllocaState
-        let putTable = table irAllocaState
-        let irStoreState = execState (irStore d e) (GeneratorState [] putCounter putTable (context irAllocaState))
-        let putBlocks = appendBlocks (blocks got) (appendBlocks (blocks irAllocaState) (blocks irStoreState))
-        put (GeneratorState putBlocks putCounter putTable (context irAllocaState))
+        let alloca = execState (irAlloca d e) (GeneratorState [] (counter got) (table got) (context got))
+        let store = execState (irStore d e) (GeneratorState [] (counter alloca) (table alloca) (context alloca))
+        let putBlocks = appendBlocks (blocks got) (appendBlocks (blocks alloca) (blocks store))
+        put (GeneratorState putBlocks (counter alloca) (table alloca) (context alloca))
 
       irAlloca :: CDeclaration -> [CDeclaration] -> GeneratorStateMonad ()
       irAlloca a [] = return ()
