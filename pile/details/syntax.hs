@@ -216,3 +216,31 @@ module Syntax where
     IRVariableGlobal String IRType IRConstant deriving (Show, Eq)
 
   data IRModule = IRModule [IRGlobalValue] deriving (Show, Eq)
+
+  data ARMOpcode =
+    ARMMov |
+    ARMMvn |
+    ARMAdd |
+    ARMAdc |
+    ARMSub |
+    ARMSbc |
+    ARMRsb |
+    ARMRsc |
+    ARMCmp |
+    ARMMul |
+    ARMMla |
+    ARMUmull |
+    ARMUmlal |
+    ARMSmull |
+    ARMSmlal |
+    ARMCmn |
+    ARMTst |
+    ARMTeq |
+    ARMAnd |
+    ARMEor |
+    ARMOrr |
+    ARMBic |
+    ARMB |
+    ARMBl |
+    ARMBx |
+    ARMNop deriving (Show, Eq)
