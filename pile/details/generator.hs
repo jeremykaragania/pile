@@ -306,7 +306,9 @@ module Generator where
           CLabeledDefault _ -> do
             put ((GeneratorState (appendBlocks ((blocks . fst) got) (blocks stat)) (counter stat) (table stat) (context stat), ((fst . snd) got ++ [((counter . fst) got) - 1], (snd . snd) got)))
             switchStatement as
-          otherwise -> switchStatement as
+          otherwise -> do
+            put ((GeneratorState (appendBlocks ((blocks . fst) got) (blocks stat)) (counter stat) (table stat) (context stat), ((fst . snd) got, (snd . snd) got)))
+            switchStatement as
 
       {-
         All selection statements consist of an expression (a), and at least one body (b) which is a compound statement.
