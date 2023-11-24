@@ -14,6 +14,14 @@ module Generator where
   -}
   data GeneratorState = GeneratorState {blocks :: [[(Maybe IRLabel, IRInstruction)]], counter :: Integer, table :: Map String (IRLabel, IRType), context :: (Maybe Integer)}
 
+  setBlocks a (GeneratorState _ b c d) = GeneratorState a b c d
+
+  setCounter a (GeneratorState b c d e) = GeneratorState b (a c) d e
+
+  setTable a (GeneratorState b c _ d) = GeneratorState b c a d
+
+  setContext a (GeneratorState b c d _) = GeneratorState b c d a
+
   type GeneratorStateMonad = State GeneratorState
 
   getIdentifier (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
@@ -157,10 +165,10 @@ module Generator where
       declaration :: CDeclaration -> GeneratorStateMonad ()
       declaration (CDeclaration d (Just (CInitDeclaratorList e))) = do
         got <- get
-        let alloca = execState (irAlloca d e) (GeneratorState [] (counter got) (table got) (context got))
-        let store = execState (irStore d e) (GeneratorState [] (counter alloca) (table alloca) (context alloca))
-        let putBlocks = appendBlocks (blocks got) (appendBlocks (blocks alloca) (blocks store))
-        put (GeneratorState putBlocks (counter alloca) (table alloca) (context alloca))
+        let alloca = execState (irAlloca d e) (setBlocks [[]] got)
+        let store = execState (irStore d e) (setBlocks [[]] alloca)
+        let newBlocks = appendBlocks (blocks got) (appendBlocks (blocks alloca) (blocks store))
+        put (setBlocks newBlocks alloca)
 
       irAlloca :: CDeclaration -> [CDeclaration] -> GeneratorStateMonad ()
       irAlloca a [] = return ()
@@ -169,9 +177,9 @@ module Generator where
         got <- get
         if Map.notMember (getIdentifier b) (table got) then do
             let instruction = IRAlloca (typeFromCSpecifiers a (getPointer b))
-            let putTable = Map.insert (getIdentifier b) (IRLabelNumber (counter got), (typeFromCSpecifiers a (getPointer b))) (table got)
-            let putBlocks = [[(Just (IRLabelNumber (counter got)), instruction)]]
-            put (GeneratorState putBlocks ((counter got) + 1) putTable (context got))
+            let newTable = Map.insert (getIdentifier b) (IRLabelNumber (counter got), (typeFromCSpecifiers a (getPointer b))) (table got)
+            let newBlocks = [[(Just (IRLabelNumber (counter got)), instruction)]]
+            put ((setBlocks newBlocks . setCounter (+1) . setTable newTable) got)
           else error ""
         irAlloca a bs
 
@@ -180,8 +188,8 @@ module Generator where
 
       irStore a (b:bs) = do
         got <- get
-        let putBlocks = [[(Nothing, IRStore (typeFromCSpecifiers a (getPointer b)) (IRConstantValue (generateIRConstant (getConstant b) (typeFromCSpecifiers a (getPointer b)))) (fst ((table got) Map.! getIdentifier b)))]]
-        put (GeneratorState putBlocks (counter got) (table got) (context got))
+        let newBlocks = [[(Nothing, IRStore (typeFromCSpecifiers a (getPointer b)) (IRConstantValue (generateIRConstant (getConstant b) (typeFromCSpecifiers a (getPointer b)))) (fst ((table got) Map.! getIdentifier b)))]]
+        put (setBlocks newBlocks got)
         irStore a bs
 
       statementList (Just (CList a)) = a
@@ -192,8 +200,9 @@ module Generator where
 
       statements (a:as) = do
         got <- get
-        let stat = execState (statement a) (GeneratorState [] (counter got) (table got) (context got))
-        put (GeneratorState (appendBlocks (blocks got) (blocks stat)) (counter stat) (table got) (context stat))
+        let stat = execState (statement a) (setBlocks [[]] got)
+        let newBlocks = (appendBlocks (blocks got) (blocks stat))
+        put (setBlocks newBlocks stat)
         statements as
 
       statement :: CStatement -> GeneratorStateMonad ()
@@ -205,52 +214,52 @@ module Generator where
 
       statement (CList a) = do
         got <- get
-        let stat = execState (statements a) (GeneratorState [[]] (counter got) (table got) (context got))
-        put (GeneratorState (blocks stat) (counter stat) (table got) (context stat))
+        let stat = execState (statements a) (setBlocks [[]] got)
+        put stat
 
       statement (CCompound a b) = do
         got <- get
-        let dec = execState ((declarations . declarationList) a) (GeneratorState (blocks got) (counter got) (table got) (context got))
-        let stat = execState ((statements . statementList) b) (GeneratorState (blocks dec) (counter dec) (table dec) (context dec))
-        put (GeneratorState ((blocks stat)) (counter stat) (table stat) (context stat))
+        let dec = execState ((declarations . declarationList) a) got
+        let stat = execState ((statements . statementList) b) dec
+        put stat
 
       statement (CCExpression (Just (CExpression []))) = do
         got <- get
-        put (GeneratorState (blocks got) (counter got) (table got) (context got))
+        put got
 
       statement (CCExpression (Just (CExpression a))) = do
         got <- get
-        let expr = execState (expressions a) (GeneratorState [[]] (counter got) (table got) (context got))
-        put (GeneratorState (blocks expr) (counter expr) (table got) (context expr))
+        let expr = execState (expressions a) (setBlocks [[]] got)
+        put expr
 
       statement (CIf a@(CExpression _) b) = do
         got <- get
-        let ifHead = execState (selectionHead a (compound b)) (GeneratorState [] (counter got) (table got) (context got))
-        let ifBody = execState ((statement . compound) b) (GeneratorState [[]] ((counter ifHead)) (table got) (context ifHead))
+        let ifHead = execState (selectionHead a (compound b)) (setBlocks [[]] got)
+        let ifBody = execState ((statement . compound) b) (setBlocks [[]] ifHead)
         let ifBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter ifBody)))))]
-        let putBlocks = (blocks ifHead) ++ appendBlocks (blocks ifBody) [ifBr, []]
-        put (GeneratorState putBlocks ((counter ifBody) + 1) (table got) (context ifBody))
+        let newBlocks = (blocks ifHead) ++ appendBlocks (blocks ifBody) [ifBr, []]
+        put ((setBlocks newBlocks . setCounter (+1)) ifBody)
 
       statement (CIfElse a@(CExpression _) b c) = do
         got <- get
-        let ifHead = execState (selectionHead a (compound b)) (GeneratorState [] (counter got) (table got) (context got))
-        let ifBody = execState ((statement . compound) b) (GeneratorState [[]] ((counter ifHead)) (table got) (context ifHead))
-        let elseBody = execState ((statement . compound) c) (GeneratorState [[]] ((counter ifBody) + 1) (table got) (context ifBody))
+        let ifHead = execState (selectionHead a (compound b)) (setBlocks [[]] got)
+        let ifBody = execState ((statement . compound) b) (setBlocks [[]] ifHead)
+        let elseBody = execState ((statement . compound) c) ((setBlocks [[]] . setCounter (+1)) ifBody)
         let elseBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter elseBody)))))]
-        let putBlocks = (blocks ifHead) ++ appendBlocks (blocks ifBody) (appendBlocks [elseBr, []] (appendBlocks (blocks elseBody) [elseBr, []]))
-        put (GeneratorState putBlocks ((counter elseBody) + 1) (table got) (context elseBody))
+        let newBlocks = (blocks ifHead) ++ appendBlocks (blocks ifBody) (appendBlocks [elseBr, []] (appendBlocks (blocks elseBody) [elseBr, []]))
+        put ((setBlocks newBlocks . setCounter (+1)) elseBody)
 
       statement (CSwitch (CExpression a) b) = do
         got <- get
         let splitStat = (CCompound Nothing . Just . CList . splitLabeled . statementList . statementFromCCompound . compound) b
-        let expr = execState (expressions a) (GeneratorState [[]] (counter got) (table got) (context got))
+        let expr = execState (expressions a) (setBlocks [[]] got)
         let exprType = (getType . snd . last . concat . blocks) expr
         if (isIntegral exprType) then do
-          let stat = execState ((switchStatement . splitLabeled . statementList . statementFromCCompound . compound) b) (GeneratorState [[], []] ((counter expr) + 1) (table got) (Just ((counter . fst) stat)), ([(counter . fst) stat], []))
+          let stat = execState ((switchStatement . splitLabeled . statementList . statementFromCCompound . compound) b) ((setBlocks [[], []] . setCounter (+1) . setContext (Just ((counter . fst) stat)) . fst) stat, ([(counter . fst) stat], []))
           let switch = [(Nothing, IRSwitch exprType (IRLabelNumber ((fromIntegral . length) ((snd . snd) stat))) (IRLabelNumber (labeledDefault ((fst . snd) stat))) ((snd . snd) stat))]
           let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (((counter . fst) stat)))))]
-          let putBlocks = appendBlocks (blocks expr) (appendBlocks [switch] (appendBlocks ((blocks . fst) stat) [switchBr, []]))
-          put (GeneratorState putBlocks (((counter . fst) stat) + 1) (table got) Nothing)
+          let newBlocks = appendBlocks (blocks expr) (appendBlocks [switch] (appendBlocks ((blocks . fst) stat) [switchBr, []]))
+          put ((setBlocks newBlocks . setCounter (+1) . setContext Nothing . fst) stat)
         else error ""
         where
           splitLabeled [] = []
@@ -267,29 +276,29 @@ module Generator where
 
       statement (CReturn Nothing) = do
         got <- get
-        let putBlocks = [[(Nothing, IRRet Nothing)]]
-        put (GeneratorState putBlocks (counter got) (table got) (context got))
+        let newBlocks = [[(Nothing, IRRet Nothing)]]
+        put (setBlocks newBlocks got)
 
       statement (CReturn (Just a)) = do
         got <- get
-        let putBlocks = [[(Nothing, IRRet (Just (IRConstantValue (generateIRConstant a b))))]]
-        put (GeneratorState putBlocks (counter got) (table got) (context got))
+        let newBlocks = [[(Nothing, IRRet (Just (IRConstantValue (generateIRConstant a b))))]]
+        put (setBlocks newBlocks got)
 
       statement (CBreak) = do
         got <- get
         case (context got) of
           Just a -> do
-            let br = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (a))))]]
-            put (GeneratorState br (counter got) (table got) (context got))
+            let newBlocks = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (a))))]]
+            put (setBlocks newBlocks got)
           otherwise -> error ""
 
       labeled :: CStatement -> GeneratorStateMonad ()
       labeled a = do
         got <- get
-        let stat = execState ((statement . compound) a) (GeneratorState [[]] (counter got) (table got) (context got))
+        let stat = execState ((statement . compound) a) (setBlocks [[]] got)
         let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter stat)))))]
-        let putBlocks = appendBlocks (blocks stat) [switchBr, []]
-        put (GeneratorState putBlocks ((counter stat) + 1) (table stat) (context stat))
+        let newBlocks = appendBlocks (blocks stat) [switchBr, []]
+        put ((setBlocks newBlocks . setCounter (+1)) stat)
 
       switchStatement :: [CStatement] -> State (GeneratorState, ([Integer], [(IRType, IRConstant, IRLabel)])) ()
       switchStatement [] = return ()
@@ -297,17 +306,18 @@ module Generator where
       switchStatement (a:as) = do
         got <- get
         let stat = execState (statement a) (GeneratorState [] ((counter . fst) got) ((table . fst) got) ((context . fst) got))
+        let newBlocks = appendBlocks ((blocks . fst) got) (blocks stat)
         case a of
           CLabeledCase a _ -> do
             let switchConstant = (constant . token) a
             let switchType = typeFromCConstant switchConstant
-            put ((GeneratorState (appendBlocks ((blocks . fst) got) (blocks stat)) (counter stat) (table stat) (context stat), ((fst . snd) got, (snd . snd) got ++ [(switchType, generateIRConstant a switchType, IRLabelNumber (((counter . fst) got) - 1))])))
+            put ((setBlocks newBlocks stat, ((fst . snd) got, (snd . snd) got ++ [(switchType, generateIRConstant a switchType, IRLabelNumber (((counter . fst) got) - 1))])))
             switchStatement as
           CLabeledDefault _ -> do
-            put ((GeneratorState (appendBlocks ((blocks . fst) got) (blocks stat)) (counter stat) (table stat) (context stat), ((fst . snd) got ++ [((counter . fst) got) - 1], (snd . snd) got)))
+            put ((setBlocks newBlocks stat, ((fst . snd) got ++ [((counter . fst) got) - 1], (snd . snd) got)))
             switchStatement as
           otherwise -> do
-            put ((GeneratorState (appendBlocks ((blocks . fst) got) (blocks stat)) (counter stat) (table stat) (context stat), ((fst . snd) got, (snd . snd) got)))
+            put ((setBlocks newBlocks stat, ((fst . snd) got, (snd . snd) got)))
             switchStatement as
 
       {-
@@ -318,13 +328,13 @@ module Generator where
       selectionHead :: CExpression -> CStatement -> GeneratorStateMonad ()
       selectionHead (CExpression a) b = do
         got <- get
-        let expr = execState (expressions a) (GeneratorState [] (counter got) (table got) (context got))
+        let expr = execState (expressions a) (setBlocks [[]] got)
         let exprType = (getType . snd . last . concat . blocks) expr
         let cmp = ((Just (IRLabelNumber (counter expr))), comparisonInstruction (exprType, (counter expr)))
-        let stat = execState (statement b) (GeneratorState [] ((counter expr) + 1) (table got) (context expr))
+        let stat = execState (statement b) ((setBlocks [[]] . setCounter (+1)) expr) 
         let firstBr = (Nothing, IRBrConditional ((getType . snd) cmp) (IRLabelValue (IRLabelNumber (counter expr))) (IRLabelValue (IRLabelNumber ((counter expr) + 1))) (IRLabelValue (IRLabelNumber ((counter stat) + 1))))
-        let putBlocks = appendBlocks (blocks expr) (appendBlocks [[cmp]] [[firstBr]])
-        put (GeneratorState (putBlocks) ((counter expr) + 2) (table got) (context expr))
+        let newBlocks = appendBlocks (blocks expr) (appendBlocks [[cmp]] [[firstBr]])
+        put ((setBlocks newBlocks . setCounter (+2)) expr)
         where
           -- Different comparison instructions are used depending on argument type.
           comparisonInstruction a
@@ -346,48 +356,46 @@ module Generator where
       expression (CIdentifier a) = do
         got <- get
         let symbol = (table got) Map.! (identifier a)
-        let putBlocks = [[((Just (IRLabelNumber (counter got))), IRLoad (snd symbol) (IRLabelValue (fst symbol)))]]
-        put (GeneratorState putBlocks ((counter got) + 1) (table got) (context got))
+        let newBlocks = [[((Just (IRLabelNumber (counter got))), IRLoad (snd symbol) (IRLabelValue (fst symbol)))]]
+        put ((setBlocks newBlocks . setCounter (+1)) got)
 
       expression a@(CConstant b) = do
         got <- get
-        let putBlocks = [[(Just (IRLabelNumber (counter got)), IRAlloca ((typeFromCConstant . constant) b)), (Nothing, IRStore ((typeFromCConstant . constant) b) (IRConstantValue (generateIRConstant a ((typeFromCConstant . constant) b))) (IRLabelNumber (counter got)))]]
-        put (GeneratorState putBlocks ((counter got) + 1) (table got) (context got))
+        let newBlocks = [[(Just (IRLabelNumber (counter got)), IRAlloca ((typeFromCConstant . constant) b)), (Nothing, IRStore ((typeFromCConstant . constant) b) (IRConstantValue (generateIRConstant a ((typeFromCConstant . constant) b))) (IRLabelNumber (counter got)))]]
+        put ((setBlocks newBlocks . setCounter (+1)) got)
 
       expression (CBinary a b c) = do
         got <- get
-        let expr = execState (binaryExpression b c a) (GeneratorState [] (counter got) (table got) (context got))
-        put (GeneratorState (blocks expr) (counter expr) (table expr) (context expr))
+        let expr = execState (binaryExpression b c a) (setBlocks [[]] got)
+        put expr
 
       expression (CAssignment a b@(CIdentifier c) d) = do
         got <- get
         let symbol = (table got) Map.! (identifier c)
-        let expr = execState (binaryExpression b d (getOperator a)) (GeneratorState [] (counter got) (table got) (context got))
-        let putBlocks = appendBlocks (blocks expr) [[(Nothing, IRStore (snd symbol) (IRLabelValue (IRLabelNumber ((counter expr) - 1))) (fst symbol))]]
-        put (GeneratorState putBlocks (counter expr) (table expr) (context expr))
+        let expr = execState (binaryExpression b d (getOperator a)) (setBlocks [[]] got)
+        let newBlocks = appendBlocks (blocks expr) [[(Nothing, IRStore (snd symbol) (IRLabelValue (IRLabelNumber ((counter expr) - 1))) (fst symbol))]]
+        put (setBlocks newBlocks expr)
 
       binaryExpression :: CExpression -> CExpression -> String -> GeneratorStateMonad ()
       binaryExpression a b c = do
         got <- get
-        let firstExpr = execState (expression a) (GeneratorState [[]] (counter got) (table got) (context got))
+        let firstExpr = execState (expression a) (setBlocks [[]] got)
         let firstType = (getType . snd . last . concat . blocks) firstExpr
         if c == "=" then do
-          let secondExpr = execState (expression b) (GeneratorState [[]] (counter got) (table got) (context got))
+          let secondExpr = execState (expression b) (setBlocks [[]] got)
           let secondType = ((getType . snd . last . concat . blocks) secondExpr)
-          let castExpr = execState (castExpression (firstType, (IRLabelValue (IRLabelNumber ((counter secondExpr) - 1)))) (secondType, (IRLabelValue (IRLabelNumber ((counter secondExpr) - 1)))) False) (GeneratorState [[]] (counter secondExpr) (table got) (context got))
-          let castCounter = counter castExpr
-          let putBlocks = appendBlocks (blocks secondExpr) (blocks castExpr)
-          put (GeneratorState putBlocks (castCounter) (table got) (context got))
+          let castExpr = execState (castExpression (firstType, (IRLabelValue (IRLabelNumber ((counter secondExpr) - 1)))) (secondType, (IRLabelValue (IRLabelNumber ((counter secondExpr) - 1)))) False) (setBlocks [[]] secondExpr)
+          let newBlocks = appendBlocks (blocks secondExpr) (blocks castExpr)
+          put ((setBlocks newBlocks) castExpr)
         else do
-          let secondExpr = execState (expression b) (GeneratorState [[]] ((counter firstExpr)) (table got) (context got))
+          let secondExpr = execState (expression b) (setBlocks [[]] firstExpr)
           let secondType = ((getType . snd . last . concat . blocks) secondExpr)
-          let castExpr = execState (castExpression (firstType, (IRLabelValue (IRLabelNumber ((counter firstExpr) - 1)))) (secondType, (IRLabelValue (IRLabelNumber ((counter secondExpr) - 1)))) True) (GeneratorState [[]] (counter secondExpr) (table got) (context got))
+          let castExpr = execState (castExpression (firstType, (IRLabelValue (IRLabelNumber ((counter firstExpr) - 1)))) (secondType, (IRLabelValue (IRLabelNumber ((counter secondExpr) - 1)))) True) (setBlocks [[]] secondExpr)
           let initBlocks = (appendBlocks (blocks firstExpr) (appendBlocks (blocks secondExpr) (blocks castExpr)))
           let castType = (getType . snd . last . concat) initBlocks
-          let castCounter = counter castExpr
-          let bin = binary (firstType, (counter firstExpr)) (secondType, (counter secondExpr)) (castType, castCounter)
-          let putBlocks = appendBlocks initBlocks [[(Just (IRLabelNumber (castCounter)), bin)]]
-          put (GeneratorState putBlocks (castCounter + 1) (table got) (context got))
+          let bin = binary (firstType, (counter firstExpr)) (secondType, (counter secondExpr)) (castType, (counter castExpr))
+          let newBlocks = appendBlocks initBlocks [[(Just (IRLabelNumber (counter castExpr)), bin)]]
+          put ((setBlocks newBlocks . setCounter (+1)) castExpr)
         where
           {-
             Selects the expression which was not casted and uses it to generate the binary instruction. Ensures that the binary
@@ -401,8 +409,8 @@ module Generator where
       castExpression a b c
         | isSameType (fst a) (fst b) == Nothing = do
           got <- get
-          let putBlocks = [[(Just (IRLabelNumber (counter got)), castInstruction a b c)]]
-          put (GeneratorState putBlocks ((counter got) + 1) (table got) (context got))
+          let newBlocks = [[(Just (IRLabelNumber (counter got)), castInstruction a b c)]]
+          put ((setBlocks newBlocks . setCounter (+1)) got)
         | otherwise = return ()
 
       {-
@@ -485,6 +493,7 @@ module Generator where
 
       compound (CCompound a b) = CCompound a b
       compound a = CCompound Nothing (Just (CList [a]))
+
 
       {-
         appendBlocks receives two lists of basic blocks (a, and b) to appended together. the first block of b is appended to
