@@ -331,7 +331,7 @@ module Generator where
         let expr = execState (expressions a) (setBlocks [[]] got)
         let exprType = (getType . snd . last . concat . blocks) expr
         let cmp = ((Just (IRLabelNumber (counter expr))), comparisonInstruction (exprType, (counter expr)))
-        let stat = execState (statement b) ((setBlocks [[]] . setCounter (+1)) expr) 
+        let stat = execState (statement b) ((setBlocks [[]] . setCounter (+1)) expr)
         let firstBr = (Nothing, IRBrConditional ((getType . snd) cmp) (IRLabelValue (IRLabelNumber (counter expr))) (IRLabelValue (IRLabelNumber ((counter expr) + 1))) (IRLabelValue (IRLabelNumber ((counter stat) + 1))))
         let newBlocks = appendBlocks (blocks expr) (appendBlocks [[cmp]] [[firstBr]])
         put ((setBlocks newBlocks . setCounter (+2)) expr)
@@ -402,8 +402,8 @@ module Generator where
             instruction is not generated with duplicate arguments.
           -}
           binary d e f
-            | fst d == fst f = (binaryInstruction c (fst d) (fst f)) (fst f) (IRLabelValue (IRLabelNumber ((snd d) - 1))) (IRLabelValue (IRLabelNumber ((snd f) - 1)))
-            | fst e == fst f = (binaryInstruction c (fst e) (fst f)) (fst f) (IRLabelValue (IRLabelNumber ((snd f) - 1))) (IRLabelValue (IRLabelNumber ((snd e) - 1)))
+            | fst d == fst f = (binaryInstruction c (fst f)) (fst f) (IRLabelValue (IRLabelNumber ((snd d) - 1))) (IRLabelValue (IRLabelNumber ((snd f) - 1)))
+            | fst e == fst f = (binaryInstruction c (fst f)) (fst f) (IRLabelValue (IRLabelNumber ((snd f) - 1))) (IRLabelValue (IRLabelNumber ((snd e) - 1)))
 
       castExpression :: (IRType, IRValue) -> (IRType, IRValue) -> Bool -> GeneratorStateMonad ()
       castExpression a b c
@@ -418,82 +418,79 @@ module Generator where
         a cast operation to either a or b according to c such that a, and b both have the same type. If c is False, the cast is
         a downcast, and if c is True, the cast is an upcast.
       -}
-      castInstruction a b c
-        | isIRShortInteger (fst a) && isIRInteger (fst b) && c = IRSext (fst a) (snd a) (fst b)
-        | isIRShortInteger (fst a) && isIRInteger (fst b) && not c = IRTrunc (fst b) (snd b) (fst b)
-        | isIRShortInteger (fst a) && isIRLongInteger (fst b) && c = IRSext (fst a) (snd a) (fst b)
-        | isIRShortInteger (fst a) && isIRLongInteger (fst b) && not c = IRTrunc (fst b) (snd b) (fst b)
-        | isIRInteger (fst a) && isIRShortInteger (fst b) && c = IRSext (fst b) (snd b) (fst a)
-        | isIRInteger (fst a) && isIRShortInteger (fst b) && not c = IRTrunc (fst a) (snd a) (fst b)
-        | isIRInteger (fst a) && isIRLongInteger (fst b) && c = IRSext (fst a) (snd a) (fst b)
-        | isIRInteger (fst a) && isIRLongInteger (fst b) && not c = IRTrunc (fst b) (snd b) (fst a)
-        | isIRLongInteger (fst a) && isIRShortInteger (fst b) && c = IRSext (fst b) (snd b) (fst a)
-        | isIRLongInteger (fst a) && isIRShortInteger (fst b) && not c = IRTrunc (fst a) (snd a) (fst b)
-        | isIRLongInteger (fst a) && isIRInteger (fst b) && c = IRSext (fst b) (snd b) (fst a)
-        | isIRLongInteger (fst a) && isIRInteger (fst b) && not c = IRTrunc (fst a) (snd a) (fst b)
-        | (fst a) == IRFloat && (fst b) == IRDouble && c = IRFpext (fst a) (snd a) (fst b)
-        | (fst a) == IRFloat && (fst b) == IRDouble && not c = IRFptrunc (fst b) (snd b) (fst a)
-        | (fst a) == IRFloat && (fst b) == IRLongDouble && c = IRFpext (fst a) (snd a) (fst b)
-        | (fst a) == IRFloat && (fst b) == IRLongDouble && not c = IRFptrunc (fst b) (snd b) (fst a)
-        | (fst a) == IRDouble && (fst b) == IRFloat && c = IRFpext (fst b) (snd b) (fst a)
-        | (fst a) == IRDouble && (fst b) == IRFloat && not c = IRFptrunc (fst a) (snd a) (fst b)
-        | (fst a) == IRDouble && (fst b) == IRLongDouble && c = IRFpext (fst a) (snd a) (fst b)
-        | (fst a) == IRDouble && (fst b) == IRLongDouble && not c = IRFptrunc (fst b) (snd b) (fst a)
-        | (fst a) == IRLongDouble && (fst b) == IRFloat && c = IRFpext (fst b) (snd b) (fst a)
-        | (fst a) == IRLongDouble && (fst b) == IRFloat && not c = IRFptrunc (fst a) (snd a) (fst b)
-        | (fst a) == IRLongDouble && (fst b) == IRDouble && c = IRFpext (fst b) (snd b) (fst a)
-        | (fst a) == IRLongDouble && (fst b) == IRDouble && not c = IRFptrunc (fst a) (snd a) (fst b)
-        | isIntegral (fst a) && isFloating (fst b) && c = IRSitofp (fst a) (snd a) (fst b)
-        | isFloating (fst a) && isIntegral (fst b) && c = IRSitofp (fst b) (snd b) (fst a)
-        | isIntegral (fst a) && isFloating (fst b) && not c = IRFptosi (fst b) (snd b) (fst a)
-        | isFloating (fst a) && isIntegral (fst b) && not c = IRSitofp (fst b) (snd b) (fst a)
+      castInstruction (a, b) (c, d) e
+        | isIRShortInteger a && isIRInteger c && e = IRSext a b c
+        | isIRShortInteger a && isIRInteger c && not e = IRTrunc c d c
+        | isIRShortInteger a && isIRLongInteger c && e = IRSext a b c
+        | isIRShortInteger a && isIRLongInteger c && not e = IRTrunc c d c
+        | isIRInteger a && isIRShortInteger c && e = IRSext c d a
+        | isIRInteger a && isIRShortInteger c && not e = IRTrunc a b c
+        | isIRInteger a && isIRLongInteger c && e = IRSext a b c
+        | isIRInteger a && isIRLongInteger c && not e = IRTrunc c d a
+        | isIRLongInteger a && isIRShortInteger c && e = IRSext c d a
+        | isIRLongInteger a && isIRShortInteger c && not e = IRTrunc a b c
+        | isIRLongInteger a && isIRInteger c && e = IRSext c d a
+        | isIRLongInteger a && isIRInteger c && not e = IRTrunc a b c
+        | a == IRFloat && c == IRDouble && e = IRFpext a b c
+        | a == IRFloat && c == IRDouble && not e = IRFptrunc c d a
+        | a == IRFloat && c == IRLongDouble && e = IRFpext a b c
+        | a == IRFloat && c == IRLongDouble && not e = IRFptrunc c d a
+        | a == IRDouble && c == IRFloat && e = IRFpext c d a
+        | a == IRDouble && c == IRFloat && not e = IRFptrunc a b c
+        | a == IRDouble && c == IRLongDouble && e = IRFpext a b c
+        | a == IRDouble && c == IRLongDouble && not e = IRFptrunc c d a
+        | a == IRLongDouble && c == IRFloat && e = IRFpext c d a
+        | a == IRLongDouble && c == IRFloat && not e = IRFptrunc a b c
+        | a == IRLongDouble && c == IRDouble && e = IRFpext c d a
+        | a == IRLongDouble && c == IRDouble && not e = IRFptrunc a b c
+        | isIntegral a && isFloating c && e = IRSitofp a b c
+        | isFloating a && isIntegral c && e = IRSitofp c d a
+        | isIntegral a && isFloating c && not e = IRFptosi c d a
+        | isFloating a && isIntegral c && not e = IRSitofp c d a
+        | otherwise =  error ""
 
       {-
         binaryInstruction receives a binary operation symbol as a string (a), and the types of the two arguments for the
         operation (a, and b) to ensure that they are the same type.
       -}
-      binaryInstruction a b c
-        | a == "*" && (isIntegral <$> (isSameType b c)) == Just True = IRMul
-        | a == "*" && (isFloating <$> (isSameType b c)) == Just True = IRFmul
-        | a == "/" && (isFloating <$> (isSameType b c)) == Just True = IRFdiv
-        | a == "/" && (isIRUnsigned <$> (isSameType b c)) == Just True = IRUdiv
-        | a == "/" && (isIRSigned <$> (isSameType b c)) == Just True = IRSdiv
-        | a == "%" && (isIRUnsigned <$> (isSameType b c)) == Just True = IRUrem
-        | a == "%" && (isIRSigned <$> (isSameType b c)) == Just True = IRSrem
-        | a == "%" && (isFloating <$> (isSameType b c)) == Just True = IRFrem
-        | a == "+" && (isIntegral <$> (isSameType b c)) == Just True = IRAdd
-        | a == "+" && (isFloating <$> (isSameType b c)) == Just True = IRFadd
-        | a == "-" && (isIntegral <$> (isSameType b c)) == Just True = IRSub
-        | a == "-" && (isFloating <$> (isSameType b c)) == Just True = IRFsub
-        | a == "<<" && (isIntegral <$> (isSameType b c)) == Just True = IRShl
-        | a == ">>" && (isIntegral <$> (isSameType b c)) == Just True = IRAshr
-        | a == "<" && (isIRUnsigned <$> (isSameType b c)) == Just True = IRIcmp IRIUlt
-        | a == "<" && (isIRSigned <$> (isSameType b c)) == Just True = IRIcmp IRISlt
-        | a == "<" && (isFloating <$> (isSameType b c)) == Just True = IRFcmp IRFOlt
-        | a == ">" && (isIRUnsigned <$> (isSameType b c)) == Just True = IRIcmp IRIUgt
-        | a == ">" && (isIRSigned <$> (isSameType b c)) == Just True = IRIcmp IRISgt
-        | a == ">" && (isFloating <$> (isSameType b c)) == Just True = IRFcmp IRFOgt
-        | a == "<=" && (isIRUnsigned <$> (isSameType b c)) == Just True = IRIcmp IRIUle
-        | a == "<=" && (isIRSigned <$> (isSameType b c)) == Just True = IRIcmp IRISle
-        | a == "<=" && (isFloating <$> (isSameType b c)) == Just True = IRFcmp IRFOle
-        | a == ">=" && (isIRUnsigned <$> (isSameType b c)) == Just True = IRIcmp IRIUge
-        | a == ">=" && (isIRSigned <$> (isSameType b c)) == Just True = IRIcmp IRISge
-        | a == ">=" && (isFloating <$> (isSameType b c)) == Just True = IRFcmp IRFOge
-        | a == "==" && (isIntegral <$> (isSameType b c)) == Just True = IRIcmp IRIEq
-        | a == "==" && (isFloating <$> (isSameType b c)) == Just True = IRFcmp IRFOeq
-        | a == "!=" && (isIntegral <$> (isSameType b c)) == Just True = IRIcmp IRINe
-        | a == "!=" && (isFloating <$> (isSameType b c)) == Just True = IRFcmp IRFOne
-        | a == "&" && (isIntegral <$> (isSameType b c)) == Just True = IRAnd
-        | a == "^" && (isIntegral <$> (isSameType b c)) == Just True = IRXor
-        | a == "|" && (isIntegral <$> (isSameType b c)) == Just True = IROr
-
-      assignmentInstruction a b c d e
-        | a == "<<=" || a == ">>=" = (binaryInstruction (getOperator a) b c) c e d
-        | otherwise = (binaryInstruction (getOperator a) b c) c d e
+      binaryInstruction a b
+        | a == "*" && isIntegral b = IRMul
+        | a == "*" && isFloating b = IRFmul
+        | a == "/" && isFloating b = IRFdiv
+        | a == "/" && isIRUnsigned b = IRUdiv
+        | a == "/" && isIRSigned b = IRSdiv
+        | a == "%" && isIRUnsigned b = IRUrem
+        | a == "%" && isIRSigned b = IRSrem
+        | a == "%" && isFloating b = IRFrem
+        | a == "+" && isIntegral b = IRAdd
+        | a == "+" && isFloating b = IRFadd
+        | a == "-" && isIntegral b = IRSub
+        | a == "-" && isFloating b = IRFsub
+        | a == "<<" && isIntegral b = IRShl
+        | a == ">>" && isIntegral b = IRAshr
+        | a == "<" && isIRUnsigned b = IRIcmp IRIUlt
+        | a == "<" && isIRSigned b = IRIcmp IRISlt
+        | a == "<" && isFloating b = IRFcmp IRFOlt
+        | a == ">" && isIRUnsigned b = IRIcmp IRIUgt
+        | a == ">" && isIRSigned b = IRIcmp IRISgt
+        | a == ">" && isFloating b = IRFcmp IRFOgt
+        | a == "<=" && isIRUnsigned b = IRIcmp IRIUle
+        | a == "<=" && isIRSigned b = IRIcmp IRISle
+        | a == "<=" && isFloating b = IRFcmp IRFOle
+        | a == ">=" && isIRUnsigned b = IRIcmp IRIUge
+        | a == ">=" && isIRSigned b = IRIcmp IRISge
+        | a == ">=" && isFloating b = IRFcmp IRFOge
+        | a == "==" && isIntegral b = IRIcmp IRIEq
+        | a == "==" && isFloating b = IRFcmp IRFOeq
+        | a == "!=" && isIntegral b = IRIcmp IRINe
+        | a == "!=" && isFloating b = IRFcmp IRFOne
+        | a == "&" && isIntegral b = IRAnd
+        | a == "^" && isIntegral b = IRXor
+        | a == "|" && isIntegral b = IROr
+        | otherwise = error ""
 
       compound (CCompound a b) = CCompound a b
       compound a = CCompound Nothing (Just (CList [a]))
-
 
       {-
         appendBlocks receives two lists of basic blocks (a, and b) to appended together. the first block of b is appended to
