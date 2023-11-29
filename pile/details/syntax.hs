@@ -259,4 +259,6 @@ module Syntax where
     ARMR10 |
     ARMR11 |
     ARMR12 |
-    ARMR13 deriving (Show, Eq)
+    ARMR13 |
+    ARMR14 |
+    ARMR15 deriving (Show, Eq)
