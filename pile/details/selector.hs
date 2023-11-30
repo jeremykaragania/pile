@@ -31,7 +31,13 @@ module Selector where
 
   type SelectorStateMonad = State SelectorState
 
-  fromIRType (IRShortInteger _) = Word
+  toNodeValueType (IRShortInteger _) = Halfword
+  toNodeValueType (IRInteger _) = Word
+  toNodeValueType (IRLongInteger _) = Word
+
+  toBytes Byte = 1
+  toBytes Halfword = 2
+  toBytes Word = 4
 
   selectIRGlobalValues :: [IRGlobalValue] -> SelectorStateMonad ()
   selectIRGlobalValues [] = return ()
@@ -75,7 +81,7 @@ module Selector where
       selectIRLabeledInstruction :: (Maybe IRLabel, IRInstruction) -> SelectorStateMonad ()
       selectIRLabeledInstruction (Just (IRLabelNumber a), IRAlloca b) = do
         got <- get
-        let newNodes = [Node (counter got) (Opcode ARMSub) [] Nothing, Node ((counter got) + 1) (Register ARMR13) [] Nothing, Node ((counter got) + 2) (Constant) [] Nothing]
+        let newNodes = [Node (counter got) (Opcode ARMSub) [] Nothing, Node ((counter got) + 1) (Register ARMR13) [] Nothing, Node ((counter got) + 2) (Constant 0) [] Nothing]
         put (SelectorState (Graph (((nodes . graph) got) ++ newNodes) ((edges . graph) got)) ((counter got) + 3))
 
   selectIRModule :: IRModule -> SelectorStateMonad Graph
