@@ -7,13 +7,13 @@ module Selector where
     EntryToken |
     BasicBlock |
     Register ARMRegister |
-    Constant NodeValue |
+    Constant |
     Opcode ARMOpcode deriving (Show, Eq)
 
-  data NodeValueType =
-    Word |
-    Halfword |
+  data MachineValueType =
     Byte |
+    Halfword |
+    Word |
     Other deriving (Show, Eq)
 
   data NodeValue =
@@ -21,7 +21,7 @@ module Selector where
     FloatingValue Double |
     OtherValue deriving (Show, Eq)
 
-  data Node = Node {nodeId :: Integer, nodeType :: NodeType, nodeValueTypes :: [NodeValueType], nodeOrder :: Maybe Integer} deriving (Show, Eq)
+  data Node = Node {nodeId :: Integer, nodeType :: NodeType, nodeValues :: [(MachineValueType, Maybe NodeValue)], nodeOrder :: Maybe Integer} deriving (Show, Eq)
 
   data Edge = Edge {fromNode :: Integer, toNode :: Integer, result :: Integer} deriving (Show, Eq)
 
@@ -81,9 +81,15 @@ module Selector where
       selectIRLabeledInstruction :: (Maybe IRLabel, IRInstruction) -> SelectorStateMonad ()
       selectIRLabeledInstruction (Just (IRLabelNumber a), IRAlloca b) = do
         got <- get
-        let newNodes = [Node (counter got) (Opcode ARMSub) [] Nothing, Node ((counter got) + 1) (Register ARMR13) [] Nothing, Node ((counter got) + 2) (Constant 0) [] Nothing]
-        put (SelectorState (Graph (((nodes . graph) got) ++ newNodes) ((edges . graph) got)) ((counter got) + 3))
+        let nodeValueType = toNodeValueType b
+        let bytes = toBytes nodeValueType
+        let newNodes = [
+              Node (counter got) (Opcode ARMSub) [(Word, Nothing)] Nothing,
+              Node ((counter got) + 1) (Register ARMR13) [(Word, Nothing)] Nothing,
+              Node ((counter got) + 2) (Constant) [(nodeValueType, Just (IntegerValue bytes))] Nothing]
+        put (SelectorState (Graph (((nodes . graph) got) ++ newNodes) (((edges . graph) got) ++ newEdges)) ((counter got) + 3))
 
+      selectIRLabeledInstruction _ = return ()
   selectIRModule :: IRModule -> SelectorStateMonad Graph
   selectIRModule (IRModule a) = do
     got <- get
