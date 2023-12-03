@@ -84,12 +84,16 @@ module Selector where
         let nodeValueType = toNodeValueType b
         let bytes = toBytes nodeValueType
         let newNodes = [
-              Node (counter got) (Opcode ARMSub) [(Word, Nothing)] Nothing,
-              Node ((counter got) + 1) (Register ARMR13) [(Word, Nothing)] Nothing,
-              Node ((counter got) + 2) (Constant) [(nodeValueType, Just (IntegerValue bytes))] Nothing]
+              Node (counter got) (Register ARMR13) [(Word, Nothing)] Nothing,
+              Node ((counter got) + 1) (Constant) [(nodeValueType, Just (IntegerValue bytes))] Nothing,
+              Node ((counter got) + 2) (Opcode ARMSub) [(Word, Nothing)] Nothing]
+        let newEdges = [
+              Edge (counter got) ((counter got) + 2) 0,
+              Edge ((counter got) + 1) ((counter got) + 2) 0]
         put (SelectorState (Graph (((nodes . graph) got) ++ newNodes) (((edges . graph) got) ++ newEdges)) ((counter got) + 3))
 
       selectIRLabeledInstruction _ = return ()
+
   selectIRModule :: IRModule -> SelectorStateMonad Graph
   selectIRModule (IRModule a) = do
     got <- get
