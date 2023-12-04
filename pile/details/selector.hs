@@ -27,6 +27,10 @@ module Selector where
 
   data Graph = Graph {nodes :: [Node], edges :: [Edge]} deriving (Show, Eq)
 
+  {-
+    SelectorState carries state between selectors. A SelectorState carries the a directed acyclic graph (graph) which is a
+    graph representation of the intermediate representation, and an accumulator (counter) for the numbering of graph nodes.
+  -}
   data SelectorState = SelectorState {graph :: Graph, counter :: Integer}
 
   type SelectorStateMonad = State SelectorState
