@@ -16,7 +16,7 @@ module Main where
 
   parseArgs (a:as) (Options inFiles outFile)
     | a == "-o" = parseArgs (drop 1 as) (Options inFiles (Just (head as)))
-    | otherwise = parseArgs as (Options (a : inFiles) outFile)
+    | otherwise = parseArgs as (Options (inFiles ++ [a]) outFile)
 
   main = do
     args <- getArgs
