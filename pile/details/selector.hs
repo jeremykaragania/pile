@@ -39,6 +39,9 @@ module Selector where
   toNodeValueType (IRInteger _) = Word
   toNodeValueType (IRLongInteger _) = Word
 
+  toNodeValue (IRConstantValue (IRIntegerConstant a)) = IntegerValue a
+  toNodeValue (IRConstantValue (IRFloatingConstant a)) = FloatingValue a
+
   toBytes Byte = 1
   toBytes Halfword = 2
   toBytes Word = 4
