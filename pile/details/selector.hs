@@ -35,9 +35,9 @@ module Selector where
 
   type SelectorStateMonad = State SelectorState
 
-  toNodeValueType (IRShortInteger _) = Halfword
-  toNodeValueType (IRInteger _) = Word
-  toNodeValueType (IRLongInteger _) = Word
+  toMachineValueType (IRShortInteger _) = Halfword
+  toMachineValueType (IRInteger _) = Word
+  toMachineValueType (IRLongInteger _) = Word
 
   toNodeValue (IRConstantValue (IRIntegerConstant a)) = IntegerValue a
   toNodeValue (IRConstantValue (IRFloatingConstant a)) = FloatingValue a
@@ -88,18 +88,36 @@ module Selector where
       selectIRLabeledInstruction :: (Maybe IRLabel, IRInstruction) -> SelectorStateMonad ()
       selectIRLabeledInstruction (Just (IRLabelNumber a), IRAlloca b) = do
         got <- get
-        let nodeValueType = toNodeValueType b
-        let bytes = toBytes nodeValueType
+        let machineValueType = toMachineValueType b
+        let bytes = toBytes machineValueType
         let newNodes = [
               Node (counter got) (Register ARMR13) [(Word, Nothing)] Nothing,
-              Node ((counter got) + 1) (Constant) [(nodeValueType, Just (IntegerValue bytes))] Nothing,
+              Node ((counter got) + 1) (Constant) [(machineValueType, Just (IntegerValue bytes))] Nothing,
               Node ((counter got) + 2) (Opcode ARMSub) [(Word, Nothing)] Nothing]
         let newEdges = [
               Edge (counter got) ((counter got) + 2) 0,
               Edge ((counter got) + 1) ((counter got) + 2) 0]
         put (SelectorState (Graph (((nodes . graph) got) ++ newNodes) (((edges . graph) got) ++ newEdges)) ((counter got) + 3))
 
-      selectIRLabeledInstruction _ = return ()
+      selectIRLabeledInstruction (Nothing, IRStore b c@(IRConstantValue _) (IRLabelNumber d)) = do
+        got <- get
+        let nodeValue = toNodeValue c
+        let machineValueType = toMachineValueType b
+        let bytes = toBytes machineValueType
+        let newNodes = [
+              Node (counter got) (Register ARMR0) [(Word, Nothing)] Nothing,
+              Node ((counter got) + 1) (Constant) [(Word, Just nodeValue)] Nothing,
+              Node ((counter got) + 2) (Opcode ARMMov) [(Word, Nothing)] Nothing,
+              Node ((counter got) + 3) (Register ARMR13) [(Word, Nothing)] Nothing,
+              Node ((counter got) + 4) (Constant) [(Word, Just (IntegerValue ((d - 1) * bytes)))] Nothing,
+              Node ((counter got) + 5) (Opcode ARMStr) [(Word, Nothing)] Nothing]
+        let newEdges = []
+        let newEdges = [
+              Edge (counter got) ((counter got) + 2) 0,
+              Edge ((counter got) + 1) ((counter got) + 2) 0,
+              Edge ((counter got) + 3) ((counter got) + 5) 0,
+              Edge ((counter got) + 4) ((counter got) + 5) 0]
+        put (SelectorState (Graph (((nodes . graph) got) ++ newNodes) (((edges . graph) got) ++ newEdges)) ((counter got) + 6))
 
   selectIRModule :: IRModule -> SelectorStateMonad Graph
   selectIRModule (IRModule a) = do
