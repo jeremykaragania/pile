@@ -2,6 +2,7 @@ module Main where
   import Generator
   import Lexer
   import Parser
+  import Selector
   import System.Environment
 
   data Options = Options [String] (Maybe String) deriving Show
@@ -30,5 +31,7 @@ module Main where
         case tree of
           Left x -> print x
           Right x -> do
-            writeFile (outFile opt) (generate x)
+            let ir = generateIRModule x
+            let graph = select ir
+            return ()
     return ()
