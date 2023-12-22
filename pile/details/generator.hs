@@ -534,26 +534,3 @@ module Generator where
     where
       cExternalDefinition (CFunction c d e f) = generateIRFunctionGlobal (CFunction c d e f)
       cExternalDefinition (CExternalDeclaration c) = generateIRVariableGlobal (CExternalDeclaration c)
-
-  generateIRBasicBlockCode a = concat (map irBasicBlockCode a)
-    where
-      irBasicBlockCode (IRBasicBlock _ a) = concat (map instruction a)
-      instruction (Nothing, IRRet Nothing) = ["mov r0, r3", "bx lr"]
-      instruction (Nothing, IRRet (Just a)) = ["mov r3, " ++ (value a), "mov r0, r3", "bx lr"]
-      value (IRConstantValue (IRIntegerConstant a)) = show a
-      value (IRConstantValue (IRFloatingConstant a)) = show a
-
-  generateIRModuleCode (IRModule a) = intercalate "\n" (map (intercalate "\n" . irGlobalValueCode) a)
-    where
-      irGlobalValueCode (IRFunctionGlobal c d e f) = [d ++ ":"] ++ map ("\t" ++) (["push {r7}"] ++ generateIRBasicBlockCode f ++ ["bx lr"])
-      irGlobalValueCode (IRVariableGlobal c d e) = [c ++ ":", "\t" ++ directive d ++ value e]
-      directive (IRShortInteger _) = ".short "
-      directive (IRInteger _) = ".int "
-      directive (IRLongInteger _) = ".long "
-      directive IRFloat = ".float "
-      directive IRDouble = ".double "
-      directive IRLongDouble = ".double "
-      value (IRIntegerConstant a) = show a
-      value (IRFloatingConstant a) = show a
-
-  generate a = (generateIRModuleCode . generateIRModule) a
