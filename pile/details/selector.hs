@@ -27,11 +27,17 @@ module Selector where
 
   data Graph = Graph {nodes :: [Node], edges :: [Edge]} deriving (Show, Eq)
 
+  appendGraph a b (Graph c d) = Graph (c ++ a) (d ++ b)
+
   {-
     SelectorState carries state between selectors. A SelectorState carries the a directed acyclic graph (graph) which is a
     graph representation of the intermediate representation, and an accumulator (counter) for the numbering of graph nodes.
   -}
   data SelectorState = SelectorState {graph :: Graph, counter :: Integer}
+
+  setGraph a (SelectorState _ b) = SelectorState a b
+
+  setCounter a (SelectorState b c) = SelectorState b (a c)
 
   type SelectorStateMonad = State SelectorState
 
@@ -97,7 +103,8 @@ module Selector where
         let newEdges = [
               Edge (counter got) ((counter got) + 2) 0,
               Edge ((counter got) + 1) ((counter got) + 2) 0]
-        put (SelectorState (Graph (((nodes . graph) got) ++ newNodes) (((edges . graph) got) ++ newEdges)) ((counter got) + 3))
+        let newGraph = appendGraph newNodes newEdges (graph got)
+        put ((setGraph newGraph . setCounter (+3)) got)
 
       selectIRLabeledInstruction (Nothing, IRStore b c@(IRConstantValue _) (IRLabelNumber d)) = do
         got <- get
@@ -117,7 +124,8 @@ module Selector where
               Edge ((counter got) + 1) ((counter got) + 2) 0,
               Edge ((counter got) + 3) ((counter got) + 5) 0,
               Edge ((counter got) + 4) ((counter got) + 5) 0]
-        put (SelectorState (Graph (((nodes . graph) got) ++ newNodes) (((edges . graph) got) ++ newEdges)) ((counter got) + 6))
+        let newGraph = appendGraph newNodes newEdges (graph got)
+        put ((setGraph newGraph . setCounter (+6)) got)
 
   selectIRModule :: IRModule -> SelectorStateMonad Graph
   selectIRModule (IRModule a) = do
