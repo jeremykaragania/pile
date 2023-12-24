@@ -27,13 +27,14 @@ module Selector where
 
   data Graph = Graph {nodes :: [Node], edges :: [Edge]} deriving (Show, Eq)
 
-  appendGraph a b (Graph c d) = Graph (c ++ a) (d ++ b)
+  appendGraph a b = init b ++ [append (last b) (head a)] ++ tail a
+    where append a b = Graph (nodes a ++ nodes b) (edges a ++ edges b)
 
   {-
-    SelectorState carries state between selectors. A SelectorState carries the a directed acyclic graph (graph) which is a
+    SelectorState carries state between selectors. A SelectorState carries a directed acyclic graphs (graph) which is a
     graph representation of the intermediate representation, and an accumulator (counter) for the numbering of graph nodes.
   -}
-  data SelectorState = SelectorState {graph :: Graph, counter :: Integer}
+  data SelectorState = SelectorState {graphs :: [Graph], counter :: Integer}
 
   setGraph a (SelectorState _ b) = SelectorState a b
 
@@ -65,7 +66,7 @@ module Selector where
   selectIRGlobalValue (IRFunctionGlobal a b c d) = do
     got <- get
     let basicBlocks = execState (selectIRBasicBlocks d) got
-    put (basicBlocks)
+    put (SelectorState (graphs basicBlocks ++ [Graph [] []]) 0)
     where
       selectIRBasicBlocks :: [IRBasicBlock] -> SelectorStateMonad ()
       selectIRBasicBlocks [] = return ()
@@ -103,7 +104,7 @@ module Selector where
         let newEdges = [
               Edge (counter got) ((counter got) + 2) 0,
               Edge ((counter got) + 1) ((counter got) + 2) 0]
-        let newGraph = appendGraph newNodes newEdges (graph got)
+        let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
         put ((setGraph newGraph . setCounter (+3)) got)
 
       selectIRLabeledInstruction (Nothing, IRStore b c@(IRConstantValue _) (IRLabelNumber d)) = do
@@ -124,14 +125,14 @@ module Selector where
               Edge ((counter got) + 1) ((counter got) + 2) 0,
               Edge ((counter got) + 3) ((counter got) + 5) 0,
               Edge ((counter got) + 4) ((counter got) + 5) 0]
-        let newGraph = appendGraph newNodes newEdges (graph got)
+        let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
         put ((setGraph newGraph . setCounter (+6)) got)
 
-  selectIRModule :: IRModule -> SelectorStateMonad Graph
+  selectIRModule :: IRModule -> SelectorStateMonad [Graph]
   selectIRModule (IRModule a) = do
     got <- get
     let newGraph = (execState (selectIRGlobalValues a) got)
-    return (graph newGraph)
+    return ((init . graphs) newGraph)
 
-  select :: IRModule -> Graph
-  select a = evalState (selectIRModule a) (SelectorState (Graph [] []) 0)
+  select :: IRModule -> [Graph]
+  select a = evalState (selectIRModule a) (SelectorState ([Graph [] []]) 0)
