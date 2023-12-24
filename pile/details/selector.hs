@@ -65,7 +65,9 @@ module Selector where
   selectIRGlobalValue :: IRGlobalValue -> SelectorStateMonad ()
   selectIRGlobalValue (IRFunctionGlobal a b c d) = do
     got <- get
-    let basicBlocks = execState (selectIRBasicBlocks d) got
+    let entryNode = Node (counter got) (EntryToken) [(Other, Nothing)] Nothing
+    let newGraph = appendGraph [Graph [entryNode] []] (graphs got)
+    let basicBlocks = execState (selectIRBasicBlocks d) ((setGraph newGraph . setCounter (+1)) got)
     put (SelectorState (graphs basicBlocks ++ [Graph [] []]) 0)
     where
       selectIRBasicBlocks :: [IRBasicBlock] -> SelectorStateMonad ()
