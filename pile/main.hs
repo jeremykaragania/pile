@@ -1,5 +1,5 @@
 module Main where
-  import Generator
+  import IRGenerator
   import Lexer
   import Parser
   import Selector

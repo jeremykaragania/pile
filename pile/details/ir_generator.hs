@@ -1,4 +1,4 @@
-module Generator where
+module IRGenerator where
   import Control.Monad.State
   import Data.Char (toLower, ord)
   import Data.List (intercalate)
@@ -8,21 +8,21 @@ module Generator where
   import Syntax
 
   {-
-    GeneratorState carries state between generators. A GeneratorState carries past basic blocks (blocks), an accumulator
+    IRGeneratorState carries state between generators. A IRGeneratorState carries past basic blocks (blocks), an accumulator
     (counter) for unnamed temporaries, a lookup table (table) which associates an identifier key with a label and type, and a
     context for break and continue statements (context) which carries the integer label number for the branch.
   -}
-  data GeneratorState = GeneratorState {blocks :: [[(Maybe IRLabel, IRInstruction)]], counter :: Integer, table :: Map String (IRLabel, IRType), context :: (Maybe Integer)}
+  data IRGeneratorState = IRGeneratorState {blocks :: [[(Maybe IRLabel, IRInstruction)]], counter :: Integer, table :: Map String (IRLabel, IRType), context :: (Maybe Integer)}
 
-  setBlocks a (GeneratorState _ b c d) = GeneratorState a b c d
+  setBlocks a (IRGeneratorState _ b c d) = IRGeneratorState a b c d
 
-  setCounter a (GeneratorState b c d e) = GeneratorState b (a c) d e
+  setCounter a (IRGeneratorState b c d e) = IRGeneratorState b (a c) d e
 
-  setTable a (GeneratorState b c _ d) = GeneratorState b c a d
+  setTable a (IRGeneratorState b c _ d) = IRGeneratorState b c a d
 
-  setContext a (GeneratorState b c d _) = GeneratorState b c d a
+  setContext a (IRGeneratorState b c d _) = IRGeneratorState b c d a
 
-  type GeneratorStateMonad = State GeneratorState
+  type IRGeneratorStateMonad = State IRGeneratorState
 
   getIdentifier (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
   getIdentifier (CInitDeclarator (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) _) = a
@@ -146,7 +146,7 @@ module Generator where
     generateIRBasicBlocks is used for the generation of basic blocks, which are just instruction lists, from a function body,
     which is just a compound statement. It receives a compound statement (a), and the return type of the function (b).
   -}
-  generateIRBasicBlocks :: CStatement -> IRType -> GeneratorStateMonad [IRBasicBlock]
+  generateIRBasicBlocks :: CStatement -> IRType -> IRGeneratorStateMonad [IRBasicBlock]
   generateIRBasicBlocks a b = do
     got <- get
     let stat = execState (statement a) got
@@ -155,14 +155,14 @@ module Generator where
       declarationList (Just (CDeclarationList a)) = a
       declarationList Nothing = []
 
-      declarations :: [CDeclaration] -> GeneratorStateMonad ()
+      declarations :: [CDeclaration] -> IRGeneratorStateMonad ()
       declarations [] = return ()
 
       declarations (a:as) = do
         declaration a
         declarations as
 
-      declaration :: CDeclaration -> GeneratorStateMonad ()
+      declaration :: CDeclaration -> IRGeneratorStateMonad ()
       declaration (CDeclaration d (Just (CInitDeclaratorList e))) = do
         got <- get
         let alloca = execState (irAlloca d e) (setBlocks [[]] got)
@@ -170,7 +170,7 @@ module Generator where
         let newBlocks = appendBlocks (blocks got) (appendBlocks (blocks alloca) (blocks store))
         put (setBlocks newBlocks alloca)
 
-      irAlloca :: CDeclaration -> [CDeclaration] -> GeneratorStateMonad ()
+      irAlloca :: CDeclaration -> [CDeclaration] -> IRGeneratorStateMonad ()
       irAlloca a [] = return ()
 
       irAlloca a (b:bs) = do
@@ -183,7 +183,7 @@ module Generator where
           else error ""
         irAlloca a bs
 
-      irStore :: CDeclaration -> [CDeclaration] -> GeneratorStateMonad ()
+      irStore :: CDeclaration -> [CDeclaration] -> IRGeneratorStateMonad ()
       irStore a [] = return ()
 
       irStore a (b:bs) = do
@@ -195,7 +195,7 @@ module Generator where
       statementList (Just (CList a)) = a
       statementList Nothing = []
 
-      statements :: [CStatement] -> GeneratorStateMonad ()
+      statements :: [CStatement] -> IRGeneratorStateMonad ()
       statements [] = return ()
 
       statements (a:as) = do
@@ -205,7 +205,7 @@ module Generator where
         put (setBlocks newBlocks stat)
         statements as
 
-      statement :: CStatement -> GeneratorStateMonad ()
+      statement :: CStatement -> IRGeneratorStateMonad ()
       statement (CLabeledCase a b) = do
         labeled b
 
@@ -292,7 +292,7 @@ module Generator where
             put (setBlocks newBlocks got)
           otherwise -> error ""
 
-      labeled :: CStatement -> GeneratorStateMonad ()
+      labeled :: CStatement -> IRGeneratorStateMonad ()
       labeled a = do
         got <- get
         let stat = execState ((statement . compound) a) (setBlocks [[]] got)
@@ -300,12 +300,12 @@ module Generator where
         let newBlocks = appendBlocks (blocks stat) [switchBr, []]
         put ((setBlocks newBlocks . setCounter (+1)) stat)
 
-      switchStatement :: [CStatement] -> State (GeneratorState, ([Integer], [(IRType, IRConstant, IRLabel)])) ()
+      switchStatement :: [CStatement] -> State (IRGeneratorState, ([Integer], [(IRType, IRConstant, IRLabel)])) ()
       switchStatement [] = return ()
 
       switchStatement (a:as) = do
         got <- get
-        let stat = execState (statement a) (GeneratorState [] ((counter . fst) got) ((table . fst) got) ((context . fst) got))
+        let stat = execState (statement a) (IRGeneratorState [] ((counter . fst) got) ((table . fst) got) ((context . fst) got))
         let newBlocks = appendBlocks ((blocks . fst) got) (blocks stat)
         case a of
           CLabeledCase a _ -> do
@@ -325,7 +325,7 @@ module Generator where
         Therefore, selectionHead generates this selection statement head so it can be used in other selection statement
         generators.
       -}
-      selectionHead :: CExpression -> CStatement -> GeneratorStateMonad ()
+      selectionHead :: CExpression -> CStatement -> IRGeneratorStateMonad ()
       selectionHead (CExpression a) b = do
         got <- get
         let expr = execState (expressions a) (setBlocks [[]] got)
@@ -345,14 +345,14 @@ module Generator where
         The last instruction of a generated expression will contain the resulting value of that expression. This makes it
         easier to get the resulting type of an expression after generation.
       -}
-      expressions :: [CExpression] -> GeneratorStateMonad ()
+      expressions :: [CExpression] -> IRGeneratorStateMonad ()
       expressions [] = return ()
 
       expressions (a:as) = do
         expression a
         expressions as
 
-      expression :: CExpression -> GeneratorStateMonad ()
+      expression :: CExpression -> IRGeneratorStateMonad ()
       expression (CIdentifier a) = do
         got <- get
         let symbol = (table got) Map.! (identifier a)
@@ -376,7 +376,7 @@ module Generator where
         let newBlocks = appendBlocks (blocks expr) [[(Nothing, IRStore (snd symbol) (IRLabelValue (IRLabelNumber ((counter expr) - 1))) (fst symbol))]]
         put (setBlocks newBlocks expr)
 
-      binaryExpression :: CExpression -> CExpression -> String -> GeneratorStateMonad ()
+      binaryExpression :: CExpression -> CExpression -> String -> IRGeneratorStateMonad ()
       binaryExpression a b c = do
         got <- get
         let firstExpr = execState (expression a) (setBlocks [[]] got)
@@ -405,7 +405,7 @@ module Generator where
             | fst d == fst f = (binaryInstruction c (fst f)) (fst f) (IRLabelValue (IRLabelNumber ((snd d) - 1))) (IRLabelValue (IRLabelNumber ((snd f) - 1)))
             | fst e == fst f = (binaryInstruction c (fst f)) (fst f) (IRLabelValue (IRLabelNumber ((snd f) - 1))) (IRLabelValue (IRLabelNumber ((snd e) - 1)))
 
-      castExpression :: (IRType, IRValue) -> (IRType, IRValue) -> Bool -> GeneratorStateMonad ()
+      castExpression :: (IRType, IRValue) -> (IRType, IRValue) -> Bool -> IRGeneratorStateMonad ()
       castExpression a b c
         | isSameType (fst a) (fst b) == Nothing = do
           got <- get
@@ -516,7 +516,7 @@ module Generator where
           numbered (Nothing, _) = False
           numbered _ = True
 
-  generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (evalState (generateIRBasicBlocks c functionType) (GeneratorState [[]] 1 Map.empty Nothing))]
+  generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (evalState (generateIRBasicBlocks c functionType) (IRGeneratorState [[]] 1 Map.empty Nothing))]
     where
       functionType = (typeFromCSpecifiers a (pointer b))
       name (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
