@@ -248,21 +248,3 @@ module Syntax where
     ARMStr |
     ARMStrb |
     ARMNop deriving (Show, Eq)
-
-  data ARMRegister =
-    ARMR0 |
-    ARMR1 |
-    ARMR2 |
-    ARMR3 |
-    ARMR4 |
-    ARMR5 |
-    ARMR6 |
-    ARMR7 |
-    ARMR8 |
-    ARMR9 |
-    ARMR10 |
-    ARMR11 |
-    ARMR12 |
-    ARMR13 |
-    ARMR14 |
-    ARMR15 deriving (Show, Eq)

@@ -6,7 +6,7 @@ module Selector where
   data NodeType =
     EntryToken |
     BasicBlock |
-    Register ARMRegister |
+    Register |
     Constant |
     Opcode ARMOpcode deriving (Show, Eq)
 
@@ -103,7 +103,7 @@ module Selector where
         let machineValueType = toMachineValueType b
         let bytes = toBytes machineValueType
         let newNodes = [
-              Node (counter got) (Register ARMR13) [(Word, Nothing)] Nothing,
+              Node (counter got) (Register) [(Word, Just (IntegerValue 13))] Nothing,
               Node ((counter got) + 1) (Constant) [(machineValueType, Just (IntegerValue bytes))] Nothing,
               Node ((counter got) + 2) (Opcode ARMSub) [(Word, Nothing)] Nothing]
         let newEdges = [
@@ -118,10 +118,10 @@ module Selector where
         let machineValueType = toMachineValueType b
         let bytes = toBytes machineValueType
         let newNodes = [
-              Node (counter got) (Register ARMR0) [(Word, Nothing)] Nothing,
+              Node (counter got) (Register) [(Word, Just (IntegerValue 13))] Nothing,
               Node ((counter got) + 1) (Constant) [(Word, Just nodeValue)] Nothing,
               Node ((counter got) + 2) (Opcode ARMMov) [(Word, Nothing)] Nothing,
-              Node ((counter got) + 3) (Register ARMR13) [(Word, Nothing)] Nothing,
+              Node ((counter got) + 3) (Register) [(Word, Just (IntegerValue 13))] Nothing,
               Node ((counter got) + 4) (Constant) [(Word, Just (IntegerValue ((d - 1) * bytes)))] Nothing,
               Node ((counter got) + 5) (Opcode ARMStr) [(Word, Nothing)] Nothing]
         let newEdges = []
