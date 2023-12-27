@@ -21,7 +21,7 @@ module Selector where
     FloatingValue Double |
     OtherValue deriving (Show, Eq)
 
-  data Node = Node {nodeId :: Integer, nodeType :: NodeType, nodeValues :: [(MachineValueType, Maybe NodeValue)], nodeOrder :: Maybe Integer} deriving (Show, Eq)
+  data Node = Node {nodeID :: Integer, nodeType :: NodeType, nodeValues :: [(MachineValueType, Maybe NodeValue)], nodeOrder :: Maybe Integer} deriving (Show, Eq)
 
   data Edge = Edge {fromNode :: Integer, toNode :: Integer, result :: Integer} deriving (Show, Eq)
 
@@ -103,8 +103,8 @@ module Selector where
         let machineValueType = toMachineValueType b
         let bytes = toBytes machineValueType
         let newNodes = [
-              Node (counter got) (Register) [(Word, Just (IntegerValue 13))] Nothing,
-              Node ((counter got) + 1) (Constant) [(machineValueType, Just (IntegerValue bytes))] Nothing,
+              Node (counter got) Register [(Word, Just (IntegerValue 13))] Nothing,
+              Node ((counter got) + 1) Constant [(machineValueType, Just (IntegerValue bytes))] Nothing,
               Node ((counter got) + 2) (Opcode ARMSub) [(Word, Nothing)] Nothing]
         let newEdges = [
               Edge (counter got) ((counter got) + 2) 0,
@@ -118,11 +118,11 @@ module Selector where
         let machineValueType = toMachineValueType b
         let bytes = toBytes machineValueType
         let newNodes = [
-              Node (counter got) (Register) [(Word, Just (IntegerValue 13))] Nothing,
-              Node ((counter got) + 1) (Constant) [(Word, Just nodeValue)] Nothing,
+              Node (counter got) Register [(Word, Just (IntegerValue 13))] Nothing,
+              Node ((counter got) + 1) Constant [(Word, Just nodeValue)] Nothing,
               Node ((counter got) + 2) (Opcode ARMMov) [(Word, Nothing)] Nothing,
-              Node ((counter got) + 3) (Register) [(Word, Just (IntegerValue 13))] Nothing,
-              Node ((counter got) + 4) (Constant) [(Word, Just (IntegerValue ((d - 1) * bytes)))] Nothing,
+              Node ((counter got) + 3) Register [(Word, Just (IntegerValue 13))] Nothing,
+              Node ((counter got) + 4) Constant [(Word, Just (IntegerValue ((d - 1) * bytes)))] Nothing,
               Node ((counter got) + 5) (Opcode ARMStr) [(Word, Nothing)] Nothing]
         let newEdges = []
         let newEdges = [
