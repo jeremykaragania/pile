@@ -131,10 +131,36 @@ module Selector where
               Edge (counter got) (counter got + 2) 0,
               Edge (counter got + 1) (counter got + 2) 0,
               Edge (chain got) (counter got + 6) 0,
+              Edge (counter got + 3) (counter got + 6) 0,
               Edge (counter got + 4) (counter got + 6) 0,
               Edge (counter got + 5) (counter got + 6) 0]
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
         put ((setGraph newGraph . setCounter (+7) . setChain (counter got + 6)) got)
+
+      selectIRLabeledInstruction (Nothing, IRStore b (IRLabelValue (IRLabelNumber c)) (IRLabelNumber d)) = do
+        got <- get
+        let machineValueType = toMachineValueType b
+        let bytes = toBytes machineValueType
+        let newNodes = [
+              Node (counter got) Register [(Word, Just (IntegerValue 0))] Nothing,
+              Node (counter got + 1) Register [(Word, Just (IntegerValue 13))] Nothing,
+              Node (counter got + 2) Constant [(Word, Just (IntegerValue ((c - 1) * bytes)))] Nothing,
+              Node (counter got + 3) (Opcode ARMLdr) [(Word, Nothing)] Nothing,
+              Node (counter got + 4) Register [(Word, Just (IntegerValue 13))] Nothing,
+              Node (counter got + 5) Register [(Word, Just (IntegerValue 0))] Nothing,
+              Node (counter got + 6) Constant [(Word, Just (IntegerValue ((d - 1) * bytes)))] Nothing,
+              Node (counter got + 7) (Opcode ARMStr) [(Word, Nothing)] Nothing]
+        let newEdges = [
+              Edge (chain got) (counter got + 3) 0,
+              Edge (counter got) (counter got + 3) 0,
+              Edge (counter got + 1) (counter got + 3) 0,
+              Edge (counter got + 2) (counter got + 3) 0,
+              Edge (counter got + 3) (counter got + 7) 0,
+              Edge (counter got + 5) (counter got + 7) 0,
+              Edge (counter got + 4) (counter got + 7) 0,
+              Edge (counter got + 6) (counter got + 7) 0]
+        let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
+        put ((setGraph newGraph . setCounter (+8) . setChain (counter got + 7)) got)
 
   selectIRModule :: IRModule -> SelectorStateMonad [Graph]
   selectIRModule (IRModule a) = do
