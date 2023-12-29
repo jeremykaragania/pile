@@ -104,11 +104,12 @@ module Selector where
         let bytes = toBytes machineValueType
         let newNodes = [
               Node (counter got) Register [(Word, Just (IntegerValue 13))] Nothing,
-              Node ((counter got) + 1) Constant [(machineValueType, Just (IntegerValue bytes))] Nothing,
-              Node ((counter got) + 2) (Opcode ARMSub) [(Word, Nothing)] Nothing]
+              Node (counter got + 1) Constant [(machineValueType, Just (IntegerValue bytes))] Nothing,
+              Node (counter got + 2) (Opcode ARMSub) [(Word, Nothing)] Nothing]
         let newEdges = [
-              Edge (counter got) ((counter got) + 2) 0,
-              Edge ((counter got) + 1) ((counter got) + 2) 0]
+              Edge (counter got) (counter got + 2) 0,
+              Edge (counter got) (counter got + 2) 0,
+              Edge (counter got + 1) (counter got + 2) 0]
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
         put ((setGraph newGraph . setCounter (+3)) got)
 
@@ -118,21 +119,22 @@ module Selector where
         let machineValueType = toMachineValueType b
         let bytes = toBytes machineValueType
         let newNodes = [
-              Node (counter got) Register [(Word, Just (IntegerValue 13))] Nothing,
-              Node ((counter got) + 1) Constant [(Word, Just nodeValue)] Nothing,
-              Node ((counter got) + 2) (Opcode ARMMov) [(Word, Nothing)] Nothing,
-              Node ((counter got) + 3) Register [(Word, Just (IntegerValue 13))] Nothing,
-              Node ((counter got) + 4) Constant [(Word, Just (IntegerValue ((d - 1) * bytes)))] Nothing,
-              Node ((counter got) + 5) (Opcode ARMStr) [(Word, Nothing)] Nothing]
+              Node (counter got) Register [(Word, Just (IntegerValue 0))] Nothing,
+              Node (counter got + 1) Constant [(Word, Just nodeValue)] Nothing,
+              Node (counter got + 2) (Opcode ARMMov) [(Word, Nothing)] Nothing,
+              Node (counter got + 3) Register [(Word, Just (IntegerValue 0))] Nothing,
+              Node (counter got + 4) Register [(Word, Just (IntegerValue 13))] Nothing,
+              Node (counter got + 5) Constant [(Word, Just (IntegerValue ((d - 1) * bytes)))] Nothing,
+              Node (counter got + 6) (Opcode ARMStr) [(Word, Nothing)] Nothing]
         let newEdges = []
         let newEdges = [
-              Edge (counter got) ((counter got) + 2) 0,
-              Edge ((counter got) + 1) ((counter got) + 2) 0,
-              Edge ((chain got)) ((counter got) + 5) 0,
-              Edge ((counter got) + 3) ((counter got) + 5) 0,
-              Edge ((counter got) + 4) ((counter got) + 5) 0]
+              Edge (counter got) (counter got + 2) 0,
+              Edge (counter got + 1) (counter got + 2) 0,
+              Edge (chain got) (counter got + 6) 0,
+              Edge (counter got + 4) (counter got + 6) 0,
+              Edge (counter got + 5) (counter got + 6) 0]
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
-        put ((setGraph newGraph . setCounter (+6) . setChain ((counter got) + 5)) got)
+        put ((setGraph newGraph . setCounter (+7) . setChain (counter got + 6)) got)
 
   selectIRModule :: IRModule -> SelectorStateMonad [Graph]
   selectIRModule (IRModule a) = do
