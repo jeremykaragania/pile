@@ -12,7 +12,7 @@ module Scheduler where
 
   opcode (Opcode a) = a
 
-  instructions a = map toInstruction zipInstructions
+  scheduleInstructions a = map toInstruction zipInstructions
     where
       opcodeNodes = filter isOpcode (nodes a)
       isOpcode (Node _ (Opcode _) _ _) = True
@@ -28,4 +28,4 @@ module Scheduler where
       toOperand (Node _ Selector.Register [(_, (Just (IntegerValue a)))] _) = Scheduler.Register a
       toOperand (Node _ Constant [(_, (Just (IntegerValue a)))] _) = Immediate a
 
-  schedule a = map (instructions) a
+  schedule a = map (scheduleInstructions) a
