@@ -2,15 +2,18 @@ module CodeEmitter where
   import Data.Char (toLower)
   import Data.List (intercalate)
   import Scheduler
+  import Selector
   import Syntax
 
-  emitInstruction (Instruction a b) = emitOpcode ++ " " ++ emitOperands
+  emitInstruction (Instruction a@(OpcodeCondition b c) d) = emitOpcodeCondition a ++ " " ++ emitOperands
     where
-      emitOpcode = (drop 3 . map toLower . show) a
-      emitOperand (Register a) = "r" ++ show a
+      emitARM a = (drop 3 . map toLower . show) a
+      emitOpcodeCondition (OpcodeCondition a Nothing) = emitARM a
+      emitOpcodeCondition (OpcodeCondition a (Just b)) = emitARM a ++ emitARM b
+      emitOperand (Scheduler.Register a) = "r" ++ show a
       emitOperand (Immediate a) = "#" ++ show a
       emitOperands
-        | a == ARMLdr || a == ARMStr = ((emitOperand . head) b) ++ " [" ++ (intercalate ", " ((map emitOperand . tail) b)) ++ "]"
-        | otherwise = (intercalate ", " (map emitOperand b))
+        | b == ARMLdr || b == ARMStr = ((emitOperand . head) d) ++ " [" ++ (intercalate ", " ((map emitOperand . tail) d)) ++ "]"
+        | otherwise = (intercalate ", " (map emitOperand d))
 
   emitInstructions = map emitInstruction

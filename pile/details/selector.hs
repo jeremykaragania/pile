@@ -3,12 +3,14 @@ module Selector where
   import Data.Int
   import Syntax
 
+  data OpcodeCondition = OpcodeCondition {opcode :: ARMOpcode, condition :: (Maybe ARMCondition)} deriving (Show, Eq)
+
   data NodeType =
     EntryToken |
     BasicBlock |
     Register |
     Constant |
-    Opcode ARMOpcode deriving (Show, Eq)
+    Opcode OpcodeCondition deriving (Show, Eq)
 
   data MachineValueType =
     Byte |
@@ -105,7 +107,7 @@ module Selector where
         let newNodes = [
               Node (counter got) Register [(Word, Just (IntegerValue 13))] Nothing,
               Node (counter got + 1) Constant [(machineValueType, Just (IntegerValue bytes))] Nothing,
-              Node (counter got + 2) (Opcode ARMSub) [(Word, Nothing)] Nothing]
+              Node (counter got + 2) (Opcode (OpcodeCondition ARMSub Nothing)) [(Word, Nothing)] Nothing]
         let newEdges = [
               Edge (counter got) (counter got + 2) 0,
               Edge (counter got) (counter got + 2) 0,
@@ -121,11 +123,11 @@ module Selector where
         let newNodes = [
               Node (counter got) Register [(Word, Just (IntegerValue 0))] Nothing,
               Node (counter got + 1) Constant [(Word, Just nodeValue)] Nothing,
-              Node (counter got + 2) (Opcode ARMMov) [(Word, Nothing)] Nothing,
+              Node (counter got + 2) (Opcode (OpcodeCondition ARMMov Nothing)) [(Word, Nothing)] Nothing,
               Node (counter got + 3) Register [(Word, Just (IntegerValue 0))] Nothing,
               Node (counter got + 4) Register [(Word, Just (IntegerValue 13))] Nothing,
               Node (counter got + 5) Constant [(Word, Just (IntegerValue ((d - 1) * bytes)))] Nothing,
-              Node (counter got + 6) (Opcode ARMStr) [(Word, Nothing)] Nothing]
+              Node (counter got + 6) (Opcode (OpcodeCondition ARMStr Nothing)) [(Word, Nothing)] Nothing]
         let newEdges = []
         let newEdges = [
               Edge (counter got) (counter got + 2) 0,
@@ -145,11 +147,11 @@ module Selector where
               Node (counter got) Register [(Word, Just (IntegerValue 0))] Nothing,
               Node (counter got + 1) Register [(Word, Just (IntegerValue 13))] Nothing,
               Node (counter got + 2) Constant [(Word, Just (IntegerValue ((c - 1) * bytes)))] Nothing,
-              Node (counter got + 3) (Opcode ARMLdr) [(Word, Nothing)] Nothing,
+              Node (counter got + 3) (Opcode (OpcodeCondition ARMLdr Nothing)) [(Word, Nothing)] Nothing,
               Node (counter got + 4) Register [(Word, Just (IntegerValue 13))] Nothing,
               Node (counter got + 5) Register [(Word, Just (IntegerValue 0))] Nothing,
               Node (counter got + 6) Constant [(Word, Just (IntegerValue ((d - 1) * bytes)))] Nothing,
-              Node (counter got + 7) (Opcode ARMStr) [(Word, Nothing)] Nothing]
+              Node (counter got + 7) (Opcode (OpcodeCondition ARMStr Nothing)) [(Word, Nothing)] Nothing]
         let newEdges = [
               Edge (chain got) (counter got + 3) 0,
               Edge (counter got) (counter got + 3) 0,

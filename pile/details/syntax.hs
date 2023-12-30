@@ -217,6 +217,23 @@ module Syntax where
 
   data IRModule = IRModule [IRGlobalValue] deriving (Show, Eq)
 
+  data ARMCondition =
+    ARMEq |
+    ARMNe |
+    ARMCs |
+    ARMCc |
+    ARMMi |
+    ARMPl |
+    ARMVs |
+    ARMVc |
+    ARMHi |
+    ARMLs |
+    ARMGe |
+    ARMLt |
+    ARMGt |
+    ARMLe |
+    ARMAl deriving (Show, Eq)
+
   data ARMOpcode =
     ARMMov |
     ARMMvn |

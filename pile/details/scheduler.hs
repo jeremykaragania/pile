@@ -2,15 +2,13 @@ module Scheduler where
   import Selector
   import Syntax
 
-  type Opcode = ARMOpcode
-
   data Operand =
     Register Integer |
     Immediate Integer deriving (Show, Eq)
 
-  data Instruction = Instruction Opcode [Operand] deriving (Show, Eq)
+  data Instruction = Instruction OpcodeCondition [Operand] deriving (Show, Eq)
 
-  opcode (Opcode a) = a
+  opcodeCondition (Opcode a) = a
 
   scheduleInstructions a = map toInstruction zipInstructions
     where
@@ -24,7 +22,7 @@ module Scheduler where
       isOperandType _ = False
       zipInstructions = zip opcodeNodes (map nodeOperands opcodeNodes)
       toInstruction (b, c) = Instruction (toOpcode b) (map toOperand (filter (isOperandType . nodeType) c))
-      toOpcode b = (opcode . nodeType) b
+      toOpcode b = (opcodeCondition . nodeType) b
       toOperand (Node _ Selector.Register [(_, (Just (IntegerValue a)))] _) = Scheduler.Register a
       toOperand (Node _ Constant [(_, (Just (IntegerValue a)))] _) = Immediate a
 
