@@ -6,7 +6,8 @@ module Scheduler where
     Register Integer |
     Immediate Integer deriving (Show, Eq)
 
-  data Instruction = Instruction OpcodeCondition [Operand] deriving (Show, Eq)
+  data MachineCode =
+    MCInstruction OpcodeCondition [Operand] deriving (Show, Eq)
 
   opcodeCondition (Opcode a) = a
 
@@ -21,7 +22,7 @@ module Scheduler where
       isOperandType (Constant) = True
       isOperandType _ = False
       zipInstructions = zip opcodeNodes (map nodeOperands opcodeNodes)
-      toInstruction (b, c) = Instruction (toOpcode b) (map toOperand (filter (isOperandType . nodeType) c))
+      toInstruction (b, c) = MCInstruction (toOpcode b) (map toOperand (filter (isOperandType . nodeType) c))
       toOpcode b = (opcodeCondition . nodeType) b
       toOperand (Node _ Selector.Register [(_, (Just (IntegerValue a)))] _) = Scheduler.Register a
       toOperand (Node _ Constant [(_, (Just (IntegerValue a)))] _) = Immediate a
