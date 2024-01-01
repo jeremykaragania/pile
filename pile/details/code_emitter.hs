@@ -16,4 +16,6 @@ module CodeEmitter where
         | b == ARMLdr || b == ARMStr = ((emitOperand . head) d) ++ " [" ++ (intercalate ", " ((map emitOperand . tail) d)) ++ "]"
         | otherwise = (intercalate ", " (map emitOperand d))
 
-  emitMachineCodes = map emitMachineCode
+  emitMachineCodes = map (map emitMachineCode)
+
+  emit = emitMachineCodes

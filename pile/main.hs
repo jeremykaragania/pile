@@ -1,7 +1,9 @@
 module Main where
+  import CodeEmitter
   import IRGenerator
   import Lexer
   import Parser
+  import Scheduler
   import Selector
   import System.Environment
 
@@ -31,7 +33,9 @@ module Main where
         case tree of
           Left x -> print x
           Right x -> do
-            let ir = generateIRModule x
+            let ir = generateIR x
             let graph = select ir
+            let machineCodes = schedule graph
+            let assembly = emit machineCodes
             return ()
     return ()

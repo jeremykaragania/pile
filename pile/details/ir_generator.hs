@@ -534,3 +534,5 @@ module IRGenerator where
     where
       cExternalDefinition (CFunction c d e f) = generateIRFunctionGlobal (CFunction c d e f)
       cExternalDefinition (CExternalDeclaration c) = generateIRVariableGlobal (CExternalDeclaration c)
+
+  generateIR = generateIRModule
