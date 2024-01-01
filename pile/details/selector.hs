@@ -115,6 +115,32 @@ module Selector where
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
         put ((setGraph newGraph . setCounter (+3)) got)
 
+      selectIRLabeledInstruction (a@(Just (IRLabelNumber b)), IRLoad c (IRLabelValue (IRLabelNumber d))) = do
+        got <- get
+        let machineValueType = toMachineValueType c
+        let bytes = toBytes machineValueType
+        let alloca = execState (selectIRLabeledInstruction (a, IRAlloca c)) got
+        let newNodes = [
+              Node (counter alloca) Register [(Word, Just (IntegerValue 0))] Nothing,
+              Node (counter alloca + 1) Register [(Word, Just (IntegerValue 13))] Nothing,
+              Node (counter alloca + 2) Constant [(Word, Just (IntegerValue ((d - 1) * bytes)))] Nothing,
+              Node (counter alloca + 3) (Opcode (OpcodeCondition ARMLdr Nothing)) [(Word, Nothing)] Nothing,
+              Node (counter alloca + 4) Register [(Word, Just (IntegerValue 0))] Nothing,
+              Node (counter alloca + 5) Register [(Word, Just (IntegerValue 13))] Nothing,
+              Node (counter alloca + 6) Constant [(Word, Just (IntegerValue ((b - 1) * bytes)))] Nothing,
+              Node (counter alloca + 7) (Opcode (OpcodeCondition ARMStr Nothing)) [(Word, Nothing)] Nothing]
+        let newEdges = [
+              Edge (chain alloca) (counter got + 3) 0,
+              Edge (counter alloca) (counter alloca + 3) 0,
+              Edge (counter alloca + 1) (counter alloca + 3) 0,
+              Edge (counter alloca + 2) (counter alloca + 3) 0,
+              Edge (counter alloca + 3) (counter alloca + 7) 0,
+              Edge (counter alloca + 4) (counter alloca + 7) 0,
+              Edge (counter alloca + 5) (counter alloca + 7) 0,
+              Edge (counter alloca + 6) (counter alloca + 7) 0]
+        let newGraph = appendGraph [Graph newNodes newEdges] (graphs alloca)
+        put ((setGraph newGraph . setCounter (+8) . setChain (counter alloca + 7)) (alloca))
+
       selectIRLabeledInstruction (Nothing, IRStore b c@(IRConstantValue _) (IRLabelNumber d)) = do
         got <- get
         let nodeValue = toNodeValue c
