@@ -7,28 +7,17 @@ module Main where
   import Selector
   import System.Environment
 
-  data Options = Options [String] (Maybe String) deriving Show
+  parseInFile [a] = a
 
-  inFiles (Options a _) = a
+  parseOutFile a = take (length a - 2) a ++ ".s"
 
-  outFile (Options _ (Just a)) = a
-
-  outFile (Options _ Nothing) = "a.out"
-
-  parseArgs [] args = args
-
-  parseArgs (a:as) (Options inFiles outFile)
-    | a == "-o" = parseArgs (drop 1 as) (Options inFiles (Just (head as)))
-    | otherwise = parseArgs as (Options (inFiles ++ [a]) outFile)
-
-  sourceCode a = drop (length a - 2) a == ".c"
+  isInFile a = drop (length a - 2) a == ".c"
 
   main = do
     args <- getArgs
-    let opt = parseArgs args (Options [] Nothing)
-    let isSourceCode = all sourceCode (inFiles opt)
-    if isSourceCode then do
-      file <- readFile ((head . inFiles) opt)
+    let inFile = parseInFile args
+    if isInFile inFile then do
+      file <- readFile inFile
       let tokens = scan file
       case tokens of
         Left x -> print x
@@ -41,6 +30,6 @@ module Main where
               let graph = select ir
               let machineCodes = schedule graph
               let assembly = emit machineCodes
+              writeFile (parseOutFile inFile) assembly
               return ()
-      else
-        error ""
+    else error ""
