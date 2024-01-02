@@ -180,7 +180,7 @@ module IRGenerator where
             let newTable = Map.insert (getIdentifier b) (IRLabelNumber (counter got), (typeFromCSpecifiers a (getPointer b))) (table got)
             let newBlocks = [[(Just (IRLabelNumber (counter got)), instruction)]]
             put ((setBlocks newBlocks . setCounter (+1) . setTable newTable) got)
-          else error ""
+        else error ""
         irAlloca a bs
 
       irStore :: CDeclaration -> [CDeclaration] -> IRGeneratorStateMonad ()
