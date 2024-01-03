@@ -2,6 +2,7 @@ module Main where
   import CodeEmitter
   import IRGenerator
   import Lexer
+  import Optimizer
   import Parser
   import Scheduler
   import Selector
@@ -28,7 +29,7 @@ module Main where
             Right x -> do
               let ir = generateIR x
               let graph = select ir
-              let machineCodes = schedule graph
+              let machineCodes = (optimizeMachineCodes . schedule) graph
               let assembly = emit machineCodes
               writeFile (parseOutFile inFile) assembly
               return ()
