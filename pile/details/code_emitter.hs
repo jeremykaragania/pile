@@ -18,4 +18,4 @@ module CodeEmitter where
 
   emitMachineCodes = map (map emitMachineCode)
 
-  emit = intercalate "\n" . concat . emitMachineCodes
+  emit = intercalate "\n" . map (intercalate "\n") . emitMachineCodes
