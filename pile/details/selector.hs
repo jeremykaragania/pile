@@ -58,6 +58,8 @@ module Selector where
   toBytes Halfword = 2
   toBytes Word = 4
 
+  offset a b = (a - 1) * b
+
   selectIRGlobalValues :: [IRGlobalValue] -> SelectorStateMonad ()
   selectIRGlobalValues [] = return ()
 
@@ -100,6 +102,7 @@ module Selector where
         selectIRLabeledInstructions as
 
       selectIRLabeledInstruction :: (Maybe IRLabel, IRInstruction) -> SelectorStateMonad ()
+
       selectIRLabeledInstruction (Just (IRLabelNumber a), IRAlloca b) = do
         got <- get
         let machineValueType = toMachineValueType b
@@ -123,11 +126,11 @@ module Selector where
         let newNodes = [
               Node (counter alloca) Register [(Word, Just (IntegerValue 0))] Nothing,
               Node (counter alloca + 1) Register [(Word, Just (IntegerValue 13))] Nothing,
-              Node (counter alloca + 2) Constant [(Word, Just (IntegerValue ((d - 1) * bytes)))] Nothing,
+              Node (counter alloca + 2) Constant [(Word, Just (IntegerValue (offset d bytes)))] Nothing,
               Node (counter alloca + 3) (Opcode (OpcodeCondition ARMLdr Nothing)) [(Word, Nothing)] Nothing,
               Node (counter alloca + 4) Register [(Word, Just (IntegerValue 0))] Nothing,
               Node (counter alloca + 5) Register [(Word, Just (IntegerValue 13))] Nothing,
-              Node (counter alloca + 6) Constant [(Word, Just (IntegerValue ((b - 1) * bytes)))] Nothing,
+              Node (counter alloca + 6) Constant [(Word, Just (IntegerValue (offset b bytes)))] Nothing,
               Node (counter alloca + 7) (Opcode (OpcodeCondition ARMStr Nothing)) [(Word, Nothing)] Nothing]
         let newEdges = [
               Edge (chain alloca) (counter got + 3) 0,
@@ -152,7 +155,7 @@ module Selector where
               Node (counter got + 2) (Opcode (OpcodeCondition ARMMov Nothing)) [(Word, Nothing)] Nothing,
               Node (counter got + 3) Register [(Word, Just (IntegerValue 0))] Nothing,
               Node (counter got + 4) Register [(Word, Just (IntegerValue 13))] Nothing,
-              Node (counter got + 5) Constant [(Word, Just (IntegerValue ((d - 1) * bytes)))] Nothing,
+              Node (counter got + 5) Constant [(Word, Just (IntegerValue (offset d bytes)))] Nothing,
               Node (counter got + 6) (Opcode (OpcodeCondition ARMStr Nothing)) [(Word, Nothing)] Nothing]
         let newEdges = []
         let newEdges = [
@@ -172,11 +175,11 @@ module Selector where
         let newNodes = [
               Node (counter got) Register [(Word, Just (IntegerValue 0))] Nothing,
               Node (counter got + 1) Register [(Word, Just (IntegerValue 13))] Nothing,
-              Node (counter got + 2) Constant [(Word, Just (IntegerValue ((c - 1) * bytes)))] Nothing,
+              Node (counter got + 2) Constant [(Word, Just (IntegerValue (offset c bytes)))] Nothing,
               Node (counter got + 3) (Opcode (OpcodeCondition ARMLdr Nothing)) [(Word, Nothing)] Nothing,
               Node (counter got + 4) Register [(Word, Just (IntegerValue 13))] Nothing,
               Node (counter got + 5) Register [(Word, Just (IntegerValue 0))] Nothing,
-              Node (counter got + 6) Constant [(Word, Just (IntegerValue ((d - 1) * bytes)))] Nothing,
+              Node (counter got + 6) Constant [(Word, Just (IntegerValue (offset d bytes)))] Nothing,
               Node (counter got + 7) (Opcode (OpcodeCondition ARMStr Nothing)) [(Word, Nothing)] Nothing]
         let newEdges = [
               Edge (chain got) (counter got + 3) 0,
