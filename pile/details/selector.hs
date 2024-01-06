@@ -60,7 +60,6 @@ module Selector where
 
   offset a b = (a - 1) * b
 
-
   selectIRGlobalValues :: [IRGlobalValue] -> SelectorStateMonad ()
   selectIRGlobalValues [] = return ()
 
@@ -102,14 +101,14 @@ module Selector where
         put (labeledInstruction)
         selectIRLabeledInstructions as
 
-      newStr :: Integer -> SelectorStateMonad ()
-      newStr a = do
+      newLdrStr :: ARMOpcode -> Integer -> SelectorStateMonad ()
+      newLdrStr a b = do
         got <- get
         let newNodes = [
               Node (counter got) Register [(Word, Just (IntegerValue 0))] Nothing,
               Node (counter got + 1) Register [(Word, Just (IntegerValue 13))] Nothing,
-              Node (counter got + 2) Constant [(Word, Just (IntegerValue a))] Nothing,
-              Node (counter got + 3) (Opcode (OpcodeCondition ARMStr Nothing)) [(Word, Nothing)] Nothing]
+              Node (counter got + 2) Constant [(Word, Just (IntegerValue b))] Nothing,
+              Node (counter got + 3) (Opcode (OpcodeCondition a Nothing)) [(Word, Nothing)] Nothing]
         let newEdges = [
               Edge (chain got) (counter got + 3) 0,
               Edge (counter got) (counter got + 3) 0,
@@ -140,18 +139,8 @@ module Selector where
         let machineValueType = toMachineValueType c
         let bytes = toBytes machineValueType
         let alloca = execState (selectIRLabeledInstruction (a, IRAlloca c)) got
-        let newNodes = [
-              Node (counter alloca) Register [(Word, Just (IntegerValue 0))] Nothing,
-              Node (counter alloca + 1) Register [(Word, Just (IntegerValue 13))] Nothing,
-              Node (counter alloca + 2) Constant [(Word, Just (IntegerValue (offset d bytes)))] Nothing,
-              Node (counter alloca + 3) (Opcode (OpcodeCondition ARMLdr Nothing)) [(Word, Nothing)] Nothing]
-        let newEdges = [
-              Edge (chain alloca) (counter got + 3) 0,
-              Edge (counter alloca) (counter alloca + 3) 0,
-              Edge (counter alloca + 1) (counter alloca + 3) 0,
-              Edge (counter alloca + 2) (counter alloca + 3) 0]
-        let newGraph = appendGraph [Graph newNodes newEdges] (graphs alloca)
-        let str = execState (newStr (offset b bytes)) ((setGraph newGraph . setCounter (+4) . setChain (counter alloca + 3)) alloca)
+        let ldr = execState (newLdrStr ARMLdr (offset d bytes)) alloca
+        let str = execState (newLdrStr ARMStr (offset b bytes)) ldr
         put str
 
       selectIRLabeledInstruction (Nothing, IRStore b c@(IRConstantValue _) (IRLabelNumber d)) = do
@@ -167,25 +156,15 @@ module Selector where
               Edge (counter got) (counter got + 2) 0,
               Edge (counter got + 1) (counter got + 2) 0]
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
-        let str = execState (newStr (offset d bytes)) ((setGraph newGraph . setCounter (+3)) got)
+        let str = execState (newLdrStr ARMStr (offset d bytes)) ((setGraph newGraph . setCounter (+3)) got)
         put str
 
       selectIRLabeledInstruction (Nothing, IRStore b (IRLabelValue (IRLabelNumber c)) (IRLabelNumber d)) = do
         got <- get
         let machineValueType = toMachineValueType b
         let bytes = toBytes machineValueType
-        let newNodes = [
-              Node (counter got) Register [(Word, Just (IntegerValue 0))] Nothing,
-              Node (counter got + 1) Register [(Word, Just (IntegerValue 13))] Nothing,
-              Node (counter got + 2) Constant [(Word, Just (IntegerValue (offset c bytes)))] Nothing,
-              Node (counter got + 3) (Opcode (OpcodeCondition ARMLdr Nothing)) [(Word, Nothing)] Nothing]
-        let newEdges = [
-              Edge (chain got) (counter got + 3) 0,
-              Edge (counter got) (counter got + 3) 0,
-              Edge (counter got + 1) (counter got + 3) 0,
-              Edge (counter got + 2) (counter got + 3) 0]
-        let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
-        let str = execState (newStr (offset d bytes)) ((setGraph newGraph . setCounter (+4) . setChain (counter got + 3)) got)
+        let ldr = execState (newLdrStr ARMLdr (offset c bytes)) got
+        let str = execState (newLdrStr ARMStr (offset d bytes)) ldr
         put str
 
   selectIRModule :: IRModule -> SelectorStateMonad [Graph]
