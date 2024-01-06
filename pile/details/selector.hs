@@ -60,6 +60,7 @@ module Selector where
 
   offset a b = (a - 1) * b
 
+
   selectIRGlobalValues :: [IRGlobalValue] -> SelectorStateMonad ()
   selectIRGlobalValues [] = return ()
 
@@ -101,8 +102,23 @@ module Selector where
         put (labeledInstruction)
         selectIRLabeledInstructions as
 
-      selectIRLabeledInstruction :: (Maybe IRLabel, IRInstruction) -> SelectorStateMonad ()
+      newStr :: Integer -> SelectorStateMonad ()
+      newStr a = do
+        got <- get
+        let newNodes = [
+              Node (counter got) Register [(Word, Just (IntegerValue 0))] Nothing,
+              Node (counter got + 1) Register [(Word, Just (IntegerValue 13))] Nothing,
+              Node (counter got + 2) Constant [(Word, Just (IntegerValue a))] Nothing,
+              Node (counter got + 3) (Opcode (OpcodeCondition ARMStr Nothing)) [(Word, Nothing)] Nothing]
+        let newEdges = [
+              Edge (chain got) (counter got + 3) 0,
+              Edge (counter got) (counter got + 3) 0,
+              Edge (counter got + 1) (counter got + 3) 0,
+              Edge (counter got + 2) (counter got + 3) 0]
+        let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
+        put ((setGraph newGraph . setCounter (+4) . setChain (counter got + 3)) got)
 
+      selectIRLabeledInstruction :: (Maybe IRLabel, IRInstruction) -> SelectorStateMonad ()
       selectIRLabeledInstruction (Just (IRLabelNumber a), IRAlloca b) = do
         got <- get
         let machineValueType = toMachineValueType b
@@ -112,11 +128,12 @@ module Selector where
               Node (counter got + 1) Constant [(machineValueType, Just (IntegerValue bytes))] Nothing,
               Node (counter got + 2) (Opcode (OpcodeCondition ARMSub Nothing)) [(Word, Nothing)] Nothing]
         let newEdges = [
+              Edge (chain got) (counter got + 2) 0,
               Edge (counter got) (counter got + 2) 0,
               Edge (counter got) (counter got + 2) 0,
               Edge (counter got + 1) (counter got + 2) 0]
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
-        put ((setGraph newGraph . setCounter (+3)) got)
+        put ((setGraph newGraph . setCounter (+3) . setChain (counter got + 2)) got)
 
       selectIRLabeledInstruction (a@(Just (IRLabelNumber b)), IRLoad c (IRLabelValue (IRLabelNumber d))) = do
         got <- get
@@ -127,22 +144,15 @@ module Selector where
               Node (counter alloca) Register [(Word, Just (IntegerValue 0))] Nothing,
               Node (counter alloca + 1) Register [(Word, Just (IntegerValue 13))] Nothing,
               Node (counter alloca + 2) Constant [(Word, Just (IntegerValue (offset d bytes)))] Nothing,
-              Node (counter alloca + 3) (Opcode (OpcodeCondition ARMLdr Nothing)) [(Word, Nothing)] Nothing,
-              Node (counter alloca + 4) Register [(Word, Just (IntegerValue 0))] Nothing,
-              Node (counter alloca + 5) Register [(Word, Just (IntegerValue 13))] Nothing,
-              Node (counter alloca + 6) Constant [(Word, Just (IntegerValue (offset b bytes)))] Nothing,
-              Node (counter alloca + 7) (Opcode (OpcodeCondition ARMStr Nothing)) [(Word, Nothing)] Nothing]
+              Node (counter alloca + 3) (Opcode (OpcodeCondition ARMLdr Nothing)) [(Word, Nothing)] Nothing]
         let newEdges = [
               Edge (chain alloca) (counter got + 3) 0,
               Edge (counter alloca) (counter alloca + 3) 0,
               Edge (counter alloca + 1) (counter alloca + 3) 0,
-              Edge (counter alloca + 2) (counter alloca + 3) 0,
-              Edge (counter alloca + 3) (counter alloca + 7) 0,
-              Edge (counter alloca + 4) (counter alloca + 7) 0,
-              Edge (counter alloca + 5) (counter alloca + 7) 0,
-              Edge (counter alloca + 6) (counter alloca + 7) 0]
+              Edge (counter alloca + 2) (counter alloca + 3) 0]
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs alloca)
-        put ((setGraph newGraph . setCounter (+8) . setChain (counter alloca + 7)) (alloca))
+        let str = execState (newStr (offset b bytes)) ((setGraph newGraph . setCounter (+4) . setChain (counter alloca + 3)) alloca)
+        put str
 
       selectIRLabeledInstruction (Nothing, IRStore b c@(IRConstantValue _) (IRLabelNumber d)) = do
         got <- get
@@ -152,21 +162,13 @@ module Selector where
         let newNodes = [
               Node (counter got) Register [(Word, Just (IntegerValue 0))] Nothing,
               Node (counter got + 1) Constant [(Word, Just nodeValue)] Nothing,
-              Node (counter got + 2) (Opcode (OpcodeCondition ARMMov Nothing)) [(Word, Nothing)] Nothing,
-              Node (counter got + 3) Register [(Word, Just (IntegerValue 0))] Nothing,
-              Node (counter got + 4) Register [(Word, Just (IntegerValue 13))] Nothing,
-              Node (counter got + 5) Constant [(Word, Just (IntegerValue (offset d bytes)))] Nothing,
-              Node (counter got + 6) (Opcode (OpcodeCondition ARMStr Nothing)) [(Word, Nothing)] Nothing]
-        let newEdges = []
+              Node (counter got + 2) (Opcode (OpcodeCondition ARMMov Nothing)) [(Word, Nothing)] Nothing]
         let newEdges = [
               Edge (counter got) (counter got + 2) 0,
-              Edge (counter got + 1) (counter got + 2) 0,
-              Edge (chain got) (counter got + 6) 0,
-              Edge (counter got + 3) (counter got + 6) 0,
-              Edge (counter got + 4) (counter got + 6) 0,
-              Edge (counter got + 5) (counter got + 6) 0]
+              Edge (counter got + 1) (counter got + 2) 0]
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
-        put ((setGraph newGraph . setCounter (+7) . setChain (counter got + 6)) got)
+        let str = execState (newStr (offset d bytes)) ((setGraph newGraph . setCounter (+3)) got)
+        put str
 
       selectIRLabeledInstruction (Nothing, IRStore b (IRLabelValue (IRLabelNumber c)) (IRLabelNumber d)) = do
         got <- get
@@ -176,22 +178,15 @@ module Selector where
               Node (counter got) Register [(Word, Just (IntegerValue 0))] Nothing,
               Node (counter got + 1) Register [(Word, Just (IntegerValue 13))] Nothing,
               Node (counter got + 2) Constant [(Word, Just (IntegerValue (offset c bytes)))] Nothing,
-              Node (counter got + 3) (Opcode (OpcodeCondition ARMLdr Nothing)) [(Word, Nothing)] Nothing,
-              Node (counter got + 4) Register [(Word, Just (IntegerValue 13))] Nothing,
-              Node (counter got + 5) Register [(Word, Just (IntegerValue 0))] Nothing,
-              Node (counter got + 6) Constant [(Word, Just (IntegerValue (offset d bytes)))] Nothing,
-              Node (counter got + 7) (Opcode (OpcodeCondition ARMStr Nothing)) [(Word, Nothing)] Nothing]
+              Node (counter got + 3) (Opcode (OpcodeCondition ARMLdr Nothing)) [(Word, Nothing)] Nothing]
         let newEdges = [
               Edge (chain got) (counter got + 3) 0,
               Edge (counter got) (counter got + 3) 0,
               Edge (counter got + 1) (counter got + 3) 0,
-              Edge (counter got + 2) (counter got + 3) 0,
-              Edge (counter got + 3) (counter got + 7) 0,
-              Edge (counter got + 5) (counter got + 7) 0,
-              Edge (counter got + 4) (counter got + 7) 0,
-              Edge (counter got + 6) (counter got + 7) 0]
+              Edge (counter got + 2) (counter got + 3) 0]
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
-        put ((setGraph newGraph . setCounter (+8) . setChain (counter got + 7)) got)
+        let str = execState (newStr (offset d bytes)) ((setGraph newGraph . setCounter (+4) . setChain (counter got + 3)) got)
+        put str
 
   selectIRModule :: IRModule -> SelectorStateMonad [Graph]
   selectIRModule (IRModule a) = do
