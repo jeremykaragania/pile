@@ -34,16 +34,18 @@ module Selector where
 
   {-
     SelectorState carries state between selectors. A SelectorState carries a directed acyclic graphs (graph) which is a graph
-    representation of the intermediate representation, an accumulator (counter) for the numbering of graph nodes, and the most
-    recent side-effecting node (chain).
+    representation of the intermediate representation, an accumulator (counter) for the numbering of graph nodes, the most
+    recent side-effecting node (chain), and the stack pointer offset (offset).
   -}
-  data SelectorState = SelectorState {graphs :: [Graph], counter :: Integer, chain :: Integer}
+  data SelectorState = SelectorState {graphs :: [Graph], counter :: Integer, chain :: Integer, offset :: Integer}
 
-  setGraph a (SelectorState _ b c) = SelectorState a b c
+  setGraph a (SelectorState _ b c d) = SelectorState a b c d
 
-  setCounter a (SelectorState b c d) = SelectorState b (a c) d
+  setCounter a (SelectorState b c d e) = SelectorState b (a c) d e
 
-  setChain a (SelectorState b c _) = SelectorState b c a
+  setChain a (SelectorState b c _ d) = SelectorState b c a d
+
+  setOffset a (SelectorState b c d e) = SelectorState b c d (a e)
 
   type SelectorStateMonad = State SelectorState
 
@@ -58,7 +60,7 @@ module Selector where
   toBytes Halfword = 2
   toBytes Word = 4
 
-  offset a b = (a - 1) * b
+  toOffset a b = (a - 1) * b
 
   selectIRGlobalValues :: [IRGlobalValue] -> SelectorStateMonad ()
   selectIRGlobalValues [] = return ()
@@ -75,7 +77,7 @@ module Selector where
     let entryNode = Node (counter got) (EntryToken) [(Other, Nothing)] Nothing
     let newGraph = appendGraph [Graph [entryNode] []] (graphs got)
     let basicBlocks = execState (selectIRBasicBlocks d) ((setGraph newGraph . setCounter (+1)) got)
-    put (SelectorState (graphs basicBlocks ++ [Graph [] []]) 0 0)
+    put (SelectorState (graphs basicBlocks ++ [Graph [] []]) 0 0 0)
     where
       selectIRBasicBlocks :: [IRBasicBlock] -> SelectorStateMonad ()
       selectIRBasicBlocks [] = return ()
@@ -90,7 +92,16 @@ module Selector where
       selectIRBasicBlock (IRBasicBlock a b) = do
         got <- get
         let labeledInstructions = execState (selectIRLabeledInstructions b) got
-        put (labeledInstructions)
+        let newNodes = [
+              Node (counter labeledInstructions) Register [(Word, Just (IntegerValue 13))] Nothing,
+              Node (counter labeledInstructions + 1) Constant [(Word, Just (IntegerValue (offset labeledInstructions)))] Nothing,
+              Node (counter labeledInstructions + 2) (Opcode (OpcodeCondition ARMAdd Nothing)) [(Word, Nothing)] Nothing]
+        let newEdges = [
+              Edge (counter labeledInstructions) (counter labeledInstructions + 2) 0,
+              Edge (counter labeledInstructions) (counter labeledInstructions + 2) 0,
+              Edge (counter labeledInstructions + 1) (counter labeledInstructions + 2) 0]
+        let newGraph = appendGraph [Graph newNodes newEdges] (graphs labeledInstructions)
+        put ((setGraph newGraph . setCounter (+3)) labeledInstructions)
 
       selectIRLabeledInstructions :: [(Maybe IRLabel, IRInstruction)] -> SelectorStateMonad ()
       selectIRLabeledInstructions [] = return ()
@@ -127,20 +138,19 @@ module Selector where
               Node (counter got + 1) Constant [(machineValueType, Just (IntegerValue bytes))] Nothing,
               Node (counter got + 2) (Opcode (OpcodeCondition ARMSub Nothing)) [(Word, Nothing)] Nothing]
         let newEdges = [
-              Edge (chain got) (counter got + 2) 0,
               Edge (counter got) (counter got + 2) 0,
               Edge (counter got) (counter got + 2) 0,
               Edge (counter got + 1) (counter got + 2) 0]
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
-        put ((setGraph newGraph . setCounter (+3) . setChain (counter got + 2)) got)
+        put ((setGraph newGraph . setCounter (+3) . setOffset (+bytes)) got)
 
       selectIRLabeledInstruction (a@(Just (IRLabelNumber b)), IRLoad c (IRLabelValue (IRLabelNumber d))) = do
         got <- get
         let machineValueType = toMachineValueType c
         let bytes = toBytes machineValueType
         let alloca = execState (selectIRLabeledInstruction (a, IRAlloca c)) got
-        let ldr = execState (newLdrStr ARMLdr (offset d bytes)) alloca
-        let str = execState (newLdrStr ARMStr (offset b bytes)) ldr
+        let ldr = execState (newLdrStr ARMLdr (toOffset d bytes)) alloca
+        let str = execState (newLdrStr ARMStr (toOffset b bytes)) ldr
         put str
 
       selectIRLabeledInstruction (Nothing, IRStore b c@(IRConstantValue _) (IRLabelNumber d)) = do
@@ -156,15 +166,15 @@ module Selector where
               Edge (counter got) (counter got + 2) 0,
               Edge (counter got + 1) (counter got + 2) 0]
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
-        let str = execState (newLdrStr ARMStr (offset d bytes)) ((setGraph newGraph . setCounter (+3)) got)
+        let str = execState (newLdrStr ARMStr (toOffset d bytes)) ((setGraph newGraph . setCounter (+3)) got)
         put str
 
       selectIRLabeledInstruction (Nothing, IRStore b (IRLabelValue (IRLabelNumber c)) (IRLabelNumber d)) = do
         got <- get
         let machineValueType = toMachineValueType b
         let bytes = toBytes machineValueType
-        let ldr = execState (newLdrStr ARMLdr (offset c bytes)) got
-        let str = execState (newLdrStr ARMStr (offset d bytes)) ldr
+        let ldr = execState (newLdrStr ARMLdr (toOffset c bytes)) got
+        let str = execState (newLdrStr ARMStr (toOffset d bytes)) ldr
         put str
 
   selectIRModule :: IRModule -> SelectorStateMonad [Graph]
@@ -174,4 +184,4 @@ module Selector where
     return ((init . graphs) newGraph)
 
   select :: IRModule -> [Graph]
-  select a = evalState (selectIRModule a) (SelectorState ([Graph [] []]) 0 0)
+  select a = evalState (selectIRModule a) (SelectorState ([Graph [] []]) 0 0 0)

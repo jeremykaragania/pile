@@ -16,7 +16,7 @@ module Scheduler where
       opcodeNodes = filter isOpcode (nodes a)
       isOpcode (Node _ (Opcode _) _ _) = True
       isOpcode _ = False
-      nodeOperands b = map (nodes a !!) (map (fromIntegral . fromNode) (filter ((isOperand . nodeID) b) (edges a)))
+      nodeOperands b = map ((nodes a !!) . fromIntegral . fromNode) (filter ((isOperand . nodeID) b) (edges a))
       isOperand a (Edge _ b _) = a == b
       isOperandType (Selector.Register) = True
       isOperandType (Constant) = True
@@ -27,4 +27,4 @@ module Scheduler where
       toOperand (Node _ Selector.Register [(_, (Just (IntegerValue a)))] _) = Scheduler.Register a
       toOperand (Node _ Constant [(_, (Just (IntegerValue a)))] _) = Immediate a
 
-  schedule a = map (scheduleGraph) a
+  schedule = map scheduleGraph
