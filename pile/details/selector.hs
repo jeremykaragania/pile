@@ -23,7 +23,7 @@ module Selector where
     FloatingValue Double |
     OtherValue deriving (Show, Eq)
 
-  data Node = Node {nodeID :: Integer, nodeType :: NodeType, nodeValues :: [(MachineValueType, Maybe NodeValue)], nodeOrder :: Maybe Integer} deriving (Show, Eq)
+  data Node = Node {nodeID :: Integer, nodeType :: NodeType, nodeValues :: [(MachineValueType, Maybe NodeValue)]} deriving (Show, Eq)
 
   data Edge = Edge {fromNode :: Integer, toNode :: Integer, result :: Integer} deriving (Show, Eq)
 
@@ -74,7 +74,7 @@ module Selector where
   selectIRGlobalValue :: IRGlobalValue -> SelectorStateMonad ()
   selectIRGlobalValue (IRFunctionGlobal a b c d) = do
     got <- get
-    let entryNode = Node (counter got) (EntryToken) [(Other, Nothing)] Nothing
+    let entryNode = Node (counter got) (EntryToken) [(Other, Nothing)]
     let newGraph = appendGraph [Graph [entryNode] []] (graphs got)
     let basicBlocks = execState (selectIRBasicBlocks d) ((setGraph newGraph . setCounter (+1)) got)
     put (SelectorState (graphs basicBlocks ++ [Graph [] []]) 0 0 0)
@@ -93,9 +93,9 @@ module Selector where
         got <- get
         let labeledInstructions = execState (selectIRLabeledInstructions b) got
         let newNodes = [
-              Node (counter labeledInstructions) Register [(Word, Just (IntegerValue 13))] Nothing,
-              Node (counter labeledInstructions + 1) Constant [(Word, Just (IntegerValue (offset labeledInstructions)))] Nothing,
-              Node (counter labeledInstructions + 2) (Opcode (OpcodeCondition ARMAdd Nothing)) [(Word, Nothing)] Nothing]
+              Node (counter labeledInstructions) Register [(Word, Just (IntegerValue 13))],
+              Node (counter labeledInstructions + 1) Constant [(Word, Just (IntegerValue (offset labeledInstructions)))],
+              Node (counter labeledInstructions + 2) (Opcode (OpcodeCondition ARMAdd Nothing)) [(Word, Nothing)]]
         let newEdges = [
               Edge (counter labeledInstructions) (counter labeledInstructions + 2) 0,
               Edge (counter labeledInstructions) (counter labeledInstructions + 2) 0,
@@ -116,10 +116,10 @@ module Selector where
       newLdrStr a b = do
         got <- get
         let newNodes = [
-              Node (counter got) Register [(Word, Just (IntegerValue 0))] Nothing,
-              Node (counter got + 1) Register [(Word, Just (IntegerValue 13))] Nothing,
-              Node (counter got + 2) Constant [(Word, Just (IntegerValue b))] Nothing,
-              Node (counter got + 3) (Opcode (OpcodeCondition a Nothing)) [(Word, Nothing)] Nothing]
+              Node (counter got) Register [(Word, Just (IntegerValue 0))],
+              Node (counter got + 1) Register [(Word, Just (IntegerValue 13))],
+              Node (counter got + 2) Constant [(Word, Just (IntegerValue b))],
+              Node (counter got + 3) (Opcode (OpcodeCondition a Nothing)) [(Word, Nothing)]]
         let newEdges = [
               Edge (chain got) (counter got + 3) 0,
               Edge (counter got) (counter got + 3) 0,
@@ -134,9 +134,9 @@ module Selector where
         let machineValueType = toMachineValueType b
         let bytes = toBytes machineValueType
         let newNodes = [
-              Node (counter got) Register [(Word, Just (IntegerValue 13))] Nothing,
-              Node (counter got + 1) Constant [(machineValueType, Just (IntegerValue bytes))] Nothing,
-              Node (counter got + 2) (Opcode (OpcodeCondition ARMSub Nothing)) [(Word, Nothing)] Nothing]
+              Node (counter got) Register [(Word, Just (IntegerValue 13))],
+              Node (counter got + 1) Constant [(machineValueType, Just (IntegerValue bytes))],
+              Node (counter got + 2) (Opcode (OpcodeCondition ARMSub Nothing)) [(Word, Nothing)]]
         let newEdges = [
               Edge (counter got) (counter got + 2) 0,
               Edge (counter got) (counter got + 2) 0,
@@ -159,9 +159,9 @@ module Selector where
         let machineValueType = toMachineValueType b
         let bytes = toBytes machineValueType
         let newNodes = [
-              Node (counter got) Register [(Word, Just (IntegerValue 0))] Nothing,
-              Node (counter got + 1) Constant [(Word, Just nodeValue)] Nothing,
-              Node (counter got + 2) (Opcode (OpcodeCondition ARMMov Nothing)) [(Word, Nothing)] Nothing]
+              Node (counter got) Register [(Word, Just (IntegerValue 0))],
+              Node (counter got + 1) Constant [(Word, Just nodeValue)],
+              Node (counter got + 2) (Opcode (OpcodeCondition ARMMov Nothing)) [(Word, Nothing)]]
         let newEdges = [
               Edge (counter got) (counter got + 2) 0,
               Edge (counter got + 1) (counter got + 2) 0]

@@ -14,7 +14,7 @@ module Scheduler where
   scheduleGraph a = map toInstruction zipInstructions
     where
       opcodeNodes = filter isOpcode (nodes a)
-      isOpcode (Node _ (Opcode _) _ _) = True
+      isOpcode (Node _ (Opcode _) _) = True
       isOpcode _ = False
       nodeOperands b = map ((nodes a !!) . fromIntegral . fromNode) (filter ((isOperand . nodeID) b) (edges a))
       isOperand a (Edge _ b _) = a == b
@@ -24,7 +24,7 @@ module Scheduler where
       zipInstructions = zip opcodeNodes (map nodeOperands opcodeNodes)
       toInstruction (b, c) = MCInstruction (toOpcode b) (map toOperand (filter (isOperandType . nodeType) c))
       toOpcode b = (opcodeCondition . nodeType) b
-      toOperand (Node _ Selector.Register [(_, (Just (IntegerValue a)))] _) = Scheduler.Register a
-      toOperand (Node _ Constant [(_, (Just (IntegerValue a)))] _) = Immediate a
+      toOperand (Node _ Selector.Register [(_, (Just (IntegerValue a)))]) = Scheduler.Register a
+      toOperand (Node _ Constant [(_, (Just (IntegerValue a)))]) = Immediate a
 
   schedule = map scheduleGraph
