@@ -7,22 +7,25 @@ module Scheduler where
     Immediate Integer deriving (Show, Eq)
 
   data MachineCode =
-    MCInstruction OpcodeCondition [Operand] deriving (Show, Eq)
+    MCInstruction OpcodeCondition [Operand] |
+    MCSymbol String deriving (Show, Eq)
 
   opcodeCondition (Opcode a) = a
 
   scheduleGraph a = map toInstruction zipInstructions
     where
-      opcodeNodes = filter isOpcode (nodes a)
-      isOpcode (Node _ (Opcode _) _) = True
-      isOpcode _ = False
+      opcodeNodes = filter isMachineCode (nodes a)
+      isMachineCode (Node _ (BasicBlock _) _) = True
+      isMachineCode (Node _ (Opcode _) _) = True
+      isMachineCode _ = False
       nodeOperands b = map ((nodes a !!) . fromIntegral . fromNode) (filter ((isOperand . nodeID) b) (edges a))
-      isOperand a (Edge _ b _) = a == b
+      isOperand b (Edge _ c _) = b == c
       isOperandType (Selector.Register) = True
       isOperandType (Constant) = True
       isOperandType _ = False
       zipInstructions = zip opcodeNodes (map nodeOperands opcodeNodes)
-      toInstruction (b, c) = MCInstruction (toOpcode b) (map toOperand (filter (isOperandType . nodeType) c))
+      toInstruction ((Node _ (BasicBlock b) _), _) = MCSymbol b
+      toInstruction (b@(Node _ (Opcode _) _), c) = MCInstruction (toOpcode b) (map toOperand (filter (isOperandType . nodeType) c))
       toOpcode b = (opcodeCondition . nodeType) b
       toOperand (Node _ Selector.Register [(_, (Just (IntegerValue a)))]) = Scheduler.Register a
       toOperand (Node _ Constant [(_, (Just (IntegerValue a)))]) = Immediate a

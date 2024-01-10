@@ -7,7 +7,7 @@ module Selector where
 
   data NodeType =
     EntryToken |
-    BasicBlock |
+    BasicBlock String |
     Register |
     Constant |
     Opcode OpcodeCondition deriving (Show, Eq)
@@ -91,7 +91,10 @@ module Selector where
       selectIRBasicBlock :: IRBasicBlock -> SelectorStateMonad ()
       selectIRBasicBlock (IRBasicBlock a b) = do
         got <- get
-        let labeledInstructions = execState (selectIRLabeledInstructions b) got
+        let newNodes = [Node (counter got) (BasicBlock (label a)) [(Other, Nothing)]]
+        let newEdges = []
+        let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
+        let labeledInstructions = execState (selectIRLabeledInstructions b) ((setGraph newGraph . setCounter (+1)) got)
         let newNodes = [
               Node (counter labeledInstructions) Register [(Word, Just (IntegerValue 13))],
               Node (counter labeledInstructions + 1) Constant [(Word, Just (IntegerValue (offset labeledInstructions)))],
@@ -102,6 +105,9 @@ module Selector where
               Edge (counter labeledInstructions + 1) (counter labeledInstructions + 2) 0]
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs labeledInstructions)
         put ((setGraph newGraph . setCounter (+3)) labeledInstructions)
+        where
+          label (IRLabelName a) = a
+          label (IRLabelNumber a) = show a
 
       selectIRLabeledInstructions :: [(Maybe IRLabel, IRInstruction)] -> SelectorStateMonad ()
       selectIRLabeledInstructions [] = return ()

@@ -14,7 +14,7 @@ module Optimizer where
 
   replaceMachineCodes a (b:c) = replaceMachineCodes (a ++ [b]) c
 
-  optimizeStackPointers a = [MCInstruction (OpcodeCondition ARMSub Nothing) [Scheduler.Register 13, Scheduler.Register 13, Immediate offset]] ++ (filter (not . subStackPointer) a)
+  optimizeStackPointers a = [head a] ++ [MCInstruction (OpcodeCondition ARMSub Nothing) [Scheduler.Register 13, Scheduler.Register 13, Immediate offset]] ++ (filter (not . subStackPointer) (tail a))
     where
       immediateValue (MCInstruction (OpcodeCondition _ _) [_, _, Immediate a]) = a
       offset = (sum . map immediateValue . filter subStackPointer) a

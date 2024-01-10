@@ -5,7 +5,7 @@ module CodeEmitter where
   import Selector
   import Syntax
 
-  emitMachineCode (MCInstruction a@(OpcodeCondition b c) d) = emitOpcodeCondition a ++ " " ++ emitOperands
+  emitMachineCode (MCInstruction a@(OpcodeCondition b c) d) = "  " ++ emitOpcodeCondition a ++ " " ++ emitOperands
     where
       emitARM a = (drop 3 . map toLower . show) a
       emitOpcodeCondition (OpcodeCondition a Nothing) = emitARM a
@@ -15,6 +15,8 @@ module CodeEmitter where
       emitOperands
         | b == ARMLdr || b == ARMStr = ((emitOperand . head) d) ++ " [" ++ (intercalate ", " ((map emitOperand . tail) d)) ++ "]"
         | otherwise = (intercalate ", " (map emitOperand d))
+
+  emitMachineCode (MCSymbol a) = a ++ ":"
 
   emitMachineCodes = map (map emitMachineCode)
 
