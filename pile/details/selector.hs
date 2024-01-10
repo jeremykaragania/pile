@@ -76,9 +76,11 @@ module Selector where
   selectIRGlobalValue :: IRGlobalValue -> SelectorStateMonad ()
   selectIRGlobalValue (IRFunctionGlobal a b c d) = do
     got <- get
-    let entryNode = Node (counter got) (EntryToken) [(Other, Nothing)]
-    let newGraph = appendGraph [Graph [entryNode] []] (graphs got)
-    let basicBlocks = execState (selectIRBasicBlocks d) ((setGraph newGraph . setCounter (+1) . setGlobal b) got)
+    let newNodes = [
+          Node (counter got) (EntryToken) [(Other, Nothing)],
+          Node (counter got + 1) (BasicBlock b) [(Other, Nothing)]]
+    let newGraph = appendGraph [Graph newNodes []] (graphs got)
+    let basicBlocks = execState (selectIRBasicBlocks d) ((setGraph newGraph . setCounter (+2) . setGlobal b) got)
     put (SelectorState (graphs basicBlocks ++ [Graph [] []]) 0 0 0 "")
     where
       selectIRBasicBlocks :: [IRBasicBlock] -> SelectorStateMonad ()
@@ -93,9 +95,8 @@ module Selector where
       selectIRBasicBlock :: IRBasicBlock -> SelectorStateMonad ()
       selectIRBasicBlock (IRBasicBlock a b) = do
         got <- get
-        let newNodes = [Node (counter got) (BasicBlock ((global got) ++ "L" ++ label a)) [(Other, Nothing)]]
-        let newEdges = []
-        let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
+        let basicBlock = Node (counter got) (BasicBlock ((global got) ++ "L" ++ label a)) [(Other, Nothing)]
+        let newGraph = appendGraph [Graph [basicBlock] []] (graphs got)
         let labeledInstructions = execState (selectIRLabeledInstructions b) ((setGraph newGraph . setCounter (+1)) got)
         let newNodes = [
               Node (counter labeledInstructions) Register [(Word, Just (IntegerValue 13))],

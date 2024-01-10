@@ -14,8 +14,10 @@ module Optimizer where
 
   replaceMachineCodes a (b:c) = replaceMachineCodes (a ++ [b]) c
 
-  optimizeStackPointers a = [head a] ++ [MCInstruction (OpcodeCondition ARMSub Nothing) [Scheduler.Register 13, Scheduler.Register 13, Immediate offset]] ++ (filter (not . subStackPointer) (tail a))
+  optimizeStackPointers a = ((fst . ff) machineCode) ++ [MCInstruction (OpcodeCondition ARMSub Nothing) [Scheduler.Register 13, Scheduler.Register 13, Immediate offset]] ++ (filter (not . subStackPointer) ((snd . ff) machineCode))
     where
+      machineCode (MCSymbol _:MCSymbol _:as) = (take 2 a, drop 2 a)
+      machineCode _  = ([head a], tail a)
       immediateValue (MCInstruction (OpcodeCondition _ _) [_, _, Immediate a]) = a
       offset = (sum . map immediateValue . filter subStackPointer) a
 
