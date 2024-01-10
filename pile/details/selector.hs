@@ -35,17 +35,19 @@ module Selector where
   {-
     SelectorState carries state between selectors. A SelectorState carries a directed acyclic graphs (graph) which is a graph
     representation of the intermediate representation, an accumulator (counter) for the numbering of graph nodes, the most
-    recent side-effecting node (chain), and the stack pointer offset (offset).
+    recent side-effecting node (chain), the stack pointer offset (offset), and the global value name (global).
   -}
-  data SelectorState = SelectorState {graphs :: [Graph], counter :: Integer, chain :: Integer, offset :: Integer}
+  data SelectorState = SelectorState {graphs :: [Graph], counter :: Integer, chain :: Integer, offset :: Integer, global :: String}
 
-  setGraph a (SelectorState _ b c d) = SelectorState a b c d
+  setGraph a (SelectorState _ b c d e) = SelectorState a b c d e
 
-  setCounter a (SelectorState b c d e) = SelectorState b (a c) d e
+  setCounter a (SelectorState b c d e f) = SelectorState b (a c) d e f
 
-  setChain a (SelectorState b c _ d) = SelectorState b c a d
+  setChain a (SelectorState b c _ d e) = SelectorState b c a d e
 
-  setOffset a (SelectorState b c d e) = SelectorState b c d (a e)
+  setOffset a (SelectorState b c d e f) = SelectorState b c d (a e) f
+
+  setGlobal a (SelectorState b c d e _) = SelectorState b c d e a
 
   type SelectorStateMonad = State SelectorState
 
@@ -76,8 +78,8 @@ module Selector where
     got <- get
     let entryNode = Node (counter got) (EntryToken) [(Other, Nothing)]
     let newGraph = appendGraph [Graph [entryNode] []] (graphs got)
-    let basicBlocks = execState (selectIRBasicBlocks d) ((setGraph newGraph . setCounter (+1)) got)
-    put (SelectorState (graphs basicBlocks ++ [Graph [] []]) 0 0 0)
+    let basicBlocks = execState (selectIRBasicBlocks d) ((setGraph newGraph . setCounter (+1) . setGlobal b) got)
+    put (SelectorState (graphs basicBlocks ++ [Graph [] []]) 0 0 0 "")
     where
       selectIRBasicBlocks :: [IRBasicBlock] -> SelectorStateMonad ()
       selectIRBasicBlocks [] = return ()
@@ -91,7 +93,7 @@ module Selector where
       selectIRBasicBlock :: IRBasicBlock -> SelectorStateMonad ()
       selectIRBasicBlock (IRBasicBlock a b) = do
         got <- get
-        let newNodes = [Node (counter got) (BasicBlock (label a)) [(Other, Nothing)]]
+        let newNodes = [Node (counter got) (BasicBlock ((global got) ++ "L" ++ label a)) [(Other, Nothing)]]
         let newEdges = []
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
         let labeledInstructions = execState (selectIRLabeledInstructions b) ((setGraph newGraph . setCounter (+1)) got)
@@ -222,4 +224,4 @@ module Selector where
     return ((init . graphs) newGraph)
 
   select :: IRModule -> [Graph]
-  select a = evalState (selectIRModule a) (SelectorState ([Graph [] []]) 0 0 0)
+  select a = evalState (selectIRModule a) (SelectorState ([Graph [] []]) 0 0 0 "")
