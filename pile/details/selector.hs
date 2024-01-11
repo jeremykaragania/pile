@@ -121,6 +121,17 @@ module Selector where
         put (labeledInstruction)
         selectIRLabeledInstructions as
 
+      newBl :: String -> SelectorStateMonad ()
+      newBl a = do
+        got <- get
+        let newNodes = [
+              Node (counter got) (BasicBlock a) [(Other, Nothing)],
+              Node (counter got + 1) (Opcode (OpcodeCondition ARMBl Nothing)) [(Word, Nothing)]]
+        let newEdges = [
+              Edge (counter got) (counter got + 1) 0]
+        let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
+        put ((setGraph newGraph . setCounter (+2)) got)
+
       newMemory :: ARMOpcode -> Integer -> Integer -> SelectorStateMonad ()
       newMemory a b c = do
         got <- get
