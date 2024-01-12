@@ -10,6 +10,7 @@ module CodeEmitter where
       emitARM a = (drop 3 . map toLower . show) a
       emitOpcodeCondition (OpcodeCondition a Nothing) = emitARM a
       emitOpcodeCondition (OpcodeCondition a (Just b)) = emitARM a ++ emitARM b
+      emitOperand (Scheduler.Label a) = a
       emitOperand (Scheduler.Register a) = "r" ++ show a
       emitOperand (Immediate a) = "#" ++ show a
       emitOperands

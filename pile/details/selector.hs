@@ -7,6 +7,7 @@ module Selector where
 
   data NodeType =
     EntryToken |
+    Label String |
     BasicBlock String |
     Register |
     Constant |
@@ -125,7 +126,7 @@ module Selector where
       newBl a = do
         got <- get
         let newNodes = [
-              Node (counter got) (BasicBlock a) [(Other, Nothing)],
+              Node (counter got) (Label a) [(Other, Nothing)],
               Node (counter got + 1) (Opcode (OpcodeCondition ARMBl Nothing)) [(Word, Nothing)]]
         let newEdges = [
               Edge (counter got) (counter got + 1) 0]
@@ -177,6 +178,10 @@ module Selector where
       selectIRLabeledInstruction (a, IRAdd b c d) = binaryInstruction (newBinary ARMAdd) a b c d
       selectIRLabeledInstruction (a, IRSub b c d) = binaryInstruction (newBinary ARMSub) a b c d
       selectIRLabeledInstruction (a, IRMul b c d) = binaryInstruction (newBinary ARMMul) a b c d
+      selectIRLabeledInstruction (a, IRUdiv b c d) = binaryInstruction (newBl "__aeabi_uidiv") a b c d
+      selectIRLabeledInstruction (a, IRSdiv b c d) = binaryInstruction (newBl "__aeabi_idiv") a b c d
+      selectIRLabeledInstruction (a, IRUrem b c d) = binaryInstruction (newBl "__aeabi_uidivmod") a b c d
+      selectIRLabeledInstruction (a, IRSrem b c d) = binaryInstruction (newBl "__aeabi_idivmod") a b c d
       selectIRLabeledInstruction (a, IRAnd b c d) = binaryInstruction (newBinary ARMAnd) a b c d
       selectIRLabeledInstruction (a, IROr b c d) = binaryInstruction (newBinary ARMOrr) a b c d
       selectIRLabeledInstruction (a, IRXor b c d) = binaryInstruction (newBinary ARMEor) a b c d
