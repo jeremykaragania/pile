@@ -14,7 +14,7 @@ module CodeEmitter where
       emitOperand (Scheduler.Register a) = "r" ++ show a
       emitOperand (Immediate a) = "#" ++ show a
       emitOperands
-        | b == ARMLdr || b == ARMStr = ((emitOperand . head) d) ++ " [" ++ (intercalate ", " ((map emitOperand . tail) d)) ++ "]"
+        | b == ARMLdr || b == ARMStr = ((emitOperand . head) d) ++ ", [" ++ (intercalate ", " ((map emitOperand . tail) d)) ++ "]"
         | otherwise = (intercalate ", " (map emitOperand d))
 
   emitMachineCode (MCSymbol a) = a ++ ":"
