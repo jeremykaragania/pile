@@ -3,9 +3,9 @@ module Scheduler where
   import Syntax
 
   data Operand =
-    Register Integer |
+    Register RegisterType Integer |
     Immediate Integer |
-    Label String deriving (Show, Eq)
+    Label String deriving (Show, Eq, Ord)
 
   data MachineCode =
     MCInstruction OpcodeCondition [Operand] |
@@ -21,7 +21,7 @@ module Scheduler where
       isMachineCode _ = False
       nodeOperands b = map ((nodes a !!) . fromIntegral . fromNode) (filter ((isOperand . nodeID) b) (edges a))
       isOperand b (Edge _ c _) = b == c
-      isOperandType (Selector.Register) = True
+      isOperandType (Selector.Register _) = True
       isOperandType (Constant) = True
       isOperandType (Selector.Label _) = True
       isOperandType _ = False
@@ -29,7 +29,7 @@ module Scheduler where
       toMachineCode ((Node _ (BasicBlock b) _), _) = MCSymbol b
       toMachineCode (b@(Node _ (Opcode _) _), c) = MCInstruction (toOpcode b) (map toOperand (filter (isOperandType . nodeType) c))
       toOpcode b = (opcodeCondition . nodeType) b
-      toOperand (Node _ Selector.Register [(_, (Just (IntegerValue a)))]) = Scheduler.Register a
+      toOperand (Node _ (Selector.Register b) [(_, (Just (IntegerValue c)))]) = Scheduler.Register b c
       toOperand (Node _ Constant [(_, (Just (IntegerValue a)))]) = Immediate a
       toOperand (Node _ (Selector.Label b) _) = Scheduler.Label b
 

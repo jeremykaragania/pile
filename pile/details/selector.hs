@@ -5,11 +5,15 @@ module Selector where
 
   data OpcodeCondition = OpcodeCondition {opcode :: ARMOpcode, condition :: (Maybe ARMCondition)} deriving (Show, Eq)
 
+  data RegisterType =
+    Virtual |
+    Physical deriving (Show, Eq, Ord)
+
   data NodeType =
     EntryToken |
     Label String |
     BasicBlock String |
-    Register |
+    Register RegisterType |
     Constant |
     Opcode OpcodeCondition deriving (Show, Eq)
 
@@ -99,16 +103,7 @@ module Selector where
         let basicBlock = Node (counter got) (BasicBlock ((global got) ++ "L" ++ label a)) [(Other, Nothing)]
         let newGraph = appendGraph [Graph [basicBlock] []] (graphs got)
         let labeledInstructions = execState (selectIRLabeledInstructions b) ((setGraph newGraph . setCounter (+1)) got)
-        let newNodes = [
-              Node (counter labeledInstructions) Register [(Word, Just (IntegerValue 13))],
-              Node (counter labeledInstructions + 1) Constant [(Word, Just (IntegerValue (offset labeledInstructions)))],
-              Node (counter labeledInstructions + 2) (Opcode (OpcodeCondition ARMAdd Nothing)) [(Word, Nothing)]]
-        let newEdges = [
-              Edge (counter labeledInstructions) (counter labeledInstructions + 2) 0,
-              Edge (counter labeledInstructions) (counter labeledInstructions + 2) 0,
-              Edge (counter labeledInstructions + 1) (counter labeledInstructions + 2) 0]
-        let newGraph = appendGraph [Graph newNodes newEdges] (graphs labeledInstructions)
-        put ((setGraph newGraph . setCounter (+3)) labeledInstructions)
+        put labeledInstructions
         where
           label (IRLabelName a) = a
           label (IRLabelNumber a) = show a
@@ -121,6 +116,19 @@ module Selector where
         let labeledInstruction = execState (selectIRLabeledInstruction a) got
         put (labeledInstruction)
         selectIRLabeledInstructions as
+
+      newMov :: Integer -> NodeType -> [(MachineValueType, Maybe NodeValue)] -> SelectorStateMonad ()
+      newMov a b c = do
+        got <- get
+        let newNodes = [
+              Node (counter got) (Register Virtual) [(Word, Just (IntegerValue a))],
+              Node (counter got + 1) b c,
+              Node (counter got + 2) (Opcode (OpcodeCondition ARMMov Nothing)) [(Word, Nothing)]]
+        let newEdges = [
+              Edge (counter got) (counter got + 2) 0,
+              Edge (counter got + 1) (counter got + 2) 0]
+        let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
+        put ((setGraph newGraph . setCounter (+3)) got)
 
       newBl :: String -> SelectorStateMonad ()
       newBl a = do
@@ -137,8 +145,8 @@ module Selector where
       newMemory a b c = do
         got <- get
         let newNodes = [
-              Node (counter got) Register [(Word, Just (IntegerValue b))],
-              Node (counter got + 1) Register [(Word, Just (IntegerValue 13))],
+              Node (counter got) (Register Virtual) [(Word, Just (IntegerValue b))],
+              Node (counter got + 1) (Register Physical) [(Word, Just (IntegerValue 13))],
               Node (counter got + 2) Constant [(Word, Just (IntegerValue c))],
               Node (counter got + 3) (Opcode (OpcodeCondition a Nothing)) [(Word, Nothing)]]
         let newEdges = [
@@ -149,90 +157,63 @@ module Selector where
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
         put ((setGraph newGraph . setCounter (+4) . setChain (counter got + 3)) got)
 
-      newBinary :: ARMOpcode -> SelectorStateMonad ()
-      newBinary a = do
+      newBinary :: ARMOpcode -> Maybe IRLabel -> IRValue -> IRValue -> SelectorStateMonad ()
+      newBinary a (Just (IRLabelNumber b)) (IRLabelValue (IRLabelNumber c)) (IRLabelValue (IRLabelNumber d)) = do
         got <- get
         let newNodes = [
-              Node (counter got) Register [(Word, Just (IntegerValue 0))],
-              Node (counter got + 1) Register [(Word, Just (IntegerValue 1))],
-              Node (counter got + 2) (Opcode (OpcodeCondition a Nothing)) [(Word, Nothing)]]
+              Node (counter got) (Register Virtual) [(Word, Just (IntegerValue b))],
+              Node (counter got + 1) (Register Virtual) [(Word, Just (IntegerValue c))],
+              Node (counter got + 1) (Register Virtual) [(Word, Just (IntegerValue d))],
+              Node (counter got + 3) (Opcode (OpcodeCondition a Nothing)) [(Word, Nothing)]]
         let newEdges = [
-              Edge (counter got) (counter got + 2) 0,
-              Edge (counter got) (counter got + 2) 0,
-              Edge (counter got + 1) (counter got + 2) 0]
+              Edge (counter got) (counter got + 3) 0,
+              Edge (counter got + 1) (counter got + 3) 0,
+              Edge (counter got + 2) (counter got + 3) 0]
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
-        put ((setGraph newGraph . setCounter (+3)) got)
+        put ((setGraph newGraph . setCounter (+4)) got)
 
-      binaryInstruction :: SelectorStateMonad () -> Maybe IRLabel -> IRType -> IRValue -> IRValue -> SelectorStateMonad ()
-      binaryInstruction a (Just (IRLabelNumber b)) c (IRLabelValue (IRLabelNumber d)) (IRLabelValue (IRLabelNumber e)) = do
+      newBinaryFunction :: String -> Maybe IRLabel -> SelectorStateMonad ()
+      newBinaryFunction a (Just (IRLabelNumber b)) = do
         got <- get
-        let machineValueType = toMachineValueType c
-        let bytes = toBytes machineValueType
-        let firstLdr = execState (newMemory ARMLdr 0 (toOffset d bytes)) got
-        let secondLdr = execState (newMemory ARMLdr 1 (toOffset e bytes)) firstLdr
-        let binary = execState a secondLdr
-        let str = execState (newMemory ARMStr 0 (toOffset b bytes)) binary
-        put str
+        let bl = execState (newBl a) got
+        let mov = execState (newMov b (Register Physical) [(Word, Just (IntegerValue 0))]) bl
+        put mov
 
       selectIRLabeledInstruction :: (Maybe IRLabel, IRInstruction) -> SelectorStateMonad ()
-      selectIRLabeledInstruction (a, IRAdd b c d) = binaryInstruction (newBinary ARMAdd) a b c d
-      selectIRLabeledInstruction (a, IRSub b c d) = binaryInstruction (newBinary ARMSub) a b c d
-      selectIRLabeledInstruction (a, IRMul b c d) = binaryInstruction (newBinary ARMMul) a b c d
-      selectIRLabeledInstruction (a, IRUdiv b c d) = binaryInstruction (newBl "__aeabi_uidiv") a b c d
-      selectIRLabeledInstruction (a, IRSdiv b c d) = binaryInstruction (newBl "__aeabi_idiv") a b c d
-      selectIRLabeledInstruction (a, IRUrem b c d) = binaryInstruction (newBl "__aeabi_uidivmod") a b c d
-      selectIRLabeledInstruction (a, IRSrem b c d) = binaryInstruction (newBl "__aeabi_idivmod") a b c d
-      selectIRLabeledInstruction (a, IRAnd b c d) = binaryInstruction (newBinary ARMAnd) a b c d
-      selectIRLabeledInstruction (a, IROr b c d) = binaryInstruction (newBinary ARMOrr) a b c d
-      selectIRLabeledInstruction (a, IRXor b c d) = binaryInstruction (newBinary ARMEor) a b c d
+      selectIRLabeledInstruction (a, IRAdd b c d) = newBinary ARMAdd a c d
+      selectIRLabeledInstruction (a, IRSub b c d) = newBinary ARMSub a c d
+      selectIRLabeledInstruction (a, IRMul b c d) = newBinary ARMMul a c d
+      selectIRLabeledInstruction (a, IRUdiv b c d) = newBinaryFunction "__aeabi_uidiv" a
+      selectIRLabeledInstruction (a, IRSdiv b c d) = newBinaryFunction "__aeabi_idiv" a
+      selectIRLabeledInstruction (a, IRUrem b c d) = newBinaryFunction "__aeabi_uidivmod" a
+      selectIRLabeledInstruction (a, IRSrem b c d) = newBinaryFunction "__aeabi_idivmod" a
+      selectIRLabeledInstruction (a, IRAnd b c d) = newBinary ARMAnd a c d
+      selectIRLabeledInstruction (a, IROr b c d) = newBinary ARMOrr a c d
+      selectIRLabeledInstruction (a, IRXor b c d) = newBinary ARMEor a c d
 
-      selectIRLabeledInstruction (Just (IRLabelNumber a), IRAlloca b) = do
-        got <- get
-        let machineValueType = toMachineValueType b
-        let bytes = toBytes machineValueType
-        let newNodes = [
-              Node (counter got) Register [(Word, Just (IntegerValue 13))],
-              Node (counter got + 1) Constant [(machineValueType, Just (IntegerValue bytes))],
-              Node (counter got + 2) (Opcode (OpcodeCondition ARMSub Nothing)) [(Word, Nothing)]]
-        let newEdges = [
-              Edge (counter got) (counter got + 2) 0,
-              Edge (counter got) (counter got + 2) 0,
-              Edge (counter got + 1) (counter got + 2) 0]
-        let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
-        put ((setGraph newGraph . setCounter (+3) . setOffset (+bytes)) got)
+      selectIRLabeledInstruction (Just (IRLabelNumber a), IRAlloca b) = return ()
 
       selectIRLabeledInstruction (a@(Just (IRLabelNumber b)), IRLoad c (IRLabelValue (IRLabelNumber d))) = do
         got <- get
         let machineValueType = toMachineValueType c
         let bytes = toBytes machineValueType
-        let alloca = execState (selectIRLabeledInstruction (a, IRAlloca c)) got
-        let ldr = execState (newMemory ARMLdr 0 (toOffset d bytes)) alloca
-        let str = execState (newMemory ARMStr 0 (toOffset b bytes)) ldr
-        put str
+        let mov = execState (newMov b (Register Virtual) [(Word, Just (IntegerValue d))]) got
+        put mov
 
       selectIRLabeledInstruction (Nothing, IRStore b c@(IRConstantValue _) (IRLabelNumber d)) = do
         got <- get
         let nodeValue = toNodeValue c
         let machineValueType = toMachineValueType b
         let bytes = toBytes machineValueType
-        let newNodes = [
-              Node (counter got) Register [(Word, Just (IntegerValue 0))],
-              Node (counter got + 1) Constant [(Word, Just nodeValue)],
-              Node (counter got + 2) (Opcode (OpcodeCondition ARMMov Nothing)) [(Word, Nothing)]]
-        let newEdges = [
-              Edge (counter got) (counter got + 2) 0,
-              Edge (counter got + 1) (counter got + 2) 0]
-        let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
-        let str = execState (newMemory ARMStr 0 (toOffset d bytes)) ((setGraph newGraph . setCounter (+3)) got)
-        put str
+        let mov = execState (newMov d Constant [(Word, Just nodeValue)]) got
+        put mov
 
       selectIRLabeledInstruction (Nothing, IRStore b (IRLabelValue (IRLabelNumber c)) (IRLabelNumber d)) = do
         got <- get
         let machineValueType = toMachineValueType b
         let bytes = toBytes machineValueType
-        let ldr = execState (newMemory ARMLdr 0 (toOffset c bytes)) got
-        let str = execState (newMemory ARMStr 0 (toOffset d bytes)) ldr
-        put str
+        let mov = execState (newMov d (Register Virtual) [(Word, Just (IntegerValue c))]) got
+        put mov
 
   selectIRModule :: IRModule -> SelectorStateMonad [Graph]
   selectIRModule (IRModule a) = do

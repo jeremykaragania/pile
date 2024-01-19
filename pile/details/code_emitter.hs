@@ -11,7 +11,7 @@ module CodeEmitter where
       emitOpcodeCondition (OpcodeCondition a Nothing) = emitARM a
       emitOpcodeCondition (OpcodeCondition a (Just b)) = emitARM a ++ emitARM b
       emitOperand (Scheduler.Label a) = a
-      emitOperand (Scheduler.Register a) = "r" ++ show a
+      emitOperand (Scheduler.Register _ a) = "r" ++ show a
       emitOperand (Immediate a) = "#" ++ show a
       emitOperands
         | b == ARMLdr || b == ARMStr = ((emitOperand . head) d) ++ ", [" ++ (intercalate ", " ((map emitOperand . tail) d)) ++ "]"
