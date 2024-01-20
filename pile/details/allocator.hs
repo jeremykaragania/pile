@@ -9,6 +9,12 @@ module Allocator where
 
   data LiveInterval = LiveInterval {liveFrom :: Integer, liveTo :: Integer} deriving (Show, Eq, Ord)
 
+  compareLiveTo (_, LiveInterval b (-1)) (_, LiveInterval c _) = compare b c
+  compareLiveTo (_, LiveInterval b _) (_, LiveInterval c (-1)) = compare c b
+  compareLiveTo (_, LiveInterval _ b) (_, LiveInterval _ c) = compare b c
+
+  compareLiveFrom (_, LiveInterval b _) (_, LiveInterval c _) = compare b c
+
   setLiveFrom a (LiveInterval _ b) = LiveInterval a b
 
   setLiveTo a (LiveInterval b _) = LiveInterval b a
@@ -104,7 +110,7 @@ module Allocator where
   allocateLiveInterval :: (Operand, LiveInterval) -> AllocatorStateMonad ()
   allocateLiveInterval a@(b@(Scheduler.Register Virtual _), c) = do
     got <- get
-    let expired = execState (expireIntervals a ((Map.toList . active) got)) got
+    let expired = execState (expireIntervals a ((sortBy compareLiveTo . Map.toList . active) got)) got
     if ((length . available) expired) == 0 then do
       return ()
     else do
@@ -125,7 +131,7 @@ module Allocator where
   expireInterval :: (Operand, LiveInterval) -> (Operand, LiveInterval) -> AllocatorStateMonad ()
   expireInterval (a, b) (c, d) = do
     got <- get
-    if (liveTo d) >= (liveFrom b) || (liveTo d) == (-1) then return ()
+    if (liveTo d) >= (liveFrom b) || ((liveTo d) == (-1) && (liveFrom d) >= (liveFrom b)) then return ()
     else do
       let newAvailable = [registerNumber ((registers got) Map.! c)] ++ (available got)
       let newActive = Map.delete c (active got)
@@ -133,12 +139,9 @@ module Allocator where
 
   allocate a = operands
     where
-      toPhysical = registers (execState (allocateLiveIntervals ((sortBy sortInterval . analyze) a)) (AllocatorState [0..12] Map.empty Map.empty))
+      toPhysical = registers (execState (allocateLiveIntervals ((sortBy compareLiveFrom . analyze) a)) (AllocatorState [0..12] Map.empty Map.empty))
       operands = map instruction a
       operand b@(Scheduler.Register _ _) = toPhysical Map.! b
       operand b = b
       instruction (MCInstruction b c) = MCInstruction b (map operand c)
       instruction b = b
-      sortInterval (_, LiveInterval _ (-1)) (_, LiveInterval _ _) = GT
-      sortInterval (_, LiveInterval _ _) (_, LiveInterval _ (-1)) = LT
-      sortInterval (_, LiveInterval _ a) (_, LiveInterval _ b) = compare a b
