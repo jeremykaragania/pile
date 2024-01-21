@@ -163,7 +163,7 @@ module Selector where
         let newNodes = [
               Node (counter got) (Register Virtual) [(Word, Just (IntegerValue b))],
               Node (counter got + 1) (Register Virtual) [(Word, Just (IntegerValue c))],
-              Node (counter got + 1) (Register Virtual) [(Word, Just (IntegerValue d))],
+              Node (counter got + 2) (Register Virtual) [(Word, Just (IntegerValue d))],
               Node (counter got + 3) (Opcode (OpcodeCondition a Nothing)) [(Word, Nothing)]]
         let newEdges = [
               Edge (counter got) (counter got + 3) 0,

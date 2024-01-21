@@ -12,6 +12,14 @@ module Optimizer where
     | (c == g && d == h && e == i) = replaceMachineCodes (a ++ [b]) j
     | otherwise = replaceMachineCodes (a ++ [b]) (f:j)
 
+  replaceMachineCodes a (b@(MCInstruction (OpcodeCondition ARMMov _) [c, d]):j)
+    | c == d = replaceMachineCodes a j
+    | otherwise = replaceMachineCodes (a ++ [b]) j
+
+  replaceMachineCodes a (b@(MCInstruction (OpcodeCondition c d) [e, f, g]):h)
+    | (c == ARMAdd || c == ARMSub) && g == Immediate 0 = replaceMachineCodes (a ++ replaceMachineCodes [] [MCInstruction (OpcodeCondition ARMMov d) [e, f]]) h
+    | otherwise = replaceMachineCodes (a ++ [b]) h
+
   replaceMachineCodes a (b:bs) = replaceMachineCodes (a ++ [b]) bs
 
   optimizeStackPointers a = ((fst . machineCode) a) ++ [MCInstruction (OpcodeCondition ARMSub Nothing) [Scheduler.Register Physical 13, Scheduler.Register Physical 13, Immediate offset]] ++ (filter (not . subStackPointer) ((snd . machineCode) a))
@@ -21,4 +29,4 @@ module Optimizer where
       immediateValue (MCInstruction (OpcodeCondition _ _) [_, _, Immediate a]) = a
       offset = (sum . map immediateValue . filter subStackPointer) a
 
-  optimize = map (optimizeStackPointers . replaceMachineCodes [])
+  optimize = map (replaceMachineCodes [] . optimizeStackPointers)
