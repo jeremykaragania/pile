@@ -1,4 +1,4 @@
-module IRGenerator where
+module Generator where
   import Control.Monad.State
   import Data.Char (toLower, ord)
   import Data.List (intercalate)
@@ -535,4 +535,4 @@ module IRGenerator where
       cExternalDefinition (CFunction c d e f) = generateIRFunctionGlobal (CFunction c d e f)
       cExternalDefinition (CExternalDeclaration c) = generateIRVariableGlobal (CExternalDeclaration c)
 
-  generateIR = generateIRModule
+  generate = generateIRModule

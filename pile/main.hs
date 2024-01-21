@@ -1,6 +1,7 @@
 module Main where
+  import Allocator
   import CodeEmitter
-  import IRGenerator
+  import Generator
   import Lexer
   import Optimizer
   import Parser
@@ -19,18 +20,20 @@ module Main where
     let inFile = parseInFile args
     if isInFile inFile then do
       file <- readFile inFile
-      let tokens = scan file
-      case tokens of
-        Left x -> print x
-        Right x -> do
-          let tree = parse x
-          case tree of
-            Left x -> print x
-            Right x -> do
-              let ir = generateIR x
-              let graph = select ir
-              let machineCodes = (optimizeMachineCodes . schedule) graph
-              let assembly = emit machineCodes
-              writeFile (parseOutFile inFile) assembly
+      let scanned = scan file
+      case scanned of
+        Left a -> print a
+        Right a -> do
+          let parsed = parse a
+          case parsed of
+            Left a -> print a
+            Right a -> do
+              let generated = generate a
+              let selected = select generated
+              let scheduled = schedule selected
+              let allocated = allocate scheduled
+              let optimized = optimize allocated
+              let emitted = emit optimized
+              writeFile (parseOutFile inFile) emitted
               return ()
     else error ""

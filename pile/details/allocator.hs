@@ -137,7 +137,7 @@ module Allocator where
       let newActive = Map.delete c (active got)
       put ((setAvailable newAvailable . setActive newActive) got)
 
-  allocate a = operands
+  allocateMachineCodes a = operands
     where
       toPhysical = registers (execState (allocateLiveIntervals ((sortBy compareLiveFrom . analyze) a)) (AllocatorState [0..12] Map.empty Map.empty))
       operands = map instruction a
@@ -145,3 +145,5 @@ module Allocator where
       operand b = b
       instruction (MCInstruction b c) = MCInstruction b (map operand c)
       instruction b = b
+
+  allocate = map allocateMachineCodes

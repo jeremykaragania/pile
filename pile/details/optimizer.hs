@@ -21,4 +21,4 @@ module Optimizer where
       immediateValue (MCInstruction (OpcodeCondition _ _) [_, _, Immediate a]) = a
       offset = (sum . map immediateValue . filter subStackPointer) a
 
-  optimizeMachineCodes = map (optimizeStackPointers . replaceMachineCodes [])
+  optimize = map (optimizeStackPointers . replaceMachineCodes [])
