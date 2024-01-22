@@ -1,10 +1,10 @@
-module Allocator where
+  module Allocator where
   import Control.Monad.State
   import Data.List
   import Data.Map (Map)
   import qualified Data.Map as Map
   import Scheduler
-  import Selector
+  import Selector hiding (counter, offset, Register, setOffset)
   import Syntax
 
   data LiveInterval = LiveInterval {liveFrom :: Integer, liveTo :: Integer} deriving (Show, Eq, Ord)
@@ -19,21 +19,23 @@ module Allocator where
 
   setLiveTo a (LiveInterval b _) = LiveInterval b a
 
-  data AnalyzerState = AnalyzerState {anc :: Integer, table :: Map Operand LiveInterval}
+  data AnalyzerState = AnalyzerState {counter :: Integer, table :: Map Operand LiveInterval}
 
   type AnalyzerStateMonad = State AnalyzerState
 
-  data AllocatorState = AllocatorState {available :: [Integer], active :: Map Operand LiveInterval, registers :: Map Operand Operand}
-
-  setAvailable a (AllocatorState _ b c) = AllocatorState a b c
-
-  setActive a (AllocatorState b _ c) = AllocatorState b a c
-
-  setRegisters a (AllocatorState b c _) = AllocatorState b c a
+  data AllocatorState = AllocatorState {available :: [Integer], active :: Map Operand LiveInterval, registers :: Map Operand Operand, offset :: Integer}
 
   type AllocatorStateMonad = State AllocatorState
 
-  registerNumber (Scheduler.Register _ a) = a
+  setAvailable a (AllocatorState _ b c d) = AllocatorState a b c d
+
+  setActive a (AllocatorState b _ c d) = AllocatorState b a c d
+
+  setRegisters a (AllocatorState b c _ d) = AllocatorState b c a d
+
+  setOffset a (AllocatorState b c d e) = AllocatorState b c d (a e)
+
+  registerNumber (Register _ a) = a
 
   readWrote (MCInstruction (OpcodeCondition ARMMov _) [a, b]) = ([b], [a])
   readWrote (MCInstruction (OpcodeCondition ARMAdd _) [a, b, c]) = ([b, c], [a])
@@ -43,11 +45,11 @@ module Allocator where
   readWrote (MCInstruction (OpcodeCondition ARMAnd _) [a, b, c]) = ([b, c], [a])
   readWrote (MCInstruction (OpcodeCondition ARMOrr _) [a, b, c]) = ([b, c], [a])
   readWrote (MCInstruction (OpcodeCondition ARMEor _) [a, b, c]) = ([b, c], [a])
-  readWrote (MCInstruction (OpcodeCondition ARMBl _) [a]) = ([a], [Scheduler.Register Physical 0])
+  readWrote (MCInstruction (OpcodeCondition ARMBl _) [a]) = ([a], [Register Physical 0])
 
   analyzeMachineCode a = ((filter isRegister ((fst . readWrote) a)), (filter isRegister ((snd . readWrote) a)))
     where
-      isRegister (Scheduler.Register _ _) = True
+      isRegister (Register _ _) = True
       isRegister _ = False
 
   analyzeMachineCodes a = map analyzeMachineCode (filter isInstruction a)
@@ -69,7 +71,7 @@ module Allocator where
     got <- get
     let analyzedRead = execState (analyzeOperands setLiveTo a) got
     let analyzedWrote = execState (analyzeOperands setLiveFrom b) analyzedRead
-    put (AnalyzerState (anc analyzedWrote + 1) (table analyzedWrote))
+    put (AnalyzerState (counter analyzedWrote + 1) (table analyzedWrote))
 
   analyzeOperands :: (Integer -> LiveInterval -> LiveInterval) -> [Operand] -> AnalyzerStateMonad ()
   analyzeOperands a [] = return ()
@@ -84,13 +86,13 @@ module Allocator where
   analyzeOperand b a = do
     got <- get
     if Map.notMember a (table got) then do
-      let newTable = Map.insert a (b (anc got) (LiveInterval (-1) (-1))) (table got)
-      put (AnalyzerState (anc got) newTable)
+      let newTable = Map.insert a (b (counter got) (LiveInterval (-1) (-1))) (table got)
+      put (AnalyzerState (counter got) newTable)
     else do
       let oldValue = (table got) Map.! a
-      let newValue = (b (anc got) oldValue)
+      let newValue = (b (counter got) oldValue)
       let newTable = Map.insert a (whichValue oldValue newValue) (table got)
-      put (AnalyzerState (anc got) newTable)
+      put (AnalyzerState (counter got) newTable)
     where
       whichValue a b
         | liveFrom a < liveFrom b = a
@@ -108,15 +110,14 @@ module Allocator where
     allocateLiveIntervals as
 
   allocateLiveInterval :: (Operand, LiveInterval) -> AllocatorStateMonad ()
-  allocateLiveInterval a@(b@(Scheduler.Register Virtual _), c) = do
+  allocateLiveInterval a@(b@(Register Virtual _), c) = do
     got <- get
     let expired = execState (expireIntervals a ((sortBy compareLiveTo . Map.toList . active) got)) got
-    if ((length . available) expired) == 0 then do
-      return ()
+    if ((length . available) expired) == 0 then spillInterval a
     else do
       let newAvailable = (tail . available) expired
       let newActive = Map.insert b c (active expired)
-      let newRegisters = Map.insert b (Scheduler.Register Physical ((head . available) expired)) (registers expired)
+      let newRegisters = Map.insert b (Register Physical ((head . available) expired)) (registers expired)
       put ((setAvailable newAvailable . setActive newActive . setRegisters newRegisters) expired)
 
   expireIntervals :: (Operand, LiveInterval) -> [(Operand, LiveInterval)] -> AllocatorStateMonad ()
@@ -137,13 +138,52 @@ module Allocator where
       let newActive = Map.delete c (active got)
       put ((setAvailable newAvailable . setActive newActive) got)
 
-  allocateMachineCodes a = operands
+  spillInterval :: (Operand, LiveInterval) -> AllocatorStateMonad ()
+  spillInterval (a, b) = do
+    got <- get
+    let spill = (last . Map.toList . active) got
+    if (liveTo . snd) spill > liveTo b then do
+      let newActive = Map.insert a b (Map.delete (fst spill) (active got))
+      let firstNewRegisters = Map.insert a ((registers got) Map.! (fst spill)) (registers got)
+      let secondNewRegisters = Map.insert (fst spill) (Address (offset got)) firstNewRegisters
+      put ((setActive newActive . setRegisters secondNewRegisters . setOffset (+4)) got)
+    else do
+      let newRegisters = Map.insert a (Address (offset got)) (registers got)
+      put ((setRegisters newRegisters . setOffset (+4)) got)
+
+  allocateMachineCodes a = machineCodes
     where
-      toPhysical = registers (execState (allocateLiveIntervals ((sortBy compareLiveFrom . analyze) a)) (AllocatorState [0..12] Map.empty Map.empty))
+      toPhysical = registers (execState (allocateLiveIntervals ((sortBy compareLiveFrom . analyze) a)) (AllocatorState [4..12] Map.empty Map.empty 0))
       operands = map instruction a
-      operand b@(Scheduler.Register _ _) = toPhysical Map.! b
+      operand b@(Register _ _) = toPhysical Map.! b
       operand b = b
       instruction (MCInstruction b c) = MCInstruction b (map operand c)
       instruction b = b
+      addSub b = [MCInstruction (OpcodeCondition b Nothing) [Register Physical 13, Register Physical 13, Immediate offset]]
+      machineCodes = ((fst . machineCode) operands) ++ addSub ARMSub ++ ((snd . machineCode) operands) ++ addSub ARMAdd
+      offset = ((*4) . fromIntegral . length . filter address . Map.toList) toPhysical
+      address (_, Address _) = True
+      address _ = False
 
-  allocate = map allocateMachineCodes
+  resolveMachineCodes a [] = a
+  resolveMachineCodes a (b@(MCInstruction c (d:e)):f) = resolveMachineCodes (a ++ (firstMachineCodes (fst operands) b) ++ [MCInstruction c (snd operands)] ++ lastMachineCodes b) f
+    where
+      operands = (resolveOperands ([], []) 0 (d:e))
+
+  resolveMachineCodes a (b:c) = resolveMachineCodes (a ++ [b]) c
+
+  resolveOperands a b [] = a
+  resolveOperands a b (Address c:d) = resolveOperands (fst a ++ [MCInstruction (OpcodeCondition ARMLdr Nothing) [Register Physical b, Register Physical 13, Immediate c]], (snd a ++ [Register Physical b])) (b + 1) d
+  resolveOperands a b (c:d) = resolveOperands (fst a, (snd a ++ [c])) b d
+
+  firstMachineCodes a (MCInstruction _ (_:b))
+    | any address b = a
+    | otherwise = []
+    where
+      address (Address _) = True
+      address _ = False
+
+  lastMachineCodes (MCInstruction _ (Address a:_)) = [MCInstruction (OpcodeCondition ARMStr Nothing) [Register Physical 0, Register Physical 13, Immediate a]]
+  lastMachineCodes _ = []
+
+  allocate = map (resolveMachineCodes [] . allocateMachineCodes)

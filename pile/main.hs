@@ -1,6 +1,6 @@
 module Main where
   import Allocator
-  import CodeEmitter
+  import Emitter
   import Generator
   import Lexer
   import Optimizer

@@ -5,6 +5,7 @@ module Scheduler where
   data Operand =
     Register RegisterType Integer |
     Immediate Integer |
+    Address Integer |
     Label String deriving (Show, Eq, Ord)
 
   data MachineCode =
@@ -12,6 +13,9 @@ module Scheduler where
     MCSymbol String deriving (Show, Eq)
 
   opcodeCondition (Opcode a) = a
+
+  machineCode a@(MCSymbol _:MCSymbol _:_) = (take 2 a, drop 2 a)
+  machineCode a = ([head a], tail a)
 
   scheduleGraph a = map toMachineCode zipInstructions
     where

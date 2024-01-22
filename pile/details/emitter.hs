@@ -1,8 +1,8 @@
-module CodeEmitter where
+module Emitter where
   import Data.Char (toLower)
   import Data.List (intercalate)
   import Scheduler
-  import Selector
+  import Selector hiding (Label, Register)
   import Syntax
 
   emitMachineCode (MCInstruction a@(OpcodeCondition b c) d) = "  " ++ emitOpcodeCondition a ++ " " ++ emitOperands
@@ -10,8 +10,8 @@ module CodeEmitter where
       emitARM a = (drop 3 . map toLower . show) a
       emitOpcodeCondition (OpcodeCondition a Nothing) = emitARM a
       emitOpcodeCondition (OpcodeCondition a (Just b)) = emitARM a ++ emitARM b
-      emitOperand (Scheduler.Label a) = a
-      emitOperand (Scheduler.Register _ a) = "r" ++ show a
+      emitOperand (Label a) = a
+      emitOperand (Register _ a) = "r" ++ show a
       emitOperand (Immediate a) = "#" ++ show a
       emitOperands
         | b == ARMLdr || b == ARMStr = ((emitOperand . head) d) ++ ", [" ++ (intercalate ", " ((map emitOperand . tail) d)) ++ "]"
