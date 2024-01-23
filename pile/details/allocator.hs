@@ -120,6 +120,11 @@
       let newRegisters = Map.insert b (Register Physical ((head . available) expired)) (registers expired)
       put ((setAvailable newAvailable . setActive newActive . setRegisters newRegisters) expired)
 
+  allocateLiveInterval a@(b@(Register Physical _), c) = do
+    got <- get
+    let newRegisters = Map.insert b b (registers got)
+    put ((setRegisters newRegisters) got)
+
   expireIntervals :: (Operand, LiveInterval) -> [(Operand, LiveInterval)] -> AllocatorStateMonad ()
   expireIntervals _ [] = return ()
 
@@ -153,7 +158,7 @@
 
   allocateMachineCodes a = machineCodes
     where
-      toPhysical = registers (execState (allocateLiveIntervals ((sortBy compareLiveFrom . analyze) a)) (AllocatorState [4..12] Map.empty Map.empty 0))
+      toPhysical = registers (execState (allocateLiveIntervals ((sortBy compareLiveFrom . analyze) a)) (AllocatorState [8..11] Map.empty Map.empty 0))
       operands = map instruction a
       operand b@(Register _ _) = toPhysical Map.! b
       operand b = b
@@ -168,7 +173,7 @@
   resolveMachineCodes a [] = a
   resolveMachineCodes a (b@(MCInstruction c (d:e)):f) = resolveMachineCodes (a ++ (firstMachineCodes (fst operands) b) ++ [MCInstruction c (snd operands)] ++ lastMachineCodes b) f
     where
-      operands = (resolveOperands ([], []) 0 (d:e))
+      operands = (resolveOperands ([], []) 4 (d:e))
 
   resolveMachineCodes a (b:c) = resolveMachineCodes (a ++ [b]) c
 
