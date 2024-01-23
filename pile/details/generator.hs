@@ -51,6 +51,7 @@ module Generator where
   getType (IRAnd a _ _) = a
   getType (IROr a _ _) = a
   getType (IRXor a _ _) = a
+  getType (IRAlloca a) = a
   getType (IRLoad a _) = a
   getType (IRStore a _ _) = a
   getType (IRIcmp _ _ _ _) = IRInteger IRSigned
@@ -167,8 +168,8 @@ module Generator where
       declaration :: CDeclaration -> GeneratorStateMonad ()
       declaration (CDeclaration d (Just (CInitDeclaratorList e))) = do
         got <- get
-        let alloca = execState (declarators d e) got
-        put alloca
+        let dec = execState (initDeclarators d e) got
+        put dec
 
       declaration (CInitDeclarator _ b) = do
         got <- get
@@ -176,24 +177,32 @@ module Generator where
         let newBlocks = appendBlocks (blocks got) (blocks expr)
         put ((setBlocks newBlocks) expr)
 
-      declarators :: CDeclaration -> [CDeclaration] -> GeneratorStateMonad ()
-      declarators a [] = return ()
+      declaration (CDeclarator _ b) = return ()
 
-      declarators a (b:bs) = do
+      newAlloca :: IRType -> GeneratorStateMonad ()
+      newAlloca a = do
+        got <- get
+        let alloca = [[(Just (IRLabelNumber (counter got)), IRAlloca a)]]
+        let newBlocks = appendBlocks alloca (blocks got)
+        put ((setBlocks newBlocks . setCounter (+1)) got)
+
+      initDeclarators :: CDeclaration -> [CDeclaration] -> GeneratorStateMonad ()
+      initDeclarators a [] = return ()
+
+      initDeclarators a (b:bs) = do
         got <- get
         if Map.notMember (getIdentifier b) (table got) then do
             let firstType = (typeFromCSpecifiers a (getPointer b))
-            let alloca = [[(Just (IRLabelNumber (counter got)), IRAlloca firstType)]]
-            let allocaBlocks = appendBlocks (blocks got) alloca
+            let alloca = execState (newAlloca firstType) got
             let newTable = Map.insert (getIdentifier b) (IRLabelNumber (counter got), (typeFromCSpecifiers a (getPointer b))) (table got)
-            let dec = execState (declaration b) ((setBlocks allocaBlocks . setCounter (+1) . setTable newTable) got)
+            let dec = execState (declaration b) alloca
             let secondType = (getType . snd . last . concat . blocks) dec
             let castExpr = execState (castExpression (firstType, (IRLabelValue (IRLabelNumber (counter got)))) (secondType, (IRLabelValue (IRLabelNumber (counter dec - 1)))) False) (setBlocks [[]] dec)
             let store = [[(Nothing, IRStore (typeFromCSpecifiers a (getPointer b)) (IRLabelValue (IRLabelNumber (counter castExpr - 1))) (IRLabelNumber (counter got)))]]
             let storeBlocks = appendBlocks (blocks dec) (appendBlocks (blocks castExpr) store)
-            put ((setBlocks storeBlocks) castExpr)
+            put ((setBlocks storeBlocks . setTable newTable) castExpr)
         else error ""
-        declarators a bs
+        initDeclarators a bs
 
       statementList (Just (CList a)) = a
       statementList Nothing = []
