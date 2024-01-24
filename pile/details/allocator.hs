@@ -40,11 +40,13 @@
   readWrote (MCInstruction (OpcodeCondition ARMMov _) [a, b]) = ([b], [a])
   readWrote (MCInstruction (OpcodeCondition ARMAdd _) [a, b, c]) = ([b, c], [a])
   readWrote (MCInstruction (OpcodeCondition ARMSub _) [a, b, c]) = ([b, c], [a])
+  readWrote (MCInstruction (OpcodeCondition ARMCmp _) [a, b]) = ([], [a, b])
   readWrote (MCInstruction (OpcodeCondition ARMMul _) [a, b, c]) = ([b, c], [a])
   readWrote (MCInstruction (OpcodeCondition ARMBl _) [a, b, c]) = ([b, c], [a])
   readWrote (MCInstruction (OpcodeCondition ARMAnd _) [a, b, c]) = ([b, c], [a])
   readWrote (MCInstruction (OpcodeCondition ARMOrr _) [a, b, c]) = ([b, c], [a])
   readWrote (MCInstruction (OpcodeCondition ARMEor _) [a, b, c]) = ([b, c], [a])
+  readWrote (MCInstruction (OpcodeCondition ARMB _) [a]) = ([a], [Register Physical 0])
   readWrote (MCInstruction (OpcodeCondition ARMBl _) [a]) = ([a], [Register Physical 0])
 
   analyzeMachineCode a = ((filter isRegister ((fst . readWrote) a)), (filter isRegister ((snd . readWrote) a)))
