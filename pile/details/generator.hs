@@ -12,15 +12,17 @@ module Generator where
     (counter) for unnamed temporaries, a lookup table (table) which associates an identifier key with a label and type, and a
     context for break and continue statements (context) which carries the integer label number for the branch.
   -}
-  data GeneratorState = GeneratorState {blocks :: [[(Maybe IRLabel, IRInstruction)]], counter :: Integer, table :: Map String (IRLabel, IRType), context :: (Maybe Integer)}
+  data GeneratorState = GeneratorState {blocks :: [[(Maybe IRLabel, IRInstruction)]], counter :: Integer, table :: Map String (IRLabel, IRType), context :: (Maybe Integer), globals :: [IRGlobalValue]}
 
-  setBlocks a (GeneratorState _ b c d) = GeneratorState a b c d
+  setBlocks a (GeneratorState _ b c d e) = GeneratorState a b c d e
 
-  setCounter a (GeneratorState b c d e) = GeneratorState b (a c) d e
+  setCounter a (GeneratorState b c d e f) = GeneratorState b (a c) d e f
 
-  setTable a (GeneratorState b c _ d) = GeneratorState b c a d
+  setTable a (GeneratorState b c _ d e) = GeneratorState b c a d e
 
-  setContext a (GeneratorState b c d _) = GeneratorState b c d a
+  setContext a (GeneratorState b c d _ e) = GeneratorState b c d a e
+
+  setGlobals a (GeneratorState b c d e _) = GeneratorState b c d e a
 
   type GeneratorStateMonad = State GeneratorState
 
@@ -144,11 +146,11 @@ module Generator where
       value _ = 0
 
   {-
-    generateIRBasicBlocks is used for the generation of basic blocks, which are just instruction lists, from a function body,
+    generateCStatement is used for the generation of basic blocks, which are just instruction lists, from a function body,
     which is just a compound statement. It receives a compound statement (a), and the return type of the function (b).
   -}
-  generateIRBasicBlocks :: CStatement -> IRType -> GeneratorStateMonad [IRBasicBlock]
-  generateIRBasicBlocks a b = do
+  generateCStatement :: CStatement -> IRType -> GeneratorStateMonad [IRBasicBlock]
+  generateCStatement a b = do
     got <- get
     let stat = execState (statement a) got
     return (fst (execState ((numberBlocks . blocks) stat) ([], 0)))
@@ -276,7 +278,7 @@ module Generator where
         where
           splitLabeled [] = []
           splitLabeled (a:as)
-            | isLabeled a  = a:as
+            | isLabeled a = a:as
             | otherwise = splitLabeled as
           isLabeled (CLabeledCase _ _) = True
           isLabeled (CLabeledDefault _) = True
@@ -317,7 +319,7 @@ module Generator where
 
       switchStatement (a:as) = do
         got <- get
-        let stat = execState (statement a) (GeneratorState [] ((counter . fst) got) ((table . fst) got) ((context . fst) got))
+        let stat = execState (statement a) (GeneratorState [] ((counter . fst) got) ((table . fst) got) ((context . fst) got) ((globals . fst) got))
         let newBlocks = appendBlocks ((blocks . fst) got) (blocks stat)
         case a of
           CLabeledCase a _ -> do
@@ -459,7 +461,7 @@ module Generator where
         | isFloating a && isIntegral c && e = IRSitofp c d a
         | isIntegral a && isFloating c && not e = IRFptosi c d a
         | isFloating a && isIntegral c && not e = IRSitofp c d a
-        | otherwise =  error ""
+        | otherwise = error ""
 
       {-
         binaryInstruction receives a binary operation symbol as a string (a), and the types of the two arguments for the
@@ -528,7 +530,11 @@ module Generator where
           numbered (Nothing, _) = False
           numbered _ = True
 
-  generateIRFunctionGlobal (CFunction (Just a) b _ c) = [IRFunctionGlobal functionType (name b) (map argument (argumentList b)) (evalState (generateIRBasicBlocks c functionType) (GeneratorState [[]] 1 Map.empty Nothing))]
+  generateCExternalDefinition :: CExternalDefinition -> GeneratorStateMonad [IRGlobalValue]
+  generateCExternalDefinition (CFunction (Just a) b c d) = do
+    let basicBlocks = evalState (generateCStatement d functionType) (GeneratorState [[]] 1 Map.empty Nothing [])
+    let functionGlobal = IRFunctionGlobal functionType (name b) [] basicBlocks
+    return [functionGlobal]
     where
       functionType = (typeFromCSpecifiers a (pointer b))
       name (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
@@ -537,14 +543,27 @@ module Generator where
       argumentList (CDeclarator _ (CDirectDeclaratorFunctionCall _ [CParameterList a])) = a
       argument (CParameterDeclaration c d) = IRArgument (typeFromCSpecifiers c Nothing) (Just (name d))
 
-  generateIRVariableGlobal (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList b)))) = map variable b
+  generateCExternalDefinition (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList b)))) = do
+    let variableGlobal = map variable b
+    return variableGlobal
     where
       variable (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) = IRVariableGlobal d (typeFromCSpecifiers a c) (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (typeFromCSpecifiers a c))
       variable (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) = IRVariableGlobal d (typeFromCSpecifiers a c) (generateIRConstant e (typeFromCSpecifiers a c))
 
-  generateIRModule (CTranslationUnit a) = IRModule (concat (map cExternalDefinition a))
-    where
-      cExternalDefinition (CFunction c d e f) = generateIRFunctionGlobal (CFunction c d e f)
-      cExternalDefinition (CExternalDeclaration c) = generateIRVariableGlobal (CExternalDeclaration c)
+  generateCExternalDefinitions :: [CExternalDefinition] -> GeneratorStateMonad ()
+  generateCExternalDefinitions [] = return ()
 
-  generate = generateIRModule
+  generateCExternalDefinitions (a:as) = do
+    got <- get
+    let globalValues = evalState (generateCExternalDefinition a) got
+    let newGlobals = globals got ++ globalValues
+    put ((setGlobals newGlobals) got)
+    generateCExternalDefinitions as
+
+  generateCTranslationUnit :: CTranslationUnit -> GeneratorStateMonad IRModule
+  generateCTranslationUnit (CTranslationUnit a) = do
+    got <- get
+    let globalValues = (globals . execState (generateCExternalDefinitions a)) got
+    return (IRModule globalValues)
+
+  generate a = evalState (generateCTranslationUnit a) (GeneratorState [[]] 1 Map.empty Nothing [])

@@ -97,9 +97,10 @@ module Syntax where
     CReturn (Maybe CExpression) deriving (Show, Eq)
 
   data CExternalDefinition =
-    CTranslationUnit [CExternalDefinition] |
     CExternalDeclaration CDeclaration |
     CFunction (Maybe CDeclaration) CDeclaration (Maybe CStatement) CStatement deriving (Show, Eq)
+
+  data CTranslationUnit = CTranslationUnit [CExternalDefinition] deriving (Show, Eq)
 
   data IRIntegerType =
     IRSigned |
