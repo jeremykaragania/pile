@@ -206,6 +206,9 @@ module Selector where
       selectIRLabeledInstruction (a, IRSdiv b c d) = newBinaryFunction "__aeabi_idiv" a c d
       selectIRLabeledInstruction (a, IRUrem b c d) = newBinaryFunction "__aeabi_uidivmod" a c d
       selectIRLabeledInstruction (a, IRSrem b c d) = newBinaryFunction "__aeabi_idivmod" a c d
+      selectIRLabeledInstruction (a, IRShl b c d) = newBinaryFunction "__aeabi_llsl" a c d
+      selectIRLabeledInstruction (a, IRLshr b c d) = newBinaryFunction "__aeabi_lasr" a c d
+      selectIRLabeledInstruction (a, IRAshr b c d) = newBinaryFunction "__aeabi_lasr" a c d
       selectIRLabeledInstruction (a, IRAnd b c d) = newBinary ARMAnd a c d
       selectIRLabeledInstruction (a, IROr b c d) = newBinary ARMOrr a c d
       selectIRLabeledInstruction (a, IRXor b c d) = newBinary ARMEor a c d
