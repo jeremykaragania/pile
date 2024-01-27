@@ -9,31 +9,33 @@ module Main where
   import Selector
   import System.Environment
 
-  parseInFile [a] = a
-
   parseOutFile a = take (length a - 2) a ++ ".s"
 
   isInFile a = drop (length a - 2) a == ".c"
 
-  main = do
-    args <- getArgs
-    let inFile = parseInFile args
-    if isInFile inFile then do
-      file <- readFile inFile
+  compile [] = return ()
+
+  compile (a:as) = do
+    if isInFile a then do
+      file <- readFile a
       let scanned = scan file
       case scanned of
-        Left a -> print a
-        Right a -> do
-          let parsed = parse a
+        Left b -> print b
+        Right b -> do
+          let parsed = parse b
           case parsed of
-            Left a -> print a
-            Right a -> do
-              let generated = generate a
+            Left b -> print b
+            Right b -> do
+              let generated = generate b
               let selected = select generated
               let scheduled = schedule selected
               let allocated = allocate scheduled
               let optimized = optimize allocated
               let emitted = emit optimized
-              writeFile (parseOutFile inFile) emitted
-              return ()
+              writeFile (parseOutFile a) emitted
     else error ""
+    compile as
+
+  main = do
+    args <- getArgs
+    compile args
