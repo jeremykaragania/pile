@@ -26,11 +26,12 @@ module Generator where
 
   type GeneratorStateMonad = State GeneratorState
 
-  getIdentifier (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
-  getIdentifier (CInitDeclarator (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) _) = a
+  getIdentifier (CInitDeclarator a _) = getIdentifier a
+  getIdentifier (CDirectDeclaratorIdentifier a) = (identifier . token) a
+  getIdentifier (CDeclarator _ a) = getIdentifier a
 
-  getPointer (CDeclarator a _) = a
   getPointer (CInitDeclarator a _) = getPointer a
+  getPointer (CDeclarator a _) = a
 
   getConstant (CInitDeclarator _ a) = a
   getConstant (CDeclarator _ _) = CConstant (CConstantToken (CIntegerConstant 0 Nothing))
@@ -530,11 +531,13 @@ module Generator where
           numbered (Nothing, _) = False
           numbered _ = True
 
-  generateCExternalDefinition :: CExternalDefinition -> GeneratorStateMonad [IRGlobalValue]
+  generateCExternalDefinition :: CExternalDefinition -> GeneratorStateMonad ()
   generateCExternalDefinition (CFunction (Just a) b c d) = do
-    let basicBlocks = evalState (generateCStatement d functionType) (GeneratorState [[]] 1 Map.empty Nothing [])
+    got <- get
+    let basicBlocks = evalState (generateCStatement d functionType) (GeneratorState [[]] 1 (table got) Nothing [])
     let functionGlobal = IRFunctionGlobal functionType (name b) [] basicBlocks
-    return [functionGlobal]
+    let newGlobals = (globals got) ++ [functionGlobal]
+    put ((setGlobals newGlobals) got)
     where
       functionType = (typeFromCSpecifiers a (pointer b))
       name (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
@@ -544,20 +547,32 @@ module Generator where
       argument (CParameterDeclaration c d) = IRArgument (typeFromCSpecifiers c Nothing) (Just (name d))
 
   generateCExternalDefinition (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList b)))) = do
-    let variableGlobal = map variable b
-    return variableGlobal
+    got <- get
+    let dec = execState (declarations b) got
+    put dec
     where
-      variable (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) = IRVariableGlobal d (typeFromCSpecifiers a c) (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (typeFromCSpecifiers a c))
-      variable (CInitDeclarator (CDeclarator c (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken d)))) e) = IRVariableGlobal d (typeFromCSpecifiers a c) (generateIRConstant e (typeFromCSpecifiers a c))
+      declarations :: [CDeclaration] -> GeneratorStateMonad ()
+      declarations [] = return ()
+
+      declarations (b:bs) = do
+        got <- get
+        let name = getIdentifier b
+        if Map.notMember name (table got) then do
+          let varType = (typeFromCSpecifiers a (getPointer b))
+          let var = IRVariableGlobal name varType (generateIRConstant (getConstant b) varType)
+          let newTable = Map.insert name (IRLabelName name, varType) (table got)
+          let newGlobals = globals got ++ [var]
+          put ((setTable newTable . setGlobals newGlobals) got)
+          declarations bs
+        else error ""
 
   generateCExternalDefinitions :: [CExternalDefinition] -> GeneratorStateMonad ()
   generateCExternalDefinitions [] = return ()
 
   generateCExternalDefinitions (a:as) = do
     got <- get
-    let globalValues = evalState (generateCExternalDefinition a) got
-    let newGlobals = globals got ++ globalValues
-    put ((setGlobals newGlobals) got)
+    let def = execState (generateCExternalDefinition a) got
+    put def
     generateCExternalDefinitions as
 
   generateCTranslationUnit :: CTranslationUnit -> GeneratorStateMonad IRModule
