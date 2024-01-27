@@ -15,7 +15,7 @@ ghc -i details/*.hs -o compiler main.hs
 
 Execute compiler.
 ```bash
-./compiler infile
+./compiler infile...
 ```
 
 ## License
