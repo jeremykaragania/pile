@@ -13,7 +13,7 @@ module Emitter where
       emitARM a = (drop 3 . map toLower . show) a
       emitOpcodeCondition (OpcodeCondition a Nothing) = emitARM a
       emitOpcodeCondition (OpcodeCondition a (Just b)) = emitARM a ++ emitARM b
-      emitOperand (Label a) = a
+      emitOperand (Label a) = "#" ++ a
       emitOperand (Register _ a) = "r" ++ show a
       emitOperand (Immediate a) = "#" ++ show a
       emitOperands

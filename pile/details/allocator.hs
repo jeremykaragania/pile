@@ -48,6 +48,8 @@
   readWrote (MCInstruction (OpcodeCondition ARMEor _) [a, b, c]) = ([b, c], [a])
   readWrote (MCInstruction (OpcodeCondition ARMB _) [a]) = ([a], [Register Physical 0])
   readWrote (MCInstruction (OpcodeCondition ARMBl _) [a]) = ([a], [Register Physical 0])
+  readWrote (MCInstruction (OpcodeCondition ARMLdr _) [a, b, _]) = ([b], [a])
+  readWrote (MCInstruction (OpcodeCondition ARMStr _) [a, b, _]) = ([a], [b])
 
   analyzeMachineCode a = ((filter isRegister ((fst . readWrote) a)), (filter isRegister ((snd . readWrote) a)))
     where

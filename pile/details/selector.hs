@@ -160,13 +160,13 @@ module Selector where
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
         put ((setGraph newGraph . setCounter (+2)) got)
 
-      newMemory :: ARMOpcode -> Integer -> Integer -> SelectorStateMonad ()
-      newMemory a b c = do
+      newMemory :: ARMOpcode -> Integer -> Integer -> Integer -> SelectorStateMonad ()
+      newMemory a b c d = do
         got <- get
         let newNodes = [
               Node (counter got) (Register Virtual) [(Word, Just (IntegerValue b))],
-              Node (counter got + 1) (Register Physical) [(Word, Just (IntegerValue 13))],
-              Node (counter got + 2) Constant [(Word, Just (IntegerValue c))],
+              Node (counter got + 1) (Register Physical) [(Word, Just (IntegerValue c))],
+              Node (counter got + 2) Constant [(Word, Just (IntegerValue d))],
               Node (counter got + 3) (Opcode (OpcodeCondition a Nothing)) [(Word, Nothing)]]
         let newEdges = [
               Edge (chain got) (counter got + 3) 0,
@@ -228,10 +228,22 @@ module Selector where
 
       selectIRLabeledInstruction (Just (IRLabelNumber a), IRAlloca b) = return ()
 
+      selectIRLabeledInstruction (a@(Just (IRLabelNumber b)), IRLoad c (IRLabelValue (IRLabelName d))) = do
+        got <- get
+        let mov = execState (newMov 0 Physical Nothing (Label d) [(Other, Nothing)]) got
+        let ldr = execState (newMemory ARMLdr b 0 0) mov
+        put ldr
+
       selectIRLabeledInstruction (a@(Just (IRLabelNumber b)), IRLoad c (IRLabelValue (IRLabelNumber d))) = do
         got <- get
         let mov = execState (newMov b Virtual Nothing (Register Virtual) [(Word, Just (IntegerValue d))]) got
         put mov
+
+      selectIRLabeledInstruction (Nothing, IRStore b (IRLabelValue (IRLabelNumber c)) (IRLabelName d)) = do
+        got <- get
+        let mov = execState (newMov 0 Physical Nothing (Label d) [(Other, Nothing)]) got
+        let str = execState (newMemory ARMStr c 0 0) mov
+        put str
 
       selectIRLabeledInstruction (Nothing, IRStore b c@(IRConstantValue _) (IRLabelNumber d)) = do
         got <- get
