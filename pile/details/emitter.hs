@@ -5,6 +5,9 @@ module Emitter where
   import Selector hiding (Label, Register)
   import Syntax
 
+  emitNodeValue (IntegerValue a) = show a
+  emitNodeValue (FloatingValue a) = show a
+
   emitMachineCode (MCInstruction a@(OpcodeCondition b c) d) = "  " ++ emitOpcodeCondition a ++ " " ++ emitOperands
     where
       emitARM a = (drop 3 . map toLower . show) a
@@ -19,6 +22,12 @@ module Emitter where
 
   emitMachineCode (MCSymbol a) = a ++ ":"
 
+  emitMachineCode (a@(MCDirective _ b)) = "  ." ++ emitMCDirective a ++ " " ++ emitNodeValue b
+
   emitMachineCodes = map (map emitMachineCode)
+
+  emitMCDirective (MCDirective Byte _) = "byte"
+  emitMCDirective (MCDirective Halfword _) = "hword"
+  emitMCDirective (MCDirective Word _) = "word"
 
   emit = intercalate "\n" . map (intercalate "\n") . emitMachineCodes

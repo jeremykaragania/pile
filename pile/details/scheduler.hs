@@ -10,16 +10,19 @@ module Scheduler where
 
   data MachineCode =
     MCInstruction OpcodeCondition [Operand] |
-    MCSymbol String deriving (Show, Eq)
+    MCSymbol String |
+    MCDirective MachineValueType NodeValue deriving (Show, Eq)
 
   opcodeCondition (Opcode a) = a
 
   machineCode a@(MCSymbol _:MCSymbol _:_) = (take 2 a, drop 2 a)
   machineCode a = ([head a], tail a)
 
-  scheduleGraph a = map toMachineCode zipInstructions
+  scheduleGraph a = (concat . map toMachineCode) zipInstructions
     where
       opcodeNodes = filter isMachineCode (nodes a)
+      isMachineCode (Node _ (FunctionGlobal _) _) = True
+      isMachineCode (Node _ (VariableGlobal _) _) = True
       isMachineCode (Node _ (BasicBlock _) _) = True
       isMachineCode (Node _ (Opcode _) _) = True
       isMachineCode _ = False
@@ -30,8 +33,10 @@ module Scheduler where
       isOperandType (Selector.Label _) = True
       isOperandType _ = False
       zipInstructions = zip opcodeNodes (map nodeOperands opcodeNodes)
-      toMachineCode ((Node _ (BasicBlock b) _), _) = MCSymbol b
-      toMachineCode (b@(Node _ (Opcode _) _), c) = MCInstruction (toOpcode b) (map toOperand (filter (isOperandType . nodeType) c))
+      toMachineCode ((Node _ (FunctionGlobal b) _), _) = [MCSymbol b]
+      toMachineCode ((Node _ (VariableGlobal b) c), _) = [MCSymbol b] ++ map (\(d, Just e) -> MCDirective d e) c
+      toMachineCode ((Node _ (BasicBlock b) _), _) = [MCSymbol b]
+      toMachineCode (b@(Node _ (Opcode _) _), c) = [MCInstruction (toOpcode b) (map toOperand (filter (isOperandType . nodeType) c))]
       toOpcode b = (opcodeCondition . nodeType) b
       toOperand (Node _ (Selector.Register b) [(_, (Just (IntegerValue c)))]) = Scheduler.Register b c
       toOperand (Node _ Constant [(_, (Just (IntegerValue a)))]) = Immediate a
