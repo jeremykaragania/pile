@@ -199,12 +199,12 @@ module Generator where
       initDeclarators a (b:bs) = do
         got <- get
         if Map.notMember (getIdentifier b) (table got) then do
-            let firstType = (typeFromCSpecifiers a (getPointer b))
-            let alloca = execState (newAlloca firstType) got
+            let type0 = (typeFromCSpecifiers a (getPointer b))
+            let alloca = execState (newAlloca type0) got
             let newTable = Map.insert (getIdentifier b) (IRLabelNumber (counter got), (typeFromCSpecifiers a (getPointer b))) (table got)
             let dec = execState (declaration b) alloca
-            let secondType = (getType . snd . last . concat . blocks) dec
-            let castExpr = execState (castExpression (firstType, (IRLabelValue (IRLabelNumber (counter got)))) (secondType, (IRLabelValue (IRLabelNumber (counter dec - 1)))) False) (setBlocks [[]] dec)
+            let type1 = (getType . snd . last . concat . blocks) dec
+            let castExpr = execState (castExpression (type0, (IRLabelValue (IRLabelNumber (counter got)))) (type1, (IRLabelValue (IRLabelNumber (counter dec - 1)))) False) (setBlocks [[]] dec)
             let store = [[(Nothing, IRStore (typeFromCSpecifiers a (getPointer b)) (IRLabelValue (IRLabelNumber (counter castExpr - 1))) (IRLabelNumber (counter got)))]]
             let storeBlocks = appendBlocks (blocks dec) (appendBlocks (blocks castExpr) store)
             put ((setBlocks storeBlocks . setTable newTable) castExpr)
@@ -351,8 +351,8 @@ module Generator where
         let exprType = (getType . snd . last . concat . blocks) expr
         let cmp = ((Just (IRLabelNumber (counter expr))), comparisonInstruction (exprType, (counter expr)))
         let stat = execState (statement b) ((setBlocks [[]] . setCounter (+1)) expr)
-        let firstBr = (Nothing, IRBrConditional ((getType . snd) cmp) (IRLabelValue (IRLabelNumber (counter expr))) (IRLabelValue (IRLabelNumber (counter expr + 1))) (IRLabelValue (IRLabelNumber (counter stat + 1))))
-        let newBlocks = appendBlocks (blocks expr) (appendBlocks [[cmp]] [[firstBr]])
+        let br0 = (Nothing, IRBrConditional ((getType . snd) cmp) (IRLabelValue (IRLabelNumber (counter expr))) (IRLabelValue (IRLabelNumber (counter expr + 1))) (IRLabelValue (IRLabelNumber (counter stat + 1))))
+        let newBlocks = appendBlocks (blocks expr) (appendBlocks [[cmp]] [[br0]])
         put ((setBlocks newBlocks . setCounter (+2)) expr)
         where
           -- Different comparison instructions are used depending on argument type.
@@ -398,21 +398,21 @@ module Generator where
       binaryExpression :: CExpression -> CExpression -> String -> GeneratorStateMonad ()
       binaryExpression a b c = do
         got <- get
-        let firstExpr = execState (expression a) (setBlocks [[]] got)
-        let firstType = (getType . snd . last . concat . blocks) firstExpr
+        let expr0 = execState (expression a) (setBlocks [[]] got)
+        let type0 = (getType . snd . last . concat . blocks) expr0
         if c == "=" then do
-          let secondExpr = execState (expression b) (setBlocks [[]] got)
-          let secondType = (getType . snd . last . concat . blocks) secondExpr
-          let castExpr = execState (castExpression (firstType, (IRLabelValue (IRLabelNumber (counter secondExpr - 1)))) (secondType, (IRLabelValue (IRLabelNumber (counter secondExpr - 1)))) False) (setBlocks [[]] secondExpr)
-          let newBlocks = appendBlocks (blocks secondExpr) (blocks castExpr)
+          let expr1 = execState (expression b) (setBlocks [[]] got)
+          let type1 = (getType . snd . last . concat . blocks) expr1
+          let castExpr = execState (castExpression (type0, (IRLabelValue (IRLabelNumber (counter expr1 - 1)))) (type1, (IRLabelValue (IRLabelNumber (counter expr1 - 1)))) False) (setBlocks [[]] expr1)
+          let newBlocks = appendBlocks (blocks expr1) (blocks castExpr)
           put ((setBlocks newBlocks) castExpr)
         else do
-          let secondExpr = execState (expression b) (setBlocks [[]] firstExpr)
-          let secondType = (getType . snd . last . concat . blocks) secondExpr
-          let castExpr = execState (castExpression (firstType, (IRLabelValue (IRLabelNumber (counter firstExpr - 1)))) (secondType, (IRLabelValue (IRLabelNumber (counter secondExpr - 1)))) True) (setBlocks [[]] secondExpr)
-          let initBlocks = (appendBlocks (blocks firstExpr) (appendBlocks (blocks secondExpr) (blocks castExpr)))
+          let expr1 = execState (expression b) (setBlocks [[]] expr0)
+          let type1 = (getType . snd . last . concat . blocks) expr1
+          let castExpr = execState (castExpression (type0, (IRLabelValue (IRLabelNumber (counter expr0 - 1)))) (type1, (IRLabelValue (IRLabelNumber (counter expr1 - 1)))) True) (setBlocks [[]] expr1)
+          let initBlocks = (appendBlocks (blocks expr0) (appendBlocks (blocks expr1) (blocks castExpr)))
           let castType = (getType . snd . last . concat) initBlocks
-          let bin = binary (firstType, (counter firstExpr)) (secondType, (counter secondExpr)) (castType, (counter castExpr))
+          let bin = binary (type0, (counter expr0)) (type1, (counter expr1)) (castType, (counter castExpr))
           let newBlocks = appendBlocks initBlocks [[(Just (IRLabelNumber (counter castExpr)), bin)]]
           put ((setBlocks newBlocks . setCounter (+1)) castExpr)
         where
