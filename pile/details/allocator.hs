@@ -38,6 +38,8 @@
   registerNumber (Register _ a) = a
 
   readWrote (MCInstruction (OpcodeCondition ARMMov _) [a, b]) = ([b], [a])
+  readWrote (MCInstruction (OpcodeCondition ARMMvn _) [a, b]) = ([b], [a])
+  readWrote (MCInstruction (OpcodeCondition ARMMovt _) [a, b]) = ([b], [a])
   readWrote (MCInstruction (OpcodeCondition ARMAdd _) [a, b, c]) = ([b, c], [a])
   readWrote (MCInstruction (OpcodeCondition ARMSub _) [a, b, c]) = ([b, c], [a])
   readWrote (MCInstruction (OpcodeCondition ARMCmp _) [a, b]) = ([], [a, b])

@@ -238,6 +238,7 @@ module Syntax where
   data ARMOpcode =
     ARMMov |
     ARMMvn |
+    ARMMovt |
     ARMAdd |
     ARMAdc |
     ARMSub |

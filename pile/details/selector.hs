@@ -1,7 +1,10 @@
 module Selector where
   import Control.Monad.State
+  import Data.Bits
   import Data.Int
+  import Data.Word
   import Syntax
+  import Unsafe.Coerce
 
   data OpcodeCondition = OpcodeCondition {opcode :: ARMOpcode, condition :: (Maybe ARMCondition)} deriving (Show, Eq)
 
@@ -91,6 +94,26 @@ module Selector where
   fromIRICondition IRISlt = ARMLt
   fromIRICondition IRISle = ARMLe
 
+  fromIRFCondition IRFOeq = ARMEq
+  fromIRFCondition IRFOgt = ARMGt
+  fromIRFCondition IRFOge = ARMGe
+  fromIRFCondition IRFOlt = ARMLt
+  fromIRFCondition IRFOle = ARMLe
+  fromIRFCondition IRFOne = ARMNe
+
+  nameFromIRFCondition IRFOeq = "__aeabi_fcmpeq"
+  nameFromIRFCondition IRFOgt = "__aeabi_fcmpgt"
+  nameFromIRFCondition IRFOge = "__aeabi_fcmpge"
+  nameFromIRFCondition IRFOlt = "__aeabi_fcmplt"
+  nameFromIRFCondition IRFOle = "__aeabi_fcmple"
+  nameFromIRFCondition IRFOne = "__aeabi_fcmpeq"
+
+  fromFloat :: Float -> Word32
+  fromFloat = unsafeCoerce
+
+  wordBottom a = a .&. (0x0000ffff :: Word32)
+  wordTop a = shift (a .&. (0xffff0000 :: Word32)) (-16)
+
   selectIRGlobalValues :: [IRGlobalValue] -> SelectorStateMonad ()
   selectIRGlobalValues [] = return ()
 
@@ -136,13 +159,13 @@ module Selector where
         put (labeledInstruction)
         selectIRLabeledInstructions as
 
-      newMov :: Integer -> RegisterType -> Maybe ARMCondition -> NodeType -> [(MachineValueType, Maybe NodeValue)] -> SelectorStateMonad ()
-      newMov a b c d e = do
+      newMov :: ARMOpcode -> Integer -> RegisterType -> Maybe ARMCondition -> NodeType -> [(MachineValueType, Maybe NodeValue)] -> SelectorStateMonad ()
+      newMov a b c d e f = do
         got <- get
         let newNodes = [
-              Node (counter got) (Register b) [(Word, Just (IntegerValue a))],
-              Node (counter got + 1) d e,
-              Node (counter got + 2) (Opcode (OpcodeCondition ARMMov c)) [(Word, Nothing)]]
+              Node (counter got) (Register c) [(Word, Just (IntegerValue b))],
+              Node (counter got + 1) e f,
+              Node (counter got + 2) (Opcode (OpcodeCondition a d)) [(Word, Nothing)]]
         let newEdges = [
               Edge (counter got) (counter got + 2) 0,
               Edge (counter got + 1) (counter got + 2) 0]
@@ -194,18 +217,30 @@ module Selector where
       newBinaryFunction :: String -> Maybe IRLabel -> IRValue -> IRValue -> SelectorStateMonad ()
       newBinaryFunction a (Just (IRLabelNumber b)) (IRLabelValue (IRLabelNumber c)) (IRLabelValue (IRLabelNumber d)) = do
         got <- get
-        let firstMov = execState (newMov 0 Physical Nothing (Register Virtual) [(Word, Just (IntegerValue c))]) got
-        let secondMov = execState (newMov 1 Physical Nothing (Register Virtual) [(Word, Just (IntegerValue d))]) firstMov
+        let firstMov = execState (newMov ARMMov 0 Physical Nothing (Register Virtual) [(Word, Just (IntegerValue c))]) got
+        let secondMov = execState (newMov ARMMov 1 Physical Nothing (Register Virtual) [(Word, Just (IntegerValue d))]) firstMov
         let bl = execState (newBranch (OpcodeCondition ARMBl Nothing) a) secondMov
-        let thirdMov = execState (newMov b Virtual Nothing (Register Physical) [(Word, Just (IntegerValue 0))]) bl
+        let thirdMov = execState (newMov ARMMov b Virtual Nothing (Register Physical) [(Word, Just (IntegerValue 0))]) bl
         put thirdMov
+
+      newCast :: String -> Maybe IRLabel -> IRValue -> SelectorStateMonad ()
+      newCast a (Just (IRLabelNumber b)) (IRLabelValue (IRLabelNumber c)) = do
+        got <- get
+        let firstMov = execState (newMov ARMMov 0 Physical Nothing (Register Virtual) [(Word, Just (IntegerValue c))]) got
+        let bl = execState (newBranch (OpcodeCondition ARMBl Nothing) a) firstMov
+        let secondMov = execState (newMov ARMMov b Virtual Nothing (Register Physical) [(Word, Just (IntegerValue 0))]) bl
+        put secondMov
 
       selectIRLabeledInstruction :: (Maybe IRLabel, IRInstruction) -> SelectorStateMonad ()
       selectIRLabeledInstruction (a, IRAdd b c d) = newBinary ARMAdd a c d
+      selectIRLabeledInstruction (a, IRFadd b c d) = newBinaryFunction "__aeabi_fadd" a c d
       selectIRLabeledInstruction (a, IRSub b c d) = newBinary ARMSub a c d
+      selectIRLabeledInstruction (a, IRFsub b c d) = newBinaryFunction "__aeabi_fsub" a c d
       selectIRLabeledInstruction (a, IRMul b c d) = newBinary ARMMul a c d
+      selectIRLabeledInstruction (a, IRFmul b c d) = newBinaryFunction "__aeabi_fmul" a c d
       selectIRLabeledInstruction (a, IRUdiv b c d) = newBinaryFunction "__aeabi_uidiv" a c d
       selectIRLabeledInstruction (a, IRSdiv b c d) = newBinaryFunction "__aeabi_idiv" a c d
+      selectIRLabeledInstruction (a, IRFdiv b c d) = newBinaryFunction "__aeabi_fdiv" a c d
       selectIRLabeledInstruction (a, IRUrem b c d) = newBinaryFunction "__aeabi_uidivmod" a c d
       selectIRLabeledInstruction (a, IRSrem b c d) = newBinaryFunction "__aeabi_idivmod" a c d
       selectIRLabeledInstruction (a, IRShl b c d) = newBinaryFunction "__aeabi_llsl" a c d
@@ -230,29 +265,38 @@ module Selector where
 
       selectIRLabeledInstruction (a@(Just (IRLabelNumber b)), IRLoad c (IRLabelValue (IRLabelName d))) = do
         got <- get
-        let mov = execState (newMov 0 Physical Nothing (Label d) [(Other, Nothing)]) got
+        let mov = execState (newMov ARMMov 0 Physical Nothing (Label d) [(Other, Nothing)]) got
         let ldr = execState (newMemory ARMLdr b 0 0) mov
         put ldr
 
       selectIRLabeledInstruction (a@(Just (IRLabelNumber b)), IRLoad c (IRLabelValue (IRLabelNumber d))) = do
         got <- get
-        let mov = execState (newMov b Virtual Nothing (Register Virtual) [(Word, Just (IntegerValue d))]) got
+        let mov = execState (newMov ARMMov b Virtual Nothing (Register Virtual) [(Word, Just (IntegerValue d))]) got
         put mov
 
       selectIRLabeledInstruction (Nothing, IRStore b (IRLabelValue (IRLabelNumber c)) (IRLabelName d)) = do
         got <- get
-        let mov = execState (newMov 0 Physical Nothing (Label d) [(Other, Nothing)]) got
+        let mov = execState (newMov ARMMov 0 Physical Nothing (Label d) [(Other, Nothing)]) got
         let str = execState (newMemory ARMStr c 0 0) mov
         put str
 
-      selectIRLabeledInstruction (Nothing, IRStore b c@(IRConstantValue _) (IRLabelNumber d)) = do
+      selectIRLabeledInstruction (Nothing, IRStore (IRInteger _) c@(IRConstantValue _) (IRLabelNumber d)) = do
         got <- get
-        let mov = execState (newMov d Virtual Nothing Constant [(Word, Just (toNodeValue c))]) got
+        let mov = execState (newMov ARMMov d Virtual Nothing Constant [(Word, Just (toNodeValue c))]) got
         put mov
+
+      selectIRLabeledInstruction (Nothing, IRStore IRFloat (IRConstantValue (IRFloatingConstant c)) (IRLabelNumber d)) = do
+        got <- get
+        let word = (fromFloat . realToFrac) c
+        let bottom = (fromIntegral . wordBottom) word
+        let top = (fromIntegral . wordTop) word
+        let firstMov = execState (newMov ARMMov d Virtual Nothing Constant [(Word, Just (IntegerValue bottom))]) got
+        let secondMov = execState (newMov ARMMovt d Virtual Nothing Constant [(Word, Just (IntegerValue top))]) firstMov
+        put secondMov
 
       selectIRLabeledInstruction (Nothing, IRStore b (IRLabelValue (IRLabelNumber c)) (IRLabelNumber d)) = do
         got <- get
-        let mov = execState (newMov d Virtual Nothing (Register Virtual) [(Word, Just (IntegerValue c))]) got
+        let mov = execState (newMov ARMMov d Virtual Nothing (Register Virtual) [(Word, Just (IntegerValue c))]) got
         put mov
 
       selectIRLabeledInstruction (Just (IRLabelNumber a), IRIcmp b _ d e) = do
@@ -265,9 +309,26 @@ module Selector where
               Edge (counter got) (counter got + 2) 0,
               Edge (counter got + 1) (counter got + 2) 0]
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
-        let firstMov = execState (newMov a Virtual Nothing (Constant) [(Word, Just (IntegerValue 0))]) ((setGraph newGraph . setCounter (+3)) got)
-        let secondMov = execState (newMov a Virtual (Just (fromIRICondition b)) (Constant) [(Word, Just (IntegerValue 1))]) firstMov
+        let firstMov = execState (newMov ARMMov a Virtual Nothing (Constant) [(Word, Just (IntegerValue 0))]) ((setGraph newGraph . setCounter (+3)) got)
+        let secondMov = execState (newMov ARMMov a Virtual (Just (fromIRICondition b)) (Constant) [(Word, Just (IntegerValue 1))]) firstMov
         put secondMov
+
+      selectIRLabeledInstruction ((Just (IRLabelNumber a)), IRFcmp b _ (IRLabelValue (IRLabelNumber c)) (IRLabelValue (IRLabelNumber d))) = do
+        got <- get
+        let firstMov = execState (newMov ARMMov 0 Physical Nothing (Register Virtual) [(Word, Just (IntegerValue c))]) got
+        let secondMov = execState (newMov ARMMov 1 Physical Nothing (Register Virtual) [(Word, Just (IntegerValue d))]) firstMov
+        let bl = execState (newBranch (OpcodeCondition ARMBl Nothing) (nameFromIRFCondition b)) secondMov
+        if (b == IRFOne) then do
+          let thirdMov = execState (newMov ARMMvn a Virtual Nothing (Register Physical) [(Word, Just (IntegerValue 0))]) bl
+          put thirdMov
+        else do
+          let thirdMov = execState (newMov ARMMov a Virtual Nothing (Register Physical) [(Word, Just (IntegerValue 0))]) bl
+          put thirdMov
+
+      selectIRLabeledInstruction (a, IRFptoui IRFloat b _) = newCast "__aeabi_f2uiz" a b
+      selectIRLabeledInstruction (a, IRFptosi IRFloat b _) = newCast "__aeabi_f2iz" a b
+      selectIRLabeledInstruction (a, IRSitofp _ b IRFloat) = newCast "__aeabi_i2f" a b
+      selectIRLabeledInstruction (a, IRUitofp _ b IRFloat) = newCast "__aeabi_ui2f" a b
 
   selectIRGlobalValue (IRVariableGlobal a b c) = do
     got <- get
