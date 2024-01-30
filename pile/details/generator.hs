@@ -109,30 +109,34 @@ module Generator where
 
   -- Set extensionality allows specifiers to be in any order.
   typeFromCSpecifiers (CSpecifiers a) Nothing
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "void")] = IRVoid
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "short")] = IRShortInteger IRSigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "short")] = IRShortInteger IRSigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "short"), CTypeSpecifier (CKeywordToken "int")] = IRShortInteger IRSigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "short"), CTypeSpecifier (CKeywordToken "int")] = IRShortInteger IRSigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "short")] = IRShortInteger IRUnsigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "short"), CTypeSpecifier (CKeywordToken "int")] = IRShortInteger IRUnsigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "int")] = IRInteger IRSigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed")] = IRInteger IRSigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "int")] = IRInteger IRSigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned")] = IRInteger IRUnsigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "int")] = IRInteger IRUnsigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "long")] = IRLongInteger IRSigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "long")] = IRLongInteger IRSigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "long"), CTypeSpecifier (CKeywordToken "int")] = IRLongInteger IRSigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "long"), CTypeSpecifier (CKeywordToken "int")] = IRLongInteger IRSigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "long")] = IRLongInteger IRUnsigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "long"), CTypeSpecifier (CKeywordToken "int")] = IRLongInteger IRUnsigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "char")] = IRInteger IRSigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "signed"), CTypeSpecifier (CKeywordToken "char")] = IRInteger IRSigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "unsigned"), CTypeSpecifier (CKeywordToken "char")] = IRInteger IRUnsigned
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "float")] = IRFloat
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "double")] = IRDouble
-    | fromList a == fromList [CTypeSpecifier (CKeywordToken "long"), CTypeSpecifier (CKeywordToken "double")] = IRLongDouble
+    | areSpecifiers ["void"] = IRVoid
+    | areSpecifiers ["short"] = IRShortInteger IRSigned
+    | areSpecifiers ["signed", "short"] = IRShortInteger IRSigned
+    | areSpecifiers ["short", "int"] = IRShortInteger IRSigned
+    | areSpecifiers ["signed", "short", "int"] = IRShortInteger IRSigned
+    | areSpecifiers ["unsigned", "short"] = IRShortInteger IRUnsigned
+    | areSpecifiers ["unsigned", "short", "int"] = IRShortInteger IRUnsigned
+    | areSpecifiers ["int"] = IRInteger IRSigned
+    | areSpecifiers ["signed"] = IRInteger IRSigned
+    | areSpecifiers ["signed", "int"] = IRInteger IRSigned
+    | areSpecifiers ["unsigned"] = IRInteger IRUnsigned
+    | areSpecifiers ["unsigned", "int"] = IRInteger IRUnsigned
+    | areSpecifiers ["long"] = IRLongInteger IRSigned
+    | areSpecifiers ["signed", "long"] = IRLongInteger IRSigned
+    | areSpecifiers ["long", "int"] = IRLongInteger IRSigned
+    | areSpecifiers ["signed", "long", "int"] = IRLongInteger IRSigned
+    | areSpecifiers ["unsigned", "long"] = IRLongInteger IRUnsigned
+    | areSpecifiers ["unsigned", "long", "int"] = IRLongInteger IRUnsigned
+    | areSpecifiers ["char"] = IRInteger IRSigned
+    | areSpecifiers ["signed", "char"] = IRInteger IRSigned
+    | areSpecifiers ["unsigned", "char"] = IRInteger IRUnsigned
+    | areSpecifiers ["float"] = IRFloat
+    | areSpecifiers ["double"] = IRDouble
+    | areSpecifiers ["long", "double"] = IRLongDouble
+    where
+      areSpecifiers b
+        | length a == (length . fromList) a = fromList a == fromList (map (\c -> (CTypeSpecifier (CKeywordToken c))) b)
+        | otherwise = error ""
 
   statementFromCCompound(CCompound a b) = b
 
