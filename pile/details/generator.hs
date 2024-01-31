@@ -12,17 +12,30 @@ module Generator where
     (counter) for unnamed temporaries, a lookup table (table) which associates an identifier key with a label and type, and a
     context for break and continue statements (context) which carries the integer label number for the branch.
   -}
-  data GeneratorState = GeneratorState {blocks :: [[(Maybe IRLabel, IRInstruction)]], counter :: Integer, table :: Map String (IRLabel, IRType), context :: (Maybe Integer), globals :: [IRGlobalValue]}
+  data GeneratorState = GeneratorState {
+    blocks :: [[(Maybe IRLabel, IRInstruction)]],
+    counter :: Integer,
+    table :: Map String [TableValue],
+    context :: (Maybe Integer),
+    globals :: [IRGlobalValue],
+    scope :: Integer}
 
-  setBlocks a (GeneratorState _ b c d e) = GeneratorState a b c d e
+  data TableValue = TableValue {
+    identScope :: Integer,
+    identLabel :: IRLabel,
+    identType :: IRType} deriving (Show)
 
-  setCounter a (GeneratorState b c d e f) = GeneratorState b (a c) d e f
+  setBlocks a (GeneratorState _ b c d e f) = GeneratorState a b c d e f
 
-  setTable a (GeneratorState b c _ d e) = GeneratorState b c a d e
+  setCounter a (GeneratorState b c d e f g) = GeneratorState b (a c) d e f g
 
-  setContext a (GeneratorState b c d _ e) = GeneratorState b c d a e
+  setTable a (GeneratorState b c _ d e f) = GeneratorState b c a d e f
 
-  setGlobals a (GeneratorState b c d e _) = GeneratorState b c d e a
+  setContext a (GeneratorState b c d _ e f) = GeneratorState b c d a e f
+
+  setGlobals a (GeneratorState b c d e _ f) = GeneratorState b c d e a f
+
+  setLevel a (GeneratorState b c d e f g) = GeneratorState b c d e f (a g)
 
   type GeneratorStateMonad = State GeneratorState
 
@@ -198,17 +211,22 @@ module Generator where
 
       initDeclarators a (b:bs) = do
         got <- get
-        if Map.notMember (getIdentifier b) (table got) then do
-            let type0 = (typeFromCSpecifiers a (getPointer b))
-            let alloca = execState (newAlloca type0) got
-            let newTable = Map.insert (getIdentifier b) (IRLabelNumber (counter got), (typeFromCSpecifiers a (getPointer b))) (table got)
-            let dec = execState (declaration b) alloca
-            let type1 = (getType . snd . last . concat . blocks) dec
-            let castExpr = execState (castExpression (type0, (IRLabelValue (IRLabelNumber (counter got)))) (type1, (IRLabelValue (IRLabelNumber (counter dec - 1)))) False) (setBlocks [[]] dec)
-            let store = [[(Nothing, IRStore (typeFromCSpecifiers a (getPointer b)) (IRLabelValue (IRLabelNumber (counter castExpr - 1))) (IRLabelNumber (counter got)))]]
-            let storeBlocks = appendBlocks (blocks dec) (appendBlocks (blocks castExpr) store)
+        let type0 = typeFromCSpecifiers a (getPointer b)
+        let alloca = execState (newAlloca type0) got
+        let dec = execState (declaration b) alloca
+        let type1 = (getType . snd . last . concat . blocks) dec
+        let castExpr = execState (castExpression (type0, IRLabelValue (IRLabelNumber (counter got))) (type1, IRLabelValue (IRLabelNumber (counter dec - 1))) False) (setBlocks [[]] dec)
+        let store = [[(Nothing, IRStore (typeFromCSpecifiers a (getPointer b)) (IRLabelValue (IRLabelNumber (counter castExpr - 1))) (IRLabelNumber (counter got)))]]
+        let storeBlocks = appendBlocks (blocks dec) (appendBlocks (blocks castExpr) store)
+        case Map.lookup (getIdentifier b) (table got) of
+          Just c -> do
+            if all (\d -> identScope d /= (scope got)) c then do
+              let newTable = Map.insert (getIdentifier b) (c ++ [(TableValue (scope got) (IRLabelNumber (counter got)) type0)]) (table got)
+              put ((setBlocks storeBlocks . setTable newTable) castExpr)
+            else error ""
+          Nothing -> do
+            let newTable = Map.insert (getIdentifier b) [(TableValue (scope got) (IRLabelNumber (counter got)) type0)] (table got)
             put ((setBlocks storeBlocks . setTable newTable) castExpr)
-        else error ""
         initDeclarators a bs
 
       statementList (Just (CList a)) = a
@@ -220,7 +238,7 @@ module Generator where
       statements (a:as) = do
         got <- get
         let stat = execState (statement a) (setBlocks [[]] got)
-        let newBlocks = (appendBlocks (blocks got) (blocks stat))
+        let newBlocks = appendBlocks (blocks got) (blocks stat)
         put (setBlocks newBlocks stat)
         statements as
 
@@ -238,9 +256,9 @@ module Generator where
 
       statement (CCompound a b) = do
         got <- get
-        let dec = execState ((declarations . declarationList) a) got
+        let dec = execState ((declarations . declarationList) a) (setLevel (+1) got)
         let stat = execState ((statements . statementList) b) dec
-        put stat
+        put (setLevel (+ (-1)) stat)
 
       statement (CCExpression (Just (CExpression []))) = do
         got <- get
@@ -324,7 +342,7 @@ module Generator where
 
       switchStatement (a:as) = do
         got <- get
-        let stat = execState (statement a) (GeneratorState [] ((counter . fst) got) ((table . fst) got) ((context . fst) got) ((globals . fst) got))
+        let stat = execState (statement a) (GeneratorState [] ((counter . fst) got) ((table . fst) got) ((context . fst) got) ((globals . fst) got) 0)
         let newBlocks = appendBlocks ((blocks . fst) got) (blocks stat)
         case a of
           CLabeledCase a _ -> do
@@ -349,7 +367,7 @@ module Generator where
         got <- get
         let expr = execState (expressions a) (setBlocks [[]] got)
         let exprType = (getType . snd . last . concat . blocks) expr
-        let cmp = ((Just (IRLabelNumber (counter expr))), comparisonInstruction (exprType, (counter expr)))
+        let cmp = (Just (IRLabelNumber (counter expr)), comparisonInstruction (exprType, counter expr))
         let stat = execState (statement b) ((setBlocks [[]] . setCounter (+1)) expr)
         let br0 = (Nothing, IRBrConditional ((getType . snd) cmp) (IRLabelValue (IRLabelNumber (counter expr))) (IRLabelValue (IRLabelNumber (counter expr + 1))) (IRLabelValue (IRLabelNumber (counter stat + 1))))
         let newBlocks = appendBlocks (blocks expr) (appendBlocks [[cmp]] [[br0]])
@@ -374,8 +392,8 @@ module Generator where
       expression :: CExpression -> GeneratorStateMonad ()
       expression (CIdentifier a) = do
         got <- get
-        let symbol = (table got) Map.! (identifier a)
-        let newBlocks = [[((Just (IRLabelNumber (counter got))), IRLoad (snd symbol) (IRLabelValue (fst symbol)))]]
+        let ident = (last . filter (\b -> (identScope b) <= (scope got))) ((table got) Map.! (identifier a))
+        let newBlocks = [[((Just (IRLabelNumber (counter got))), IRLoad (identType ident) (IRLabelValue (identLabel ident)))]]
         put ((setBlocks newBlocks . setCounter (+1)) got)
 
       expression a@(CConstant b) = do
@@ -390,9 +408,9 @@ module Generator where
 
       expression (CAssignment a b@(CIdentifier c) d) = do
         got <- get
-        let symbol = (table got) Map.! (identifier c)
+        let ident = (last . filter (\e -> (identScope e) <= (scope got))) ((table got) Map.! (identifier c))
         let expr = execState (binaryExpression b d (getOperator a)) (setBlocks [[]] got)
-        let newBlocks = appendBlocks (blocks expr) [[(Nothing, IRStore (snd symbol) (IRLabelValue (IRLabelNumber (counter expr - 1))) (fst symbol))]]
+        let newBlocks = appendBlocks (blocks expr) [[(Nothing, IRStore (identType ident) (IRLabelValue (IRLabelNumber (counter expr - 1))) (identLabel ident))]]
         put (setBlocks newBlocks expr)
 
       binaryExpression :: CExpression -> CExpression -> String -> GeneratorStateMonad ()
@@ -403,16 +421,16 @@ module Generator where
         if c == "=" then do
           let expr1 = execState (expression b) (setBlocks [[]] got)
           let type1 = (getType . snd . last . concat . blocks) expr1
-          let castExpr = execState (castExpression (type0, (IRLabelValue (IRLabelNumber (counter expr1 - 1)))) (type1, (IRLabelValue (IRLabelNumber (counter expr1 - 1)))) False) (setBlocks [[]] expr1)
+          let castExpr = execState (castExpression (type0, IRLabelValue (IRLabelNumber (counter expr1 - 1))) (type1, IRLabelValue (IRLabelNumber (counter expr1 - 1))) False) (setBlocks [[]] expr1)
           let newBlocks = appendBlocks (blocks expr1) (blocks castExpr)
           put ((setBlocks newBlocks) castExpr)
         else do
           let expr1 = execState (expression b) (setBlocks [[]] expr0)
           let type1 = (getType . snd . last . concat . blocks) expr1
-          let castExpr = execState (castExpression (type0, (IRLabelValue (IRLabelNumber (counter expr0 - 1)))) (type1, (IRLabelValue (IRLabelNumber (counter expr1 - 1)))) True) (setBlocks [[]] expr1)
-          let initBlocks = (appendBlocks (blocks expr0) (appendBlocks (blocks expr1) (blocks castExpr)))
+          let castExpr = execState (castExpression (type0, IRLabelValue (IRLabelNumber (counter expr0 - 1))) (type1, IRLabelValue (IRLabelNumber (counter expr1 - 1))) True) (setBlocks [[]] expr1)
+          let initBlocks = appendBlocks (blocks expr0) (appendBlocks (blocks expr1) (blocks castExpr))
           let castType = (getType . snd . last . concat) initBlocks
-          let bin = binary (type0, (counter expr0)) (type1, (counter expr1)) (castType, (counter castExpr))
+          let bin = binary (type0, counter expr0) (type1, counter expr1) (castType, counter castExpr)
           let newBlocks = appendBlocks initBlocks [[(Just (IRLabelNumber (counter castExpr)), bin)]]
           put ((setBlocks newBlocks . setCounter (+1)) castExpr)
         where
@@ -527,8 +545,8 @@ module Generator where
       numberBlocks [] = return ()
       numberBlocks (a:as) = do
         got <- get
-        let present = ((toInteger . length . filter numbered) a)
-        let past = (snd got)
+        let present = (toInteger . length . filter numbered) a
+        let past = snd got
         put (((fst got) ++ [IRBasicBlock (IRLabelNumber past) a], present + past + 1))
         numberBlocks as
         where
@@ -538,12 +556,12 @@ module Generator where
   generateCExternalDefinition :: CExternalDefinition -> GeneratorStateMonad ()
   generateCExternalDefinition (CFunction (Just a) b c d) = do
     got <- get
-    let basicBlocks = evalState (generateCStatement d functionType) (GeneratorState [[]] 1 (table got) Nothing [])
+    let basicBlocks = evalState (generateCStatement d functionType) (GeneratorState [[]] 1 (table got) Nothing [] 0)
     let functionGlobal = IRFunctionGlobal functionType (name b) [] basicBlocks
     let newGlobals = (globals got) ++ [functionGlobal]
     put ((setGlobals newGlobals) got)
     where
-      functionType = (typeFromCSpecifiers a (pointer b))
+      functionType = typeFromCSpecifiers a (pointer b)
       name (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
       name (CDeclarator _ (CDirectDeclaratorFunctionCall (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a))) _)) = a
       pointer (CDeclarator a _) = a
@@ -562,9 +580,9 @@ module Generator where
         got <- get
         let name = getIdentifier b
         if Map.notMember name (table got) then do
-          let varType = (typeFromCSpecifiers a (getPointer b))
+          let varType = typeFromCSpecifiers a (getPointer b)
           let var = IRVariableGlobal name varType (generateIRConstant (getConstant b) varType)
-          let newTable = Map.insert name (IRLabelName name, varType) (table got)
+          let newTable = Map.insert name [(TableValue (scope got) (IRLabelName name) varType)] (table got)
           let newGlobals = globals got ++ [var]
           put ((setTable newTable . setGlobals newGlobals) got)
           declarations bs
@@ -585,4 +603,4 @@ module Generator where
     let globalValues = (globals . execState (generateCExternalDefinitions a)) got
     return (IRModule globalValues)
 
-  generate a = evalState (generateCTranslationUnit a) (GeneratorState [[]] 1 Map.empty Nothing [])
+  generate a = evalState (generateCTranslationUnit a) (GeneratorState [[]] 1 Map.empty Nothing [] 0)

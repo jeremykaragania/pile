@@ -6,7 +6,9 @@ module Selector where
   import Syntax
   import Unsafe.Coerce
 
-  data OpcodeCondition = OpcodeCondition {opcode :: ARMOpcode, condition :: (Maybe ARMCondition)} deriving (Show, Eq)
+  data OpcodeCondition = OpcodeCondition {
+    opcode :: ARMOpcode,
+    condition :: (Maybe ARMCondition)} deriving (Show, Eq)
 
   data RegisterType =
     Virtual |
@@ -33,11 +35,19 @@ module Selector where
     FloatingValue Double |
     OtherValue deriving (Show, Eq)
 
-  data Node = Node {nodeID :: Integer, nodeType :: NodeType, nodeValues :: [(MachineValueType, Maybe NodeValue)]} deriving (Show, Eq)
+  data Node = Node {
+    nodeID :: Integer,
+    nodeType :: NodeType,
+    nodeValues :: [(MachineValueType, Maybe NodeValue)]} deriving (Show, Eq)
 
-  data Edge = Edge {fromNode :: Integer, toNode :: Integer, result :: Integer} deriving (Show, Eq)
+  data Edge = Edge {
+    fromNode :: Integer,
+    toNode :: Integer,
+    result :: Integer} deriving (Show, Eq)
 
-  data Graph = Graph {nodes :: [Node], edges :: [Edge]} deriving (Show, Eq)
+  data Graph = Graph {
+    nodes :: [Node],
+    edges :: [Edge]} deriving (Show, Eq)
 
   appendGraph a b = init b ++ [append (last b) (head a)] ++ tail a
     where append a b = Graph (nodes a ++ nodes b) (edges a ++ edges b)
@@ -47,7 +57,12 @@ module Selector where
     representation of the intermediate representation, an accumulator (counter) for the numbering of graph nodes, the most
     recent side-effecting node (chain), the stack pointer offset (offset), and the global value name (global).
   -}
-  data SelectorState = SelectorState {graphs :: [Graph], counter :: Integer, chain :: Integer, offset :: Integer, global :: String}
+  data SelectorState = SelectorState {
+    graphs :: [Graph],
+    counter :: Integer,
+    chain :: Integer,
+    offset :: Integer,
+    global :: String}
 
   setGraph a (SelectorState _ b c d e) = SelectorState a b c d e
 

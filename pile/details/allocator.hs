@@ -7,7 +7,9 @@
   import Selector hiding (counter, offset, Register, setOffset)
   import Syntax
 
-  data LiveInterval = LiveInterval {liveFrom :: Integer, liveTo :: Integer} deriving (Show, Eq, Ord)
+  data LiveInterval = LiveInterval {
+    liveFrom :: Integer,
+    liveTo :: Integer} deriving (Show, Eq, Ord)
 
   compareLiveTo (_, LiveInterval b (-1)) (_, LiveInterval c _) = compare b c
   compareLiveTo (_, LiveInterval b _) (_, LiveInterval c (-1)) = compare c b
@@ -19,11 +21,17 @@
 
   setLiveTo a (LiveInterval b _) = LiveInterval b a
 
-  data AnalyzerState = AnalyzerState {counter :: Integer, table :: Map Operand LiveInterval}
+  data AnalyzerState = AnalyzerState {
+    counter :: Integer,
+    table :: Map Operand LiveInterval}
 
   type AnalyzerStateMonad = State AnalyzerState
 
-  data AllocatorState = AllocatorState {available :: [Integer], active :: Map Operand LiveInterval, registers :: Map Operand Operand, offset :: Integer}
+  data AllocatorState = AllocatorState {
+    available :: [Integer],
+    active :: Map Operand LiveInterval,
+    registers :: Map Operand Operand,
+    offset :: Integer}
 
   type AllocatorStateMonad = State AllocatorState
 
