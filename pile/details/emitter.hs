@@ -21,13 +21,14 @@ module Emitter where
         | otherwise = (intercalate ", " (map emitOperand d))
 
   emitMachineCode (MCSymbol a) = a ++ ":"
-
-  emitMachineCode (a@(MCDirective _ b)) = "  ." ++ emitMCDirective a ++ " " ++ emitNodeValue b
+  emitMachineCode (MCDirective a@(MCConstant _ _)) = "  ." ++ emitMCDirective a
+  emitMachineCode (MCDirective a) = "." ++ emitMCDirective a
 
   emitMachineCodes = map (map emitMachineCode)
 
-  emitMCDirective (MCDirective Byte _) = "byte"
-  emitMCDirective (MCDirective Halfword _) = "hword"
-  emitMCDirective (MCDirective Word _) = "word"
+  emitMCDirective (MCConstant Halfword a) = "hword " ++ emitNodeValue a
+  emitMCDirective (MCConstant a b) = (map toLower . show) a ++ " " ++ emitNodeValue b
+  emitMCDirective (Global a) = "global " ++ a
+  emitMCDirective a = (map toLower . show) a
 
   emit = intercalate "\n" . map (intercalate "\n") . emitMachineCodes
