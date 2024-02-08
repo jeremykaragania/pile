@@ -292,7 +292,7 @@ module Generator where
         let expr = execState (expressions a) (setBlocks [[]] got)
         let exprType = (getType . snd . last . concat . blocks) expr
         if (isIntegral exprType) then do
-          let stat = execState ((switchStatement . splitLabeled . statementList . statementFromCCompound . compound) b) ((setBlocks [[], []] . setCounter (+1) . setContext (Just ((counter . fst) stat)) . fst) stat, ([(counter . fst) stat], []))
+          let stat = execState ((switchStatement . splitLabeled . statementList . statementFromCCompound . compound) b) ((GeneratorState [[], []] ((counter expr) + 1) (table got) (Just ((counter . fst) stat)) (globals got) (scope got)), ([(counter . fst) stat], []))
           let switch = [(Nothing, IRSwitch exprType (IRLabelNumber ((fromIntegral . length) ((snd . snd) stat))) (IRLabelNumber (labeledDefault ((fst . snd) stat))) ((snd . snd) stat))]
           let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (((counter . fst) stat)))))]
           let newBlocks = appendBlocks (blocks expr) (appendBlocks [switch] (appendBlocks ((blocks . fst) stat) [switchBr, []]))
