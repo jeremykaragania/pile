@@ -304,6 +304,22 @@ module Selector where
         let branch = execState (newBranch (OpcodeCondition ARMB Nothing) (toLabel (global got) a)) got
         put branch
 
+      selectIRLabeledInstruction (Nothing, IRSwitch _ a b c) = do
+        got <- get
+        let cmps = execState (comparisons c) got
+        let branch = execState (newBranch (OpcodeCondition ARMB Nothing) (toLabel (global got) b)) cmps
+        put branch
+        where
+          comparisons :: [(IRType, IRConstant, IRLabel)] -> SelectorStateMonad ()
+          comparisons [] = return ()
+
+          comparisons ((_, d, e):es) = do
+            got <- get
+            let cmp = execState (newIntegerCompare 0 Physical IRIEq (IRLabelValue a) (IRConstantValue d)) got
+            let branch = execState (newBranch (OpcodeCondition ARMB (Just ARMEq)) (toLabel (global got) e)) cmp
+            put branch
+            comparisons es
+
       selectIRLabeledInstruction (Just (IRLabelNumber a), IRAlloca b) = return ()
 
       selectIRLabeledInstruction (a@(Just (IRLabelNumber b)), IRLoad c (IRLabelValue (IRLabelName d))) = do
