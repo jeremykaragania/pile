@@ -238,33 +238,18 @@ module Selector where
         let mov2 = execState (newMov (OpcodeCondition ARMMov Nothing) b Virtual (Register Physical) [(Word, Just (IntegerValue 0))]) bl
         put mov2
 
-      newIntegerCompare :: Integer -> RegisterType -> IRICondition -> IRValue -> IRValue -> SelectorStateMonad ()
-      newIntegerCompare a b c d e = do
+      newIntegerCompare :: IRValue -> IRValue -> SelectorStateMonad ()
+      newIntegerCompare a b = do
         got <- get
         let newNodes = [
-              Node (counter got) (toNodeType d) [(Word, Just (toNodeValue d))],
-              Node (counter got + 1) (toNodeType e) [(Word, Just (toNodeValue e))],
+              Node (counter got) (toNodeType a) [(Word, Just (toNodeValue a))],
+              Node (counter got + 1) (toNodeType b) [(Word, Just (toNodeValue b))],
               Node (counter got + 2) (Opcode (OpcodeCondition ARMCmp Nothing)) [(Word, Nothing)]]
         let newEdges = [
               Edge (counter got) (counter got + 2) 0,
               Edge (counter got + 1) (counter got + 2) 0]
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
-        let mov0 = execState (newMov (OpcodeCondition ARMMov Nothing) a b (Constant) [(Word, Just (IntegerValue 0))]) ((setGraph newGraph . setCounter (+3)) got)
-        let mov1 = execState (newMov (OpcodeCondition ARMMov (Just (fromIRICondition c))) a b (Constant) [(Word, Just (IntegerValue 1))]) mov0
-        put mov1
-
-      newFloatingCompare :: Integer -> RegisterType -> IRFCondition -> Integer -> Integer -> SelectorStateMonad ()
-      newFloatingCompare a b c d e = do
-        got <- get
-        let mov0 = execState (newMov (OpcodeCondition ARMMov Nothing) 0 Physical (Register Virtual) [(Word, Just (IntegerValue d))]) got
-        let mov1 = execState (newMov (OpcodeCondition ARMMov Nothing) 1 Physical (Register Virtual) [(Word, Just (IntegerValue e))]) mov0
-        let bl = execState (newBranch (OpcodeCondition ARMBl Nothing) (nameFromIRFCondition c)) mov1
-        if (c == IRFOne) then do
-          let mov2 = execState (newMov (OpcodeCondition ARMMvn Nothing) a b (Register Physical) [(Word, Just (IntegerValue 0))]) bl
-          put mov2
-        else do
-          let mov2 = execState (newMov (OpcodeCondition ARMMov Nothing) a b (Register Physical) [(Word, Just (IntegerValue 0))]) bl
-          put mov2
+        put ((setGraph newGraph . setCounter (+3)) got)
 
       newCast :: String -> Maybe IRLabel -> IRValue -> SelectorStateMonad ()
       newCast a (Just (IRLabelNumber b)) (IRLabelValue (IRLabelNumber c)) = do
@@ -315,7 +300,7 @@ module Selector where
 
           comparisons ((_, d, e):es) = do
             got <- get
-            let cmp = execState (newIntegerCompare 0 Physical IRIEq (IRLabelValue a) (IRConstantValue d)) got
+            let cmp = execState (newIntegerCompare (IRLabelValue a) (IRConstantValue d)) got
             let branch = execState (newBranch (OpcodeCondition ARMB (Just ARMEq)) (toLabel (global got) e)) cmp
             put branch
             comparisons es
@@ -358,9 +343,24 @@ module Selector where
         let mov = execState (newMov (OpcodeCondition ARMMov Nothing) d Virtual (Register Virtual) [(Word, Just (IntegerValue c))]) got
         put mov
 
-      selectIRLabeledInstruction (Just (IRLabelNumber a), IRIcmp b _ d e) = newIntegerCompare a Virtual b d e
+      selectIRLabeledInstruction (Just (IRLabelNumber a), IRIcmp b _ c d) = do
+        got <- get
+        let cmp = execState (newIntegerCompare c d) got
+        let mov0 = execState (newMov (OpcodeCondition ARMMov Nothing) a Virtual (Constant) [(Word, Just (IntegerValue 0))]) cmp
+        let mov1 = execState (newMov (OpcodeCondition ARMMov (Just (fromIRICondition b))) a Virtual (Constant) [(Word, Just (IntegerValue 1))]) mov0
+        put mov1
 
-      selectIRLabeledInstruction ((Just (IRLabelNumber a)), IRFcmp b _ (IRLabelValue (IRLabelNumber c)) (IRLabelValue (IRLabelNumber d))) = newFloatingCompare a Virtual b c d
+      selectIRLabeledInstruction ((Just (IRLabelNumber a)), IRFcmp b _ (IRLabelValue (IRLabelNumber c)) (IRLabelValue (IRLabelNumber d))) = do
+        got <- get
+        let mov0 = execState (newMov (OpcodeCondition ARMMov Nothing) 0 Physical (Register Virtual) [(Word, Just (IntegerValue c))]) got
+        let mov1 = execState (newMov (OpcodeCondition ARMMov Nothing) 1 Physical (Register Virtual) [(Word, Just (IntegerValue d))]) mov0
+        let bl = execState (newBranch (OpcodeCondition ARMBl Nothing) (nameFromIRFCondition b)) mov1
+        if (b == IRFOne) then do
+          let mov2 = execState (newMov (OpcodeCondition ARMMvn Nothing) a Virtual (Register Physical) [(Word, Just (IntegerValue 0))]) bl
+          put mov2
+        else do
+          let mov2 = execState (newMov (OpcodeCondition ARMMov Nothing) a Virtual (Register Physical) [(Word, Just (IntegerValue 0))]) bl
+          put mov2
 
       selectIRLabeledInstruction (a, IRFptoui IRFloat b _) = newCast "__aeabi_f2uiz" a b
       selectIRLabeledInstruction (a, IRFptosi IRFloat b _) = newCast "__aeabi_f2iz" a b
