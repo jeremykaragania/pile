@@ -186,30 +186,9 @@ module Generator where
         declarations as
 
       declaration :: CDeclaration -> GeneratorStateMonad ()
-      declaration (CDeclaration d (Just (CInitDeclaratorList e))) = do
-        got <- get
-        let dec = execState (initDeclarators d e) got
-        put dec
+      declaration (CDeclaration d (Just (CInitDeclaratorList []))) = return ()
 
-      declaration (CInitDeclarator _ b) = do
-        got <- get
-        let expr = execState (expression b) got
-        let newBlocks = appendBlocks (blocks got) (blocks expr)
-        put ((setBlocks newBlocks) expr)
-
-      declaration (CDeclarator _ b) = return ()
-
-      newAlloca :: IRType -> GeneratorStateMonad ()
-      newAlloca a = do
-        got <- get
-        let alloca = [[(Just (IRLabelNumber (counter got)), IRAlloca a)]]
-        let newBlocks = appendBlocks alloca (blocks got)
-        put ((setBlocks newBlocks . setCounter (+1)) got)
-
-      initDeclarators :: CDeclaration -> [CDeclaration] -> GeneratorStateMonad ()
-      initDeclarators a [] = return ()
-
-      initDeclarators a (b:bs) = do
+      declaration (CDeclaration a (Just (CInitDeclaratorList (b:bs)))) = do
         got <- get
         let type0 = typeFromCSpecifiers a (getPointer b)
         let alloca = execState (newAlloca type0) got
@@ -227,7 +206,22 @@ module Generator where
           Nothing -> do
             let newTable = Map.insert (getIdentifier b) [(TableValue (scope got) (IRLabelNumber (counter got)) type0)] (table got)
             put ((setBlocks storeBlocks . setTable newTable) castExpr)
-        initDeclarators a bs
+        declaration (CDeclaration a (Just (CInitDeclaratorList bs)))
+
+      declaration (CInitDeclarator _ b) = do
+        got <- get
+        let expr = execState (expression b) got
+        let newBlocks = appendBlocks (blocks got) (blocks expr)
+        put ((setBlocks newBlocks) expr)
+
+      declaration (CDeclarator _ b) = return ()
+
+      newAlloca :: IRType -> GeneratorStateMonad ()
+      newAlloca a = do
+        got <- get
+        let alloca = [[(Just (IRLabelNumber (counter got)), IRAlloca a)]]
+        let newBlocks = appendBlocks alloca (blocks got)
+        put ((setBlocks newBlocks . setCounter (+1)) got)
 
       statementList (Just (CList a)) = a
       statementList Nothing = []
@@ -412,6 +406,14 @@ module Generator where
         let expr = execState (binaryExpression b d (getOperator a)) (setBlocks [[]] got)
         let newBlocks = appendBlocks (blocks expr) [[(Nothing, IRStore (identType ident) (IRLabelValue (IRLabelNumber (counter expr - 1))) (identLabel ident))]]
         put (setBlocks newBlocks expr)
+
+      expression (CExpression []) = return ()
+
+      expression (CExpression (a:as)) = do
+        got <- get
+        let expr = execState (expression a) got
+        put expr
+        expression (CExpression as)
 
       binaryExpression :: CExpression -> CExpression -> String -> GeneratorStateMonad ()
       binaryExpression a b c = do
