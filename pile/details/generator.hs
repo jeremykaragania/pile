@@ -25,6 +25,10 @@ module Generator where
     identLabel :: IRLabel,
     identType :: IRType} deriving (Show)
 
+  data InstrData = InstrData {
+    instrType :: IRType,
+    instrTo :: IRLabel}
+
   setBlocks a (GeneratorState _ b c d e f) = GeneratorState a b c d e f
 
   setCounter a (GeneratorState b c d e f g) = GeneratorState b (a c) d e f g
@@ -49,40 +53,44 @@ module Generator where
   getConstant (CInitDeclarator _ a) = a
   getConstant (CDeclarator _ _) = CConstant (CConstantToken (CIntegerConstant 0 Nothing))
 
-  getType (IRAdd a _ _) = a
-  getType (IRFadd a _ _) = a
-  getType (IRSub a _ _) = a
-  getType (IRFsub a _ _) = a
-  getType (IRMul a _ _) = a
-  getType (IRFmul a _ _) = a
-  getType (IRUdiv a _ _) = a
-  getType (IRSdiv a _ _) = a
-  getType (IRFdiv a _ _) = a
-  getType (IRUrem a _ _) = a
-  getType (IRSrem a _ _) = a
-  getType (IRFrem a _ _) = a
-  getType (IRShl a _ _) = a
-  getType (IRLshr a _ _) = a
-  getType (IRAshr a _ _) = a
-  getType (IRAnd a _ _) = a
-  getType (IROr a _ _) = a
-  getType (IRXor a _ _) = a
-  getType (IRAlloca a) = a
-  getType (IRLoad a _) = a
-  getType (IRStore a _ _) = a
-  getType (IRIcmp _ _ _ _) = IRInteger IRSigned
-  getType (IRFcmp _ _ _ _) = IRInteger IRSigned
-  getType (IRSext _ _ a) = a
-  getType (IRFptrunc _ _ a) = a
-  getType (IRFpext _ _ a) = a
-  getType (IRFptoui _ _ a) = a
-  getType (IRFptosi _ _ a) = a
-  getType (IRUitofp _ _ a) = a
-  getType (IRSitofp _ _ a) = a
-  getType (IRPtrtoint _ _ a) = a
-  getType (IRInttoptr _ _ a) = a
-  getType (IRBitcast _ _ a) = a
-  getType (IRAddrspacecast _ _ a) = a
+  getInstrData (Just a, (IRAdd b _ _)) = InstrData b a
+  getInstrData (Just a, (IRFadd b _ _)) = InstrData b a
+  getInstrData (Just a, (IRSub b _ _)) = InstrData b a
+  getInstrData (Just a, (IRFsub b _ _)) = InstrData b a
+  getInstrData (Just a, (IRMul b _ _)) = InstrData b a
+  getInstrData (Just a, (IRFmul b _ _)) = InstrData b a
+  getInstrData (Just a, (IRUdiv b _ _)) = InstrData b a
+  getInstrData (Just a, (IRSdiv b _ _)) = InstrData b a
+  getInstrData (Just a, (IRFdiv b _ _)) = InstrData b a
+  getInstrData (Just a, (IRUrem b _ _)) = InstrData b a
+  getInstrData (Just a, (IRSrem b _ _)) = InstrData b a
+  getInstrData (Just a, (IRFrem b _ _)) = InstrData b a
+  getInstrData (Just a, (IRShl b _ _)) = InstrData b a
+  getInstrData (Just a, (IRLshr b _ _)) = InstrData b a
+  getInstrData (Just a, (IRAshr b _ _)) = InstrData b a
+  getInstrData (Just a, (IRAnd b _ _)) = InstrData b a
+  getInstrData (Just a, (IROr b _ _)) = InstrData b a
+  getInstrData (Just a, (IRXor b _ _)) = InstrData b a
+  getInstrData (Just a, (IRAlloca b)) = InstrData b a
+  getInstrData (Just a, (IRLoad b _)) = InstrData b a
+  getInstrData (_, (IRStore a _ b)) = InstrData a b
+  getInstrData (Just a, (IRIcmp _ _ _ _)) = InstrData (IRInteger IRSigned) a
+  getInstrData (Just a, (IRFcmp _ _ _ _)) = InstrData (IRInteger IRSigned) a
+  getInstrData (Just a, (IRSext _ _ b)) = InstrData b a
+  getInstrData (Just a, (IRFptrunc _ _ b)) = InstrData b a
+  getInstrData (Just a, (IRFpext _ _ b)) = InstrData b a
+  getInstrData (Just a, (IRFptoui _ _ b)) = InstrData b a
+  getInstrData (Just a, (IRFptosi _ _ b)) = InstrData b a
+  getInstrData (Just a, (IRUitofp _ _ b)) = InstrData b a
+  getInstrData (Just a, (IRSitofp _ _ b)) = InstrData b a
+  getInstrData (Just a, (IRPtrtoint _ _ b)) = InstrData b a
+  getInstrData (Just a, (IRInttoptr _ _ b)) = InstrData b a
+  getInstrData (Just a, (IRBitcast _ _ b)) = InstrData b a
+  getInstrData (Just a, (IRAddrspacecast _ _ b)) = InstrData b a
+
+  getInstrType = (instrType . getInstrData)
+
+  getInstrTo = (instrTo . getInstrData)
 
   getOperator a
     | a == "=" = a
@@ -191,7 +199,7 @@ module Generator where
         let type0 = typeFromCSpecifiers a (getPointer b)
         let alloca = execState (newAlloca type0) got
         let dec = execState (declaration b) alloca
-        let type1 = (getType . snd . last . concat . blocks) dec
+        let type1 = (getInstrType . last . concat . blocks) dec
         let castExpr = execState (castExpression (type0, IRLabelValue (IRLabelNumber (counter got))) (type1, IRLabelValue (IRLabelNumber (counter dec - 1))) False) dec
         let store = [[(Nothing, IRStore (typeFromCSpecifiers a (getPointer b)) (IRLabelValue (IRLabelNumber (counter castExpr - 1))) (IRLabelNumber (counter got)))]]
         let newBlocks = appendBlocks (blocks castExpr) store
@@ -266,7 +274,7 @@ module Generator where
         got <- get
         let splitStat = (CCompound Nothing . Just . CList . splitLabeled . statementList . statementFromCCompound . compound) b
         let expr = execState (expressions a) got
-        let exprType = (getType . snd . last . concat . blocks) expr
+        let exprType = (getInstrType . last . concat . blocks) expr
         if (isIntegral exprType) then do
           let stat = execState ((switchStatement . splitLabeled . statementList . statementFromCCompound . compound) b) ((GeneratorState [[], []] ((counter expr) + 1) (table expr) (Just ((counter . fst) stat)) (globals got) (scope got)), ([(counter . fst) stat], []))
           let switch = [(Nothing, IRSwitch exprType (IRLabelNumber ((fromIntegral . length) ((snd . snd) stat))) (IRLabelNumber (labeledDefault ((fst . snd) stat))) ((snd . snd) stat))]
@@ -345,10 +353,10 @@ module Generator where
       selectionHead (CExpression a) b = do
         got <- get
         let expr = execState (expressions a) got
-        let exprType = (getType . snd . last . concat . blocks) expr
+        let exprType = (getInstrType . last . concat . blocks) expr
         let cmp = (Just (IRLabelNumber (counter expr)), comparisonInstruction (exprType, counter expr))
         let stat = execState (statement b) (setCounter (+1) expr)
-        let br0 = (Nothing, IRBrConditional ((getType . snd) cmp) (IRLabelValue (IRLabelNumber (counter expr))) (IRLabelValue (IRLabelNumber (counter expr + 1))) (IRLabelValue (IRLabelNumber (counter stat + 1))))
+        let br0 = (Nothing, IRBrConditional (getInstrType cmp) (IRLabelValue (IRLabelNumber (counter expr))) (IRLabelValue (IRLabelNumber (counter expr + 1))) (IRLabelValue (IRLabelNumber (counter stat + 1))))
         let newBlocks = appendBlocks (blocks stat) (appendBlocks [[cmp]] [[br0]])
         put ((setBlocks newBlocks . setCounter (+2)) expr)
         where
@@ -385,17 +393,17 @@ module Generator where
       expression (CBinary a b c) = do
         got <- get
         let expr0 = execState (expression b) got
-        let type0 = (getType . snd . last . concat . blocks) expr0
+        let type0 = (getInstrType . last . concat . blocks) expr0
         if a == "=" then do
           let expr1 = execState (expression c) got
-          let type1 = (getType . snd . last . concat . blocks) expr1
+          let type1 = (getInstrType . last . concat . blocks) expr1
           let castExpr = execState (castExpression (type0, IRLabelValue (IRLabelNumber (counter expr1 - 1))) (type1, IRLabelValue (IRLabelNumber (counter expr1 - 1))) False) expr1
           put castExpr
         else do
           let expr1 = execState (expression c) expr0
-          let type1 = (getType . snd . last . concat . blocks) expr1
+          let type1 = (getInstrType . last . concat . blocks) expr1
           let castExpr = execState (castExpression (type0, IRLabelValue (IRLabelNumber (counter expr0 - 1))) (type1, IRLabelValue (IRLabelNumber (counter expr1 - 1))) True) expr1
-          let castType = (getType . snd . last . concat) (blocks castExpr)
+          let castType = (getInstrType . last . concat) (blocks castExpr)
           let bin = binary (type0, counter expr0) (type1, counter expr1) (castType, counter castExpr)
           let newBlocks = appendBlocks (blocks castExpr) [[(Just (IRLabelNumber (counter castExpr)), bin)]]
           put ((setBlocks newBlocks . setCounter (+1)) castExpr)
