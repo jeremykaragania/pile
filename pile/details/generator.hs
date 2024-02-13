@@ -303,9 +303,11 @@ module Generator where
 
       statement (CReturn (Just a)) = do
         got <- get
-        let instrs = [[(Nothing, IRRet (Just (IRConstantValue (generateIRConstant a b))))]]
-        let newBlocks = appendBlocks (blocks got) instrs
-        put (setBlocks newBlocks got)
+        let expr = execState (expression a) got
+        let exprLabel = (getInstrTo . last . concat . blocks) expr
+        let instrs = [[(Nothing, IRRet (Just (IRLabelValue exprLabel)))]]
+        let newBlocks = appendBlocks (blocks expr) instrs
+        put (setBlocks newBlocks expr)
 
       statement (CBreak) = do
         got <- get
