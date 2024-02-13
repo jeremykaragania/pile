@@ -43,6 +43,15 @@ module Generator where
 
   type GeneratorStateMonad = State GeneratorState
 
+  declarationList (Just (CDeclarationList a)) = a
+  declarationList Nothing = []
+
+  statementList (Just (CList a)) = a
+  statementList Nothing = []
+
+  compound (CCompound a b) = CCompound a b
+  compound a = CCompound Nothing (Just (CList [a]))
+
   getIdentifier (CInitDeclarator a _) = getIdentifier a
   getIdentifier (CDirectDeclaratorIdentifier a) = (identifier . token) a
   getIdentifier (CDeclarator _ a) = getIdentifier a
@@ -172,362 +181,143 @@ module Generator where
       value _ = 0
 
   {-
-    generateCStatement is used for the generation of basic blocks, which are just instruction lists, from a function body,
+    appendBlocks receives two lists of basic blocks (a, and b) to appended together. the first block of b is appended to
+    the last block of a and the remaining blocks of b are appended to the end which results in the modification of the last
+    block of a. When modification is not desired and a new block should be started, append an empty block to a beforehand.
+  -}
+  appendBlocks a b = init a ++ [last a ++ head b] ++ tail b
+
+  {-
+    getCastInstr receives two type-value pairs (a, and b), with different types and cast specifier (c). It will perform
+    a cast operation to either a or b according to c such that a, and b both have the same type. If c is False, the cast is
+    a downcast, and if c is True, the cast is an upcast.
+  -}
+  getCastInstr (a, b) (c, d) e
+    | isIRShortInteger a && isIRInteger c && e = IRSext a b c
+    | isIRShortInteger a && isIRInteger c && not e = IRTrunc c d c
+    | isIRShortInteger a && isIRLongInteger c && e = IRSext a b c
+    | isIRShortInteger a && isIRLongInteger c && not e = IRTrunc c d c
+    | isIRInteger a && isIRShortInteger c && e = IRSext c d a
+    | isIRInteger a && isIRShortInteger c && not e = IRTrunc a b c
+    | isIRInteger a && isIRLongInteger c && e = IRSext a b c
+    | isIRInteger a && isIRLongInteger c && not e = IRTrunc c d a
+    | isIRLongInteger a && isIRShortInteger c && e = IRSext c d a
+    | isIRLongInteger a && isIRShortInteger c && not e = IRTrunc a b c
+    | isIRLongInteger a && isIRInteger c && e = IRSext c d a
+    | isIRLongInteger a && isIRInteger c && not e = IRTrunc a b c
+    | a == IRFloat && c == IRDouble && e = IRFpext a b c
+    | a == IRFloat && c == IRDouble && not e = IRFptrunc c d a
+    | a == IRFloat && c == IRLongDouble && e = IRFpext a b c
+    | a == IRFloat && c == IRLongDouble && not e = IRFptrunc c d a
+    | a == IRDouble && c == IRFloat && e = IRFpext c d a
+    | a == IRDouble && c == IRFloat && not e = IRFptrunc a b c
+    | a == IRDouble && c == IRLongDouble && e = IRFpext a b c
+    | a == IRDouble && c == IRLongDouble && not e = IRFptrunc c d a
+    | a == IRLongDouble && c == IRFloat && e = IRFpext c d a
+    | a == IRLongDouble && c == IRFloat && not e = IRFptrunc a b c
+    | a == IRLongDouble && c == IRDouble && e = IRFpext c d a
+    | a == IRLongDouble && c == IRDouble && not e = IRFptrunc a b c
+    | isIntegral a && isFloating c && e = IRSitofp a b c
+    | isFloating a && isIntegral c && e = IRSitofp c d a
+    | isIntegral a && isFloating c && not e = IRFptosi c d a
+    | isFloating a && isIntegral c && not e = IRSitofp c d a
+    | otherwise = error ""
+
+  {-
+    getBinaryInstr receives a binary operation symbol as a string (a), and the types of the two arguments for the
+    operation (a, and b) to ensure that they are the same type.
+  -}
+  getBinaryInstr a b
+    | a == "*" && isIntegral b = IRMul
+    | a == "*" && isFloating b = IRFmul
+    | a == "/" && isFloating b = IRFdiv
+    | a == "/" && isIRUnsigned b = IRUdiv
+    | a == "/" && isIRSigned b = IRSdiv
+    | a == "%" && isIRUnsigned b = IRUrem
+    | a == "%" && isIRSigned b = IRSrem
+    | a == "%" && isFloating b = IRFrem
+    | a == "+" && isIntegral b = IRAdd
+    | a == "+" && isFloating b = IRFadd
+    | a == "-" && isIntegral b = IRSub
+    | a == "-" && isFloating b = IRFsub
+    | a == "<<" && isIntegral b = IRShl
+    | a == ">>" && isIntegral b = IRAshr
+    | a == "<" && isIRUnsigned b = IRIcmp IRIUlt
+    | a == "<" && isIRSigned b = IRIcmp IRISlt
+    | a == "<" && isFloating b = IRFcmp IRFOlt
+    | a == ">" && isIRUnsigned b = IRIcmp IRIUgt
+    | a == ">" && isIRSigned b = IRIcmp IRISgt
+    | a == ">" && isFloating b = IRFcmp IRFOgt
+    | a == "<=" && isIRUnsigned b = IRIcmp IRIUle
+    | a == "<=" && isIRSigned b = IRIcmp IRISle
+    | a == "<=" && isFloating b = IRFcmp IRFOle
+    | a == ">=" && isIRUnsigned b = IRIcmp IRIUge
+    | a == ">=" && isIRSigned b = IRIcmp IRISge
+    | a == ">=" && isFloating b = IRFcmp IRFOge
+    | a == "==" && isIntegral b = IRIcmp IRIEq
+    | a == "==" && isFloating b = IRFcmp IRFOeq
+    | a == "!=" && isIntegral b = IRIcmp IRINe
+    | a == "!=" && isFloating b = IRFcmp IRFOne
+    | a == "&" && isIntegral b = IRAnd
+    | a == "^" && isIntegral b = IRXor
+    | a == "|" && isIntegral b = IROr
+    | otherwise = error ""
+
+  newAlloca :: IRType -> GeneratorStateMonad ()
+  newAlloca a = do
+    got <- get
+    let alloca = [[(Just (IRLabelNumber (counter got)), IRAlloca a)]]
+    let newBlocks = appendBlocks (blocks got) alloca
+    put ((setBlocks newBlocks . setCounter (+1)) got)
+
+  newCast :: (IRType, IRValue) -> (IRType, IRValue) -> Bool -> GeneratorStateMonad ()
+  newCast a b c
+    | isSameType (fst a) (fst b) == Nothing = do
+      got <- get
+      let instrs = [[(Just (IRLabelNumber (counter got)), getCastInstr a b c)]]
+      let newBlocks = appendBlocks (blocks got) instrs
+      put ((setBlocks newBlocks . setCounter (+1)) got)
+    | otherwise = return ()
+
+  newLabeled :: CStatement -> GeneratorStateMonad ()
+  newLabeled a = do
+    got <- get
+    let stat = execState ((generateCStatement . compound) a) got
+    let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter stat)))))]
+    let newBlocks = appendBlocks (blocks stat) [switchBr, []]
+    put ((setBlocks newBlocks . setCounter (+1)) stat)
+
+  {-
+    All selection statements consist of an expression (a), and at least one body (b) which is a compound statement.
+    Therefore, newSelectionHead generates this selection statement head so it can be used in other selection statement
+    generators.
+  -}
+  newSelectionHead :: CExpression -> CStatement -> GeneratorStateMonad ()
+  newSelectionHead (CExpression a) b = do
+    got <- get
+    let expr = execState (generateCExpressions a) got
+    let exprType = (getInstrType . last . concat . blocks) expr
+    let cmp = (Just (IRLabelNumber (counter expr)), comparisonInstruction (exprType, counter expr))
+    let stat = execState (generateCStatement b) (setCounter (+1) expr)
+    let br0 = (Nothing, IRBrConditional (getInstrType cmp) (IRLabelValue (IRLabelNumber (counter expr))) (IRLabelValue (IRLabelNumber (counter expr + 1))) (IRLabelValue (IRLabelNumber (counter stat + 1))))
+    let newBlocks = appendBlocks (blocks stat) (appendBlocks [[cmp]] [[br0]])
+    put ((setBlocks newBlocks . setCounter (+2)) expr)
+    where
+      -- Different comparison instructions are used depending on argument type.
+      comparisonInstruction a
+        | (isIntegral . fst) a = IRIcmp IRINe (fst a) (IRLabelValue (IRLabelNumber (snd a - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
+        | (isFloating . fst) a = IRFcmp IRFOne (fst a) (IRLabelValue (IRLabelNumber (snd a - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
+
+  {-
+    newFunctionBody is used for the generation of basic blocks, which are just instruction lists, from a function body,
     which is just a compound statement. It receives a compound statement (a), and the return type of the function (b).
   -}
-  generateCStatement :: CStatement -> IRType -> GeneratorStateMonad [IRBasicBlock]
-  generateCStatement a b = do
+  newFunctionBody :: CStatement -> IRType -> GeneratorStateMonad [IRBasicBlock]
+  newFunctionBody a b = do
     got <- get
-    let stat = execState (statement a) got
+    let stat = execState (generateCStatement a) got
     return (fst (execState ((numberBlocks . blocks) stat) ([], 0)))
     where
-      declarationList (Just (CDeclarationList a)) = a
-      declarationList Nothing = []
-
-      declarations :: [CDeclaration] -> GeneratorStateMonad ()
-      declarations [] = return ()
-
-      declarations (a:as) = do
-        declaration a
-        declarations as
-
-      declaration :: CDeclaration -> GeneratorStateMonad ()
-      declaration (CDeclaration d (Just (CInitDeclaratorList []))) = return ()
-
-      declaration (CDeclaration a (Just (CInitDeclaratorList (b:bs)))) = do
-        got <- get
-        let type0 = typeFromCSpecifiers a (getPointer b)
-        let alloca = execState (newAlloca type0) got
-        let dec = execState (declaration b) alloca
-        let type1 = (getInstrType . last . concat . blocks) dec
-        let castExpr = execState (castExpression (type0, IRLabelValue (IRLabelNumber (counter got))) (type1, IRLabelValue (IRLabelNumber (counter dec - 1))) False) dec
-        let store = [[(Nothing, IRStore (typeFromCSpecifiers a (getPointer b)) (IRLabelValue (IRLabelNumber (counter castExpr - 1))) (IRLabelNumber (counter got)))]]
-        let newBlocks = appendBlocks (blocks castExpr) store
-        case Map.lookup (getIdentifier b) (table got) of
-          Just c -> do
-            if all (\d -> identScope d /= (scope got)) c then do
-              let newTable = Map.insert (getIdentifier b) (c ++ [(TableValue (scope got) (IRLabelNumber (counter got)) type0)]) (table got)
-              put ((setBlocks newBlocks . setTable newTable) castExpr)
-            else error ""
-          Nothing -> do
-            let newTable = Map.insert (getIdentifier b) [(TableValue (scope got) (IRLabelNumber (counter got)) type0)] (table got)
-            put ((setBlocks newBlocks . setTable newTable) castExpr)
-        declaration (CDeclaration a (Just (CInitDeclaratorList bs)))
-
-      declaration (CInitDeclarator _ b) = expression b
-
-      declaration (CDeclarator _ b) = return ()
-
-      newAlloca :: IRType -> GeneratorStateMonad ()
-      newAlloca a = do
-        got <- get
-        let alloca = [[(Just (IRLabelNumber (counter got)), IRAlloca a)]]
-        let newBlocks = appendBlocks (blocks got) alloca
-        put ((setBlocks newBlocks . setCounter (+1)) got)
-
-      statementList (Just (CList a)) = a
-      statementList Nothing = []
-
-      statements :: [CStatement] -> GeneratorStateMonad ()
-      statements [] = return ()
-
-      statements (a:as) = do
-        got <- get
-        statement a
-        statements as
-
-      statement :: CStatement -> GeneratorStateMonad ()
-      statement (CLabeledCase a b) = labeled b
-
-      statement (CLabeledDefault a) = labeled a
-
-      statement (CList a) = statements a
-
-      statement (CCompound a b) = do
-        got <- get
-        let dec = execState ((declarations . declarationList) a) (setLevel (+1) got)
-        let stat = execState ((statements . statementList) b) dec
-        put (setLevel (+ (-1)) stat)
-
-      statement (CCExpression (Just (CExpression []))) = return ()
-
-      statement (CCExpression (Just (CExpression a))) = expressions a
-
-      statement (CIf a@(CExpression _) b) = do
-        got <- get
-        let ifHead = execState (selectionHead a (compound b)) got
-        let ifBody = execState ((statement . compound) b) (setBlocks ((blocks ifHead) ++ [[]]) ifHead)
-        let ifBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter ifBody)))))]
-        let newBlocks = appendBlocks (blocks ifBody) [ifBr, []]
-        put ((setBlocks newBlocks . setCounter (+1)) ifBody)
-
-      statement (CIfElse a@(CExpression _) b c) = do
-        got <- get
-        let ifHead = execState (selectionHead a (compound b)) got
-        let ifBody = execState ((statement . compound) b) (setBlocks ((blocks ifHead) ++ [[]]) ifHead)
-        let elseBody = execState ((statement . compound) c) ((setBlocks ((blocks ifBody) ++ [[]]) . setCounter (+1)) ifBody)
-        let elseBr = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter elseBody)))))]]
-        let newBlocks = appendBlocks (blocks elseBody) elseBr
-        put ((setBlocks newBlocks . setCounter (+1)) elseBody)
-
-      statement (CSwitch (CExpression a) b) = do
-        got <- get
-        let splitStat = (CCompound Nothing . Just . CList . splitLabeled . statementList . statementFromCCompound . compound) b
-        let expr = execState (expressions a) got
-        let exprType = (getInstrType . last . concat . blocks) expr
-        if (isIntegral exprType) then do
-          let stat = execState ((switchStatement . splitLabeled . statementList . statementFromCCompound . compound) b) ((GeneratorState [[], []] ((counter expr) + 1) (table expr) (Just ((counter . fst) stat)) (globals got) (scope got)), ([(counter . fst) stat], []))
-          let switch = [(Nothing, IRSwitch exprType (IRLabelNumber ((fromIntegral . length) ((snd . snd) stat))) (IRLabelNumber (labeledDefault ((fst . snd) stat))) ((snd . snd) stat))]
-          let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (((counter . fst) stat)))))]
-          let newBlocks = appendBlocks (blocks expr) (appendBlocks [switch] (appendBlocks ((blocks . fst) stat) [switchBr, []]))
-          put ((setBlocks newBlocks . setCounter (+1) . setContext Nothing . fst) stat)
-        else error ""
-        where
-          splitLabeled [] = []
-          splitLabeled (a:as)
-            | isLabeled a = a:as
-            | otherwise = splitLabeled as
-          isLabeled (CLabeledCase _ _) = True
-          isLabeled (CLabeledDefault _) = True
-          isLabeled _ = False
-          -- Decides whether to use the explicit (a) or implicit (b) default label.
-          labeledDefault [a] = a
-          labeledDefault [a, b] = b
-          labeledDefault _ = error ""
-
-      statement (CReturn Nothing) = do
-        got <- get
-        let instrs = [[(Nothing, IRRet Nothing)]]
-        let newBlocks = appendBlocks (blocks got) instrs
-        put (setBlocks newBlocks got)
-
-      statement (CReturn (Just a)) = do
-        got <- get
-        let expr = execState (expression a) got
-        let exprLabel = (getInstrTo . last . concat . blocks) expr
-        let instrs = [[(Nothing, IRRet (Just (IRLabelValue exprLabel)))]]
-        let newBlocks = appendBlocks (blocks expr) instrs
-        put (setBlocks newBlocks expr)
-
-      statement (CBreak) = do
-        got <- get
-        case (context got) of
-          Just a -> do
-            let instrs = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (a))))]]
-            let newBlocks = appendBlocks (blocks got) instrs
-            put (setBlocks newBlocks got)
-          otherwise -> error ""
-
-      labeled :: CStatement -> GeneratorStateMonad ()
-      labeled a = do
-        got <- get
-        let stat = execState ((statement . compound) a) got
-        let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter stat)))))]
-        let newBlocks = appendBlocks (blocks stat) [switchBr, []]
-        put ((setBlocks newBlocks . setCounter (+1)) stat)
-
-      switchStatement :: [CStatement] -> State (GeneratorState, ([Integer], [(IRType, IRConstant, IRLabel)])) ()
-      switchStatement [] = return ()
-
-      switchStatement (a:as) = do
-        got <- get
-        let stat = execState (statement a) (fst got)
-        let newBlocks = blocks stat
-        case a of
-          CLabeledCase a _ -> do
-            let switchConstant = (constant . token) a
-            let switchType = typeFromCConstant switchConstant
-            put ((stat, ((fst . snd) got, (snd . snd) got ++ [(switchType, generateIRConstant a switchType, IRLabelNumber ((counter . fst) got - 1))])))
-            switchStatement as
-          CLabeledDefault _ -> do
-            put ((stat, ((fst . snd) got ++ [(counter . fst) got - 1], (snd . snd) got)))
-            switchStatement as
-          otherwise -> do
-            put ((stat, ((fst . snd) got, (snd . snd) got)))
-            switchStatement as
-
-      {-
-        All selection statements consist of an expression (a), and at least one body (b) which is a compound statement.
-        Therefore, selectionHead generates this selection statement head so it can be used in other selection statement
-        generators.
-      -}
-      selectionHead :: CExpression -> CStatement -> GeneratorStateMonad ()
-      selectionHead (CExpression a) b = do
-        got <- get
-        let expr = execState (expressions a) got
-        let exprType = (getInstrType . last . concat . blocks) expr
-        let cmp = (Just (IRLabelNumber (counter expr)), comparisonInstruction (exprType, counter expr))
-        let stat = execState (statement b) (setCounter (+1) expr)
-        let br0 = (Nothing, IRBrConditional (getInstrType cmp) (IRLabelValue (IRLabelNumber (counter expr))) (IRLabelValue (IRLabelNumber (counter expr + 1))) (IRLabelValue (IRLabelNumber (counter stat + 1))))
-        let newBlocks = appendBlocks (blocks stat) (appendBlocks [[cmp]] [[br0]])
-        put ((setBlocks newBlocks . setCounter (+2)) expr)
-        where
-          -- Different comparison instructions are used depending on argument type.
-          comparisonInstruction a
-            | (isIntegral . fst) a = IRIcmp IRINe (fst a) (IRLabelValue (IRLabelNumber (snd a - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
-            | (isFloating . fst) a = IRFcmp IRFOne (fst a) (IRLabelValue (IRLabelNumber (snd a - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
-
-      {-
-        The last instruction of a generated expression will contain the resulting value of that expression. This makes it
-        easier to get the resulting type of an expression after generation.
-      -}
-      expressions :: [CExpression] -> GeneratorStateMonad ()
-      expressions [] = return ()
-
-      expressions (a:as) = do
-        expression a
-        expressions as
-
-      expression :: CExpression -> GeneratorStateMonad ()
-      expression (CIdentifier a) = do
-        got <- get
-        let ident = (last . filter (\b -> (identScope b) <= (scope got))) ((table got) Map.! (identifier a))
-        let instrs = [[((Just (IRLabelNumber (counter got))), IRLoad (identType ident) (IRLabelValue (identLabel ident)))]]
-        let newBlocks = appendBlocks (blocks got) instrs
-        put ((setBlocks newBlocks . setCounter (+1)) got)
-
-      expression a@(CConstant b) = do
-        got <- get
-        let instrs = [[(Just (IRLabelNumber (counter got)), IRAlloca ((typeFromCConstant . constant) b)), (Nothing, IRStore ((typeFromCConstant . constant) b) (IRConstantValue (generateIRConstant a ((typeFromCConstant . constant) b))) (IRLabelNumber (counter got)))]]
-        let newBlocks = appendBlocks (blocks got) instrs
-        put ((setBlocks newBlocks . setCounter (+1)) got)
-
-      expression (CBinary a b c) = do
-        got <- get
-        let expr0 = execState (expression b) got
-        let type0 = (getInstrType . last . concat . blocks) expr0
-        if a == "=" then do
-          let expr1 = execState (expression c) got
-          let type1 = (getInstrType . last . concat . blocks) expr1
-          let castExpr = execState (castExpression (type0, IRLabelValue (IRLabelNumber (counter expr1 - 1))) (type1, IRLabelValue (IRLabelNumber (counter expr1 - 1))) False) expr1
-          put castExpr
-        else do
-          let expr1 = execState (expression c) expr0
-          let type1 = (getInstrType . last . concat . blocks) expr1
-          let castExpr = execState (castExpression (type0, IRLabelValue (IRLabelNumber (counter expr0 - 1))) (type1, IRLabelValue (IRLabelNumber (counter expr1 - 1))) True) expr1
-          let castType = (getInstrType . last . concat) (blocks castExpr)
-          let bin = binary (type0, counter expr0) (type1, counter expr1) (castType, counter castExpr)
-          let newBlocks = appendBlocks (blocks castExpr) [[(Just (IRLabelNumber (counter castExpr)), bin)]]
-          put ((setBlocks newBlocks . setCounter (+1)) castExpr)
-        where
-          {-
-            Selects the expression which was not casted and uses it to generate the binary instruction. Ensures that the binary
-            instruction is not generated with duplicate arguments.
-          -}
-          binary d e f
-            | fst d == fst f = (binaryInstruction a (fst f)) (fst f) (IRLabelValue (IRLabelNumber (snd d - 1))) (IRLabelValue (IRLabelNumber (snd f - 1)))
-            | fst e == fst f = (binaryInstruction a (fst f)) (fst f) (IRLabelValue (IRLabelNumber (snd f - 1))) (IRLabelValue (IRLabelNumber (snd e - 1)))
-
-      expression (CAssignment a b@(CIdentifier c) d) = do
-        got <- get
-        let ident = (last . filter (\e -> (identScope e) <= (scope got))) ((table got) Map.! (identifier c))
-        let expr = execState (expression (CBinary (getOperator a) b d)) got
-        let newBlocks = appendBlocks (blocks expr) [[(Nothing, IRStore (identType ident) (IRLabelValue (IRLabelNumber (counter expr - 1))) (identLabel ident))]]
-        put (setBlocks newBlocks expr)
-
-      expression (CExpression []) = return ()
-
-      expression (CExpression (a:as)) = do
-        got <- get
-        let expr = execState (expression a) got
-        put expr
-        expression (CExpression as)
-
-      castExpression :: (IRType, IRValue) -> (IRType, IRValue) -> Bool -> GeneratorStateMonad ()
-      castExpression a b c
-        | isSameType (fst a) (fst b) == Nothing = do
-          got <- get
-          let instrs = [[(Just (IRLabelNumber (counter got)), castInstruction a b c)]]
-          let newBlocks = appendBlocks (blocks got) instrs
-          put ((setBlocks newBlocks . setCounter (+1)) got)
-        | otherwise = return ()
-
-      {-
-        castInstruction receives two type-value pairs (a, and b), with different types and cast specifier (c). It will perform
-        a cast operation to either a or b according to c such that a, and b both have the same type. If c is False, the cast is
-        a downcast, and if c is True, the cast is an upcast.
-      -}
-      castInstruction (a, b) (c, d) e
-        | isIRShortInteger a && isIRInteger c && e = IRSext a b c
-        | isIRShortInteger a && isIRInteger c && not e = IRTrunc c d c
-        | isIRShortInteger a && isIRLongInteger c && e = IRSext a b c
-        | isIRShortInteger a && isIRLongInteger c && not e = IRTrunc c d c
-        | isIRInteger a && isIRShortInteger c && e = IRSext c d a
-        | isIRInteger a && isIRShortInteger c && not e = IRTrunc a b c
-        | isIRInteger a && isIRLongInteger c && e = IRSext a b c
-        | isIRInteger a && isIRLongInteger c && not e = IRTrunc c d a
-        | isIRLongInteger a && isIRShortInteger c && e = IRSext c d a
-        | isIRLongInteger a && isIRShortInteger c && not e = IRTrunc a b c
-        | isIRLongInteger a && isIRInteger c && e = IRSext c d a
-        | isIRLongInteger a && isIRInteger c && not e = IRTrunc a b c
-        | a == IRFloat && c == IRDouble && e = IRFpext a b c
-        | a == IRFloat && c == IRDouble && not e = IRFptrunc c d a
-        | a == IRFloat && c == IRLongDouble && e = IRFpext a b c
-        | a == IRFloat && c == IRLongDouble && not e = IRFptrunc c d a
-        | a == IRDouble && c == IRFloat && e = IRFpext c d a
-        | a == IRDouble && c == IRFloat && not e = IRFptrunc a b c
-        | a == IRDouble && c == IRLongDouble && e = IRFpext a b c
-        | a == IRDouble && c == IRLongDouble && not e = IRFptrunc c d a
-        | a == IRLongDouble && c == IRFloat && e = IRFpext c d a
-        | a == IRLongDouble && c == IRFloat && not e = IRFptrunc a b c
-        | a == IRLongDouble && c == IRDouble && e = IRFpext c d a
-        | a == IRLongDouble && c == IRDouble && not e = IRFptrunc a b c
-        | isIntegral a && isFloating c && e = IRSitofp a b c
-        | isFloating a && isIntegral c && e = IRSitofp c d a
-        | isIntegral a && isFloating c && not e = IRFptosi c d a
-        | isFloating a && isIntegral c && not e = IRSitofp c d a
-        | otherwise = error ""
-
-      {-
-        binaryInstruction receives a binary operation symbol as a string (a), and the types of the two arguments for the
-        operation (a, and b) to ensure that they are the same type.
-      -}
-      binaryInstruction a b
-        | a == "*" && isIntegral b = IRMul
-        | a == "*" && isFloating b = IRFmul
-        | a == "/" && isFloating b = IRFdiv
-        | a == "/" && isIRUnsigned b = IRUdiv
-        | a == "/" && isIRSigned b = IRSdiv
-        | a == "%" && isIRUnsigned b = IRUrem
-        | a == "%" && isIRSigned b = IRSrem
-        | a == "%" && isFloating b = IRFrem
-        | a == "+" && isIntegral b = IRAdd
-        | a == "+" && isFloating b = IRFadd
-        | a == "-" && isIntegral b = IRSub
-        | a == "-" && isFloating b = IRFsub
-        | a == "<<" && isIntegral b = IRShl
-        | a == ">>" && isIntegral b = IRAshr
-        | a == "<" && isIRUnsigned b = IRIcmp IRIUlt
-        | a == "<" && isIRSigned b = IRIcmp IRISlt
-        | a == "<" && isFloating b = IRFcmp IRFOlt
-        | a == ">" && isIRUnsigned b = IRIcmp IRIUgt
-        | a == ">" && isIRSigned b = IRIcmp IRISgt
-        | a == ">" && isFloating b = IRFcmp IRFOgt
-        | a == "<=" && isIRUnsigned b = IRIcmp IRIUle
-        | a == "<=" && isIRSigned b = IRIcmp IRISle
-        | a == "<=" && isFloating b = IRFcmp IRFOle
-        | a == ">=" && isIRUnsigned b = IRIcmp IRIUge
-        | a == ">=" && isIRSigned b = IRIcmp IRISge
-        | a == ">=" && isFloating b = IRFcmp IRFOge
-        | a == "==" && isIntegral b = IRIcmp IRIEq
-        | a == "==" && isFloating b = IRFcmp IRFOeq
-        | a == "!=" && isIntegral b = IRIcmp IRINe
-        | a == "!=" && isFloating b = IRFcmp IRFOne
-        | a == "&" && isIntegral b = IRAnd
-        | a == "^" && isIntegral b = IRXor
-        | a == "|" && isIntegral b = IROr
-        | otherwise = error ""
-
-      compound (CCompound a b) = CCompound a b
-      compound a = CCompound Nothing (Just (CList [a]))
-
-      {-
-        appendBlocks receives two lists of basic blocks (a, and b) to appended together. the first block of b is appended to
-        the last block of a and the remaining blocks of b are appended to the end which results in the modification of the last
-        block of a. When modification is not desired and a new block should be started, append an empty block to a beforehand.
-      -}
-      appendBlocks a b = init a ++ [last a ++ head b] ++ tail b
-
       {-
         It is hard to number blocks as they are being generated because there is not enough context. Therefore, block
         numbering is the last step. A block number can be calculated by counting the past numbered instructions in past blocks.
@@ -545,10 +335,219 @@ module Generator where
           numbered (Nothing, _) = False
           numbered _ = True
 
+  {-
+    The last instruction of a generated expression will contain the resulting value of that expression. This makes it
+    easier to get the resulting type of an expression after generation.
+  -}
+  generateCExpressions :: [CExpression] -> GeneratorStateMonad ()
+  generateCExpressions [] = return ()
+
+  generateCExpressions (a:as) = do
+    generateCExpression a
+    generateCExpressions as
+
+  generateCExpression :: CExpression -> GeneratorStateMonad ()
+  generateCExpression (CIdentifier a) = do
+    got <- get
+    let ident = (last . filter (\b -> (identScope b) <= (scope got))) ((table got) Map.! (identifier a))
+    let instrs = [[((Just (IRLabelNumber (counter got))), IRLoad (identType ident) (IRLabelValue (identLabel ident)))]]
+    let newBlocks = appendBlocks (blocks got) instrs
+    put ((setBlocks newBlocks . setCounter (+1)) got)
+
+  generateCExpression a@(CConstant b) = do
+    got <- get
+    let instrs = [[(Just (IRLabelNumber (counter got)), IRAlloca ((typeFromCConstant . constant) b)), (Nothing, IRStore ((typeFromCConstant . constant) b) (IRConstantValue (generateIRConstant a ((typeFromCConstant . constant) b))) (IRLabelNumber (counter got)))]]
+    let newBlocks = appendBlocks (blocks got) instrs
+    put ((setBlocks newBlocks . setCounter (+1)) got)
+
+  generateCExpression (CBinary a b c) = do
+    got <- get
+    let expr0 = execState (generateCExpression b) got
+    let type0 = (getInstrType . last . concat . blocks) expr0
+    if a == "=" then do
+      let expr1 = execState (generateCExpression c) got
+      let type1 = (getInstrType . last . concat . blocks) expr1
+      let castExpr = execState (newCast (type0, IRLabelValue (IRLabelNumber (counter expr1 - 1))) (type1, IRLabelValue (IRLabelNumber (counter expr1 - 1))) False) expr1
+      put castExpr
+    else do
+      let expr1 = execState (generateCExpression c) expr0
+      let type1 = (getInstrType . last . concat . blocks) expr1
+      let castExpr = execState (newCast (type0, IRLabelValue (IRLabelNumber (counter expr0 - 1))) (type1, IRLabelValue (IRLabelNumber (counter expr1 - 1))) True) expr1
+      let castType = (getInstrType . last . concat) (blocks castExpr)
+      let bin = binary (type0, counter expr0) (type1, counter expr1) (castType, counter castExpr)
+      let newBlocks = appendBlocks (blocks castExpr) [[(Just (IRLabelNumber (counter castExpr)), bin)]]
+      put ((setBlocks newBlocks . setCounter (+1)) castExpr)
+    where
+      {-
+        Selects the expression which was not casted and uses it to generate the binary instruction. Ensures that the binary
+        instruction is not generated with duplicate arguments.
+      -}
+      binary d e f
+        | fst d == fst f = (getBinaryInstr a (fst f)) (fst f) (IRLabelValue (IRLabelNumber (snd d - 1))) (IRLabelValue (IRLabelNumber (snd f - 1)))
+        | fst e == fst f = (getBinaryInstr a (fst f)) (fst f) (IRLabelValue (IRLabelNumber (snd f - 1))) (IRLabelValue (IRLabelNumber (snd e - 1)))
+
+  generateCExpression (CAssignment a b@(CIdentifier c) d) = do
+    got <- get
+    let ident = (last . filter (\e -> (identScope e) <= (scope got))) ((table got) Map.! (identifier c))
+    let expr = execState (generateCExpression (CBinary (getOperator a) b d)) got
+    let newBlocks = appendBlocks (blocks expr) [[(Nothing, IRStore (identType ident) (IRLabelValue (IRLabelNumber (counter expr - 1))) (identLabel ident))]]
+    put (setBlocks newBlocks expr)
+
+  generateCExpression (CExpression []) = return ()
+
+  generateCExpression (CExpression (a:as)) = do
+    got <- get
+    let expr = execState (generateCExpression a) got
+    put expr
+    generateCExpression (CExpression as)
+  generateCDeclarations :: [CDeclaration] -> GeneratorStateMonad ()
+  generateCDeclarations [] = return ()
+
+  generateCDeclarations (a:as) = do
+    generateCDeclaration a
+    generateCDeclarations as
+
+  generateCDeclaration :: CDeclaration -> GeneratorStateMonad ()
+  generateCDeclaration (CDeclaration d (Just (CInitDeclaratorList []))) = return ()
+
+  generateCDeclaration (CDeclaration a (Just (CInitDeclaratorList (b:bs)))) = do
+    got <- get
+    let type0 = typeFromCSpecifiers a (getPointer b)
+    let alloca = execState (newAlloca type0) got
+    let dec = execState (generateCDeclaration b) alloca
+    let type1 = (getInstrType . last . concat . blocks) dec
+    let castExpr = execState (newCast (type0, IRLabelValue (IRLabelNumber (counter got))) (type1, IRLabelValue (IRLabelNumber (counter dec - 1))) False) dec
+    let store = [[(Nothing, IRStore (typeFromCSpecifiers a (getPointer b)) (IRLabelValue (IRLabelNumber (counter castExpr - 1))) (IRLabelNumber (counter got)))]]
+    let newBlocks = appendBlocks (blocks castExpr) store
+    case Map.lookup (getIdentifier b) (table got) of
+      Just c -> do
+        if all (\d -> identScope d /= (scope got)) c then do
+          let newTable = Map.insert (getIdentifier b) (c ++ [(TableValue (scope got) (IRLabelNumber (counter got)) type0)]) (table got)
+          put ((setBlocks newBlocks . setTable newTable) castExpr)
+        else error ""
+      Nothing -> do
+        let newTable = Map.insert (getIdentifier b) [(TableValue (scope got) (IRLabelNumber (counter got)) type0)] (table got)
+        put ((setBlocks newBlocks . setTable newTable) castExpr)
+    generateCDeclaration (CDeclaration a (Just (CInitDeclaratorList bs)))
+
+  generateCDeclaration (CInitDeclarator _ b) = generateCExpression b
+
+  generateCDeclaration (CDeclarator _ b) = return ()
+
+  generateCStatements :: [CStatement] -> GeneratorStateMonad ()
+  generateCStatements [] = return ()
+
+  generateCStatements (a:as) = do
+    got <- get
+    generateCStatement a
+    generateCStatements as
+
+  generateCStatement :: CStatement -> GeneratorStateMonad ()
+  generateCStatement (CLabeledCase a b) = newLabeled b
+
+  generateCStatement (CLabeledDefault a) = newLabeled a
+
+  generateCStatement (CList a) = generateCStatements a
+
+  generateCStatement (CCompound a b) = do
+    got <- get
+    let dec = execState ((generateCDeclarations . declarationList) a) (setLevel (+1) got)
+    let stat = execState ((generateCStatements . statementList) b) dec
+    put (setLevel (+ (-1)) stat)
+
+  generateCStatement (CCExpression (Just (CExpression []))) = return ()
+
+  generateCStatement (CCExpression (Just (CExpression a))) = generateCExpressions a
+
+  generateCStatement (CIf a@(CExpression _) b) = do
+    got <- get
+    let ifHead = execState (newSelectionHead a (compound b)) got
+    let ifBody = execState ((generateCStatement . compound) b) (setBlocks ((blocks ifHead) ++ [[]]) ifHead)
+    let ifBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter ifBody)))))]
+    let newBlocks = appendBlocks (blocks ifBody) [ifBr, []]
+    put ((setBlocks newBlocks . setCounter (+1)) ifBody)
+
+  generateCStatement (CIfElse a@(CExpression _) b c) = do
+    got <- get
+    let ifHead = execState (newSelectionHead a (compound b)) got
+    let ifBody = execState ((generateCStatement . compound) b) (setBlocks ((blocks ifHead) ++ [[]]) ifHead)
+    let elseBody = execState ((generateCStatement . compound) c) ((setBlocks ((blocks ifBody) ++ [[]]) . setCounter (+1)) ifBody)
+    let elseBr = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter elseBody)))))]]
+    let newBlocks = appendBlocks (blocks elseBody) elseBr
+    put ((setBlocks newBlocks . setCounter (+1)) elseBody)
+
+  generateCStatement (CSwitch (CExpression a) b) = do
+    got <- get
+    let splitStat = (CCompound Nothing . Just . CList . splitLabeled . statementList . statementFromCCompound . compound) b
+    let expr = execState (generateCExpressions a) got
+    let exprType = (getInstrType . last . concat . blocks) expr
+    if (isIntegral exprType) then do
+      let stat = execState ((switchStatement . splitLabeled . statementList . statementFromCCompound . compound) b) ((GeneratorState [[], []] ((counter expr) + 1) (table expr) (Just ((counter . fst) stat)) (globals got) (scope got)), ([(counter . fst) stat], []))
+      let switch = [(Nothing, IRSwitch exprType (IRLabelNumber ((fromIntegral . length) ((snd . snd) stat))) (IRLabelNumber (labeledDefault ((fst . snd) stat))) ((snd . snd) stat))]
+      let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (((counter . fst) stat)))))]
+      let newBlocks = appendBlocks (blocks expr) (appendBlocks [switch] (appendBlocks ((blocks . fst) stat) [switchBr, []]))
+      put ((setBlocks newBlocks . setCounter (+1) . setContext Nothing . fst) stat)
+    else error ""
+    where
+      splitLabeled [] = []
+      splitLabeled (a:as)
+        | isLabeled a = a:as
+        | otherwise = splitLabeled as
+      isLabeled (CLabeledCase _ _) = True
+      isLabeled (CLabeledDefault _) = True
+      isLabeled _ = False
+      -- Decides whether to use the explicit (a) or implicit (b) default label.
+      labeledDefault [a] = a
+      labeledDefault [a, b] = b
+      labeledDefault _ = error ""
+
+  generateCStatement (CReturn Nothing) = do
+    got <- get
+    let instrs = [[(Nothing, IRRet Nothing)]]
+    let newBlocks = appendBlocks (blocks got) instrs
+    put (setBlocks newBlocks got)
+
+  generateCStatement (CReturn (Just a)) = do
+    got <- get
+    let expr = execState (generateCExpression a) got
+    let exprLabel = (getInstrTo . last . concat . blocks) expr
+    let instrs = [[(Nothing, IRRet (Just (IRLabelValue exprLabel)))]]
+    let newBlocks = appendBlocks (blocks expr) instrs
+    put (setBlocks newBlocks expr)
+
+  generateCStatement (CBreak) = do
+    got <- get
+    case (context got) of
+      Just a -> do
+        let instrs = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (a))))]]
+        let newBlocks = appendBlocks (blocks got) instrs
+        put (setBlocks newBlocks got)
+      otherwise -> error ""
+
+  switchStatement :: [CStatement] -> State (GeneratorState, ([Integer], [(IRType, IRConstant, IRLabel)])) ()
+  switchStatement [] = return ()
+
+  switchStatement (a:as) = do
+    got <- get
+    let stat = execState (generateCStatement a) (fst got)
+    let newBlocks = blocks stat
+    case a of
+      CLabeledCase a _ -> do
+        let switchConstant = (constant . token) a
+        let switchType = typeFromCConstant switchConstant
+        put ((stat, ((fst . snd) got, (snd . snd) got ++ [(switchType, generateIRConstant a switchType, IRLabelNumber ((counter . fst) got - 1))])))
+        switchStatement as
+      CLabeledDefault _ -> do
+        put ((stat, ((fst . snd) got ++ [(counter . fst) got - 1], (snd . snd) got)))
+        switchStatement as
+      otherwise -> do
+        put ((stat, ((fst . snd) got, (snd . snd) got)))
+        switchStatement as
+
   generateCExternalDefinition :: CExternalDefinition -> GeneratorStateMonad ()
   generateCExternalDefinition (CFunction (Just a) b c d) = do
     got <- get
-    let basicBlocks = evalState (generateCStatement d functionType) (GeneratorState [[]] 1 (table got) Nothing [] 0)
+    let basicBlocks = evalState (newFunctionBody d functionType) (GeneratorState [[]] 1 (table got) Nothing [] 0)
     let functionGlobal = IRFunctionGlobal functionType (name b) [] basicBlocks
     let newGlobals = (globals got) ++ [functionGlobal]
     put ((setGlobals newGlobals) got)
