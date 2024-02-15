@@ -31,4 +31,4 @@ module Emitter where
   emitMCDirective (Global a) = "global " ++ a
   emitMCDirective a = (map toLower . show) a
 
-  emit = intercalate "\n" . map (intercalate "\n") . emitMachineCodes
+  emit = (++) "\n" . intercalate "\n" . map (intercalate "\n") . emitMachineCodes
