@@ -187,11 +187,11 @@ module Selector where
         let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
         put ((setGraph newGraph . setCounter (+3)) got)
 
-      newBranch :: OpcodeCondition -> String -> SelectorStateMonad ()
-      newBranch a b = do
+      newBranch :: OpcodeCondition -> NodeType -> [(MachineValueType, Maybe NodeValue)] -> SelectorStateMonad ()
+      newBranch a b c = do
         got <- get
         let newNodes = [
-              Node (counter got) (Label b) [(Other, Nothing)],
+              Node (counter got) b c,
               Node (counter got + 1) (Opcode a) [(Word, Nothing)]]
         let newEdges = [
               Edge (counter got) (counter got + 1) 0]
@@ -234,7 +234,7 @@ module Selector where
         got <- get
         let mov0 = execState (newMov (OpcodeCondition ARMMov Nothing) 0 Physical (Register Virtual) [(Word, Just (IntegerValue c))]) got
         let mov1 = execState (newMov (OpcodeCondition ARMMov Nothing) 1 Physical (Register Virtual) [(Word, Just (IntegerValue d))]) mov0
-        let bl = execState (newBranch (OpcodeCondition ARMBl Nothing) a) mov1
+        let bl = execState (newBranch (OpcodeCondition ARMBl Nothing) (Label a) [(Other, Nothing)]) mov1
         let mov2 = execState (newMov (OpcodeCondition ARMMov Nothing) b Virtual (Register Physical) [(Word, Just (IntegerValue 0))]) bl
         put mov2
 
@@ -255,11 +255,52 @@ module Selector where
       newCast a (Just (IRLabelNumber b)) (IRLabelValue (IRLabelNumber c)) = do
         got <- get
         let mov0 = execState (newMov (OpcodeCondition ARMMov Nothing) 0 Physical (Register Virtual) [(Word, Just (IntegerValue c))]) got
-        let bl = execState (newBranch (OpcodeCondition ARMBl Nothing) a) mov0
+        let bl = execState (newBranch (OpcodeCondition ARMBl Nothing) (Label a) [(Other, Nothing)]) mov0
         let mov1 = execState (newMov (OpcodeCondition ARMMov Nothing) b Virtual (Register Physical) [(Word, Just (IntegerValue 0))]) bl
         put mov1
 
       selectIRLabeledInstruction :: (Maybe IRLabel, IRInstruction) -> SelectorStateMonad ()
+
+      selectIRLabeledInstruction (Nothing, IRBrConditional _ _ (IRLabelValue a) (IRLabelValue b)) = do
+        got <- get
+        let branch0 = execState (newBranch (OpcodeCondition ARMB (Just ARMNe)) (Label (toLabel (global got) a)) [(Other, Nothing)]) got
+        let branch1 = execState (newBranch (OpcodeCondition ARMB Nothing) (Label (toLabel (global got) b)) [(Other, Nothing)]) branch0
+        put branch1
+
+      selectIRLabeledInstruction (Nothing, IRBrUnconditional (IRLabelValue a)) = do
+        got <- get
+        let branch = execState (newBranch (OpcodeCondition ARMB Nothing) (Label (toLabel (global got) a)) [(Other, Nothing)]) got
+        put branch
+
+      selectIRLabeledInstruction (Nothing, IRSwitch _ a b c) = do
+        got <- get
+        let cmps = execState (comparisons c) got
+        let branch = execState (newBranch (OpcodeCondition ARMB Nothing) (Label (toLabel (global got) b)) [(Other, Nothing)]) cmps
+        put branch
+        where
+          comparisons :: [(IRType, IRConstant, IRLabel)] -> SelectorStateMonad ()
+          comparisons [] = return ()
+
+          comparisons ((_, d, e):es) = do
+            got <- get
+            let cmp = execState (newIntegerCompare (IRLabelValue a) (IRConstantValue d)) got
+            let branch = execState (newBranch (OpcodeCondition ARMB (Just ARMEq)) (Label (toLabel (global got) e)) [(Other, Nothing)]) cmp
+            put branch
+            comparisons es
+
+      selectIRLabeledInstruction (Nothing, IRRet Nothing) = newBranch (OpcodeCondition ARMBx Nothing) (Register Physical) [(Word, Just (IntegerValue 14))]
+
+      selectIRLabeledInstruction (Nothing, IRRet (Just a)) = do
+        got <- get
+        let mov = execState (newMov (OpcodeCondition ARMMov Nothing) 0 Physical (toNodeType a) [(sourceType a, sourceValue a)]) got
+        let branch = execState (newBranch (OpcodeCondition ARMBx Nothing) (Register Physical) [(Word, Just (IntegerValue 14))]) mov
+        put branch
+        where
+          sourceType (IRLabelValue _) = Word
+          soruceType _ = Other
+          sourceValue (IRLabelValue _) = Just (toNodeValue a)
+          sourceValue _ = Nothing
+
       selectIRLabeledInstruction (a, IRAdd b c d) = newBinary ARMAdd a c d
       selectIRLabeledInstruction (a, IRFadd b c d) = newBinaryFunction "__aeabi_fadd" a c d
       selectIRLabeledInstruction (a, IRSub b c d) = newBinary ARMSub a c d
@@ -277,33 +318,6 @@ module Selector where
       selectIRLabeledInstruction (a, IRAnd b c d) = newBinary ARMAnd a c d
       selectIRLabeledInstruction (a, IROr b c d) = newBinary ARMOrr a c d
       selectIRLabeledInstruction (a, IRXor b c d) = newBinary ARMEor a c d
-
-      selectIRLabeledInstruction (Nothing, IRBrConditional _ _ (IRLabelValue a) (IRLabelValue b)) = do
-        got <- get
-        let branch0 = execState (newBranch (OpcodeCondition ARMB (Just ARMNe)) (toLabel (global got) a)) got
-        let branch1 = execState (newBranch (OpcodeCondition ARMB Nothing) (toLabel (global got) b)) branch0
-        put branch1
-
-      selectIRLabeledInstruction (Nothing, IRBrUnconditional (IRLabelValue a)) = do
-        got <- get
-        let branch = execState (newBranch (OpcodeCondition ARMB Nothing) (toLabel (global got) a)) got
-        put branch
-
-      selectIRLabeledInstruction (Nothing, IRSwitch _ a b c) = do
-        got <- get
-        let cmps = execState (comparisons c) got
-        let branch = execState (newBranch (OpcodeCondition ARMB Nothing) (toLabel (global got) b)) cmps
-        put branch
-        where
-          comparisons :: [(IRType, IRConstant, IRLabel)] -> SelectorStateMonad ()
-          comparisons [] = return ()
-
-          comparisons ((_, d, e):es) = do
-            got <- get
-            let cmp = execState (newIntegerCompare (IRLabelValue a) (IRConstantValue d)) got
-            let branch = execState (newBranch (OpcodeCondition ARMB (Just ARMEq)) (toLabel (global got) e)) cmp
-            put branch
-            comparisons es
 
       selectIRLabeledInstruction (Just (IRLabelNumber a), IRAlloca b) = return ()
 
@@ -354,7 +368,7 @@ module Selector where
         got <- get
         let mov0 = execState (newMov (OpcodeCondition ARMMov Nothing) 0 Physical (Register Virtual) [(Word, Just (IntegerValue c))]) got
         let mov1 = execState (newMov (OpcodeCondition ARMMov Nothing) 1 Physical (Register Virtual) [(Word, Just (IntegerValue d))]) mov0
-        let bl = execState (newBranch (OpcodeCondition ARMBl Nothing) (nameFromIRFCondition b)) mov1
+        let bl = execState (newBranch (OpcodeCondition ARMBl Nothing) (Label (nameFromIRFCondition b)) [(Other, Nothing)]) mov1
         if (b == IRFOne) then do
           let mov2 = execState (newMov (OpcodeCondition ARMMvn Nothing) a Virtual (Register Physical) [(Word, Just (IntegerValue 0))]) bl
           put mov2
