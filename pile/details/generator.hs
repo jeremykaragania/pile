@@ -8,24 +8,33 @@ module Generator where
   import Syntax
 
   {-
-    GeneratorState carries state between generators. A GeneratorState carries past basic blocks (blocks), an accumulator
-    (counter) for unnamed temporaries, a lookup table (table) which associates an identifier key with a label and type, and a
-    context for break and continue statements (context) which carries the integer label number for the branch.
+    GeneratorState carries state between generators. A GeneratorState carries past basic blocks ("blocks"), an accumulator
+    ("counter") for unnamed temporaries, a lookup table ("table") which associates an identifier key with an IdentInfo, and a
+    context for break and continue statements ("context") which carries the integer label number for the branch.
   -}
   data GeneratorState = GeneratorState {
     blocks :: [[(Maybe IRLabel, IRInstruction)]],
     counter :: Integer,
-    table :: Map String [TableValue],
+    table :: Map String [IdentInfo],
     context :: (Maybe Integer),
     globals :: [IRGlobalValue],
     scope :: Integer}
 
-  data TableValue = TableValue {
+  {-
+    IdentInfo carries identifier information which provides context when performing a lookup. Since identifiers can have the
+    same name, this is just a way to differentiate between them when scopes are nested.
+  -}
+  data IdentInfo = IdentInfo {
     identScope :: Integer,
     identLabel :: IRLabel,
     identType :: IRType} deriving (Show)
 
-  data InstrData = InstrData {
+  {-
+    InstrInfo carries instruction information which is useful for querying past generated instructions. Most instructions
+    (the items of the list in a basic block) contain a type and a destination in their actual syntax. When we speak of a
+    destination, we mean the label which the instruction stores its result to.
+  -}
+  data InstrInfo = InstrInfo {
     instrType :: IRType,
     instrTo :: IRLabel}
 
@@ -62,44 +71,44 @@ module Generator where
   getConstant (CInitDeclarator _ a) = a
   getConstant (CDeclarator _ _) = CConstant (CConstantToken (CIntegerConstant 0 Nothing))
 
-  getInstrData (Just a, (IRAdd b _ _)) = InstrData b a
-  getInstrData (Just a, (IRFadd b _ _)) = InstrData b a
-  getInstrData (Just a, (IRSub b _ _)) = InstrData b a
-  getInstrData (Just a, (IRFsub b _ _)) = InstrData b a
-  getInstrData (Just a, (IRMul b _ _)) = InstrData b a
-  getInstrData (Just a, (IRFmul b _ _)) = InstrData b a
-  getInstrData (Just a, (IRUdiv b _ _)) = InstrData b a
-  getInstrData (Just a, (IRSdiv b _ _)) = InstrData b a
-  getInstrData (Just a, (IRFdiv b _ _)) = InstrData b a
-  getInstrData (Just a, (IRUrem b _ _)) = InstrData b a
-  getInstrData (Just a, (IRSrem b _ _)) = InstrData b a
-  getInstrData (Just a, (IRFrem b _ _)) = InstrData b a
-  getInstrData (Just a, (IRShl b _ _)) = InstrData b a
-  getInstrData (Just a, (IRLshr b _ _)) = InstrData b a
-  getInstrData (Just a, (IRAshr b _ _)) = InstrData b a
-  getInstrData (Just a, (IRAnd b _ _)) = InstrData b a
-  getInstrData (Just a, (IROr b _ _)) = InstrData b a
-  getInstrData (Just a, (IRXor b _ _)) = InstrData b a
-  getInstrData (Just a, (IRAlloca b)) = InstrData b a
-  getInstrData (Just a, (IRLoad b _)) = InstrData b a
-  getInstrData (_, (IRStore a _ b)) = InstrData a b
-  getInstrData (Just a, (IRIcmp _ _ _ _)) = InstrData (IRInteger IRSigned) a
-  getInstrData (Just a, (IRFcmp _ _ _ _)) = InstrData (IRInteger IRSigned) a
-  getInstrData (Just a, (IRSext _ _ b)) = InstrData b a
-  getInstrData (Just a, (IRFptrunc _ _ b)) = InstrData b a
-  getInstrData (Just a, (IRFpext _ _ b)) = InstrData b a
-  getInstrData (Just a, (IRFptoui _ _ b)) = InstrData b a
-  getInstrData (Just a, (IRFptosi _ _ b)) = InstrData b a
-  getInstrData (Just a, (IRUitofp _ _ b)) = InstrData b a
-  getInstrData (Just a, (IRSitofp _ _ b)) = InstrData b a
-  getInstrData (Just a, (IRPtrtoint _ _ b)) = InstrData b a
-  getInstrData (Just a, (IRInttoptr _ _ b)) = InstrData b a
-  getInstrData (Just a, (IRBitcast _ _ b)) = InstrData b a
-  getInstrData (Just a, (IRAddrspacecast _ _ b)) = InstrData b a
+  getInstrInfo (Just a, (IRAdd b _ _)) = InstrInfo b a
+  getInstrInfo (Just a, (IRFadd b _ _)) = InstrInfo b a
+  getInstrInfo (Just a, (IRSub b _ _)) = InstrInfo b a
+  getInstrInfo (Just a, (IRFsub b _ _)) = InstrInfo b a
+  getInstrInfo (Just a, (IRMul b _ _)) = InstrInfo b a
+  getInstrInfo (Just a, (IRFmul b _ _)) = InstrInfo b a
+  getInstrInfo (Just a, (IRUdiv b _ _)) = InstrInfo b a
+  getInstrInfo (Just a, (IRSdiv b _ _)) = InstrInfo b a
+  getInstrInfo (Just a, (IRFdiv b _ _)) = InstrInfo b a
+  getInstrInfo (Just a, (IRUrem b _ _)) = InstrInfo b a
+  getInstrInfo (Just a, (IRSrem b _ _)) = InstrInfo b a
+  getInstrInfo (Just a, (IRFrem b _ _)) = InstrInfo b a
+  getInstrInfo (Just a, (IRShl b _ _)) = InstrInfo b a
+  getInstrInfo (Just a, (IRLshr b _ _)) = InstrInfo b a
+  getInstrInfo (Just a, (IRAshr b _ _)) = InstrInfo b a
+  getInstrInfo (Just a, (IRAnd b _ _)) = InstrInfo b a
+  getInstrInfo (Just a, (IROr b _ _)) = InstrInfo b a
+  getInstrInfo (Just a, (IRXor b _ _)) = InstrInfo b a
+  getInstrInfo (Just a, (IRAlloca b)) = InstrInfo b a
+  getInstrInfo (Just a, (IRLoad b _)) = InstrInfo b a
+  getInstrInfo (_, (IRStore a _ b)) = InstrInfo a b
+  getInstrInfo (Just a, (IRIcmp _ _ _ _)) = InstrInfo (IRInteger IRSigned) a
+  getInstrInfo (Just a, (IRFcmp _ _ _ _)) = InstrInfo (IRInteger IRSigned) a
+  getInstrInfo (Just a, (IRSext _ _ b)) = InstrInfo b a
+  getInstrInfo (Just a, (IRFptrunc _ _ b)) = InstrInfo b a
+  getInstrInfo (Just a, (IRFpext _ _ b)) = InstrInfo b a
+  getInstrInfo (Just a, (IRFptoui _ _ b)) = InstrInfo b a
+  getInstrInfo (Just a, (IRFptosi _ _ b)) = InstrInfo b a
+  getInstrInfo (Just a, (IRUitofp _ _ b)) = InstrInfo b a
+  getInstrInfo (Just a, (IRSitofp _ _ b)) = InstrInfo b a
+  getInstrInfo (Just a, (IRPtrtoint _ _ b)) = InstrInfo b a
+  getInstrInfo (Just a, (IRInttoptr _ _ b)) = InstrInfo b a
+  getInstrInfo (Just a, (IRBitcast _ _ b)) = InstrInfo b a
+  getInstrInfo (Just a, (IRAddrspacecast _ _ b)) = InstrInfo b a
 
-  getInstrType = (instrType . getInstrData)
+  getInstrType = (instrType . getInstrInfo)
 
-  getInstrTo = (instrTo . getInstrData)
+  getInstrTo = (instrTo . getInstrInfo)
 
   getOperator a
     | a == "=" = a
@@ -349,7 +358,7 @@ module Generator where
   generateCExpression :: CExpression -> GeneratorStateMonad ()
   generateCExpression (CIdentifier a) = do
     got <- get
-    let ident = (last . filter (\b -> (identScope b) <= (scope got))) ((table got) Map.! (identifier a))
+    let ident = (last . filter (\b -> (identScope b) <= (scope got))) ((table got) Map.! (identifier a)) -- We use the identifier closest to the current scope.
     let instrs = [[((Just (IRLabelNumber (counter got))), IRLoad (identType ident) (IRLabelValue (identLabel ident)))]]
     let newBlocks = appendBlocks (blocks got) instrs
     put ((setBlocks newBlocks . setCounter (+1)) got)
@@ -422,11 +431,11 @@ module Generator where
     case Map.lookup (getIdentifier b) (table got) of
       Just c -> do
         if all (\d -> identScope d /= (scope got)) c then do
-          let newTable = Map.insert (getIdentifier b) (c ++ [(TableValue (scope got) (IRLabelNumber (counter got)) type0)]) (table got)
+          let newTable = Map.insert (getIdentifier b) (c ++ [(IdentInfo (scope got) (IRLabelNumber (counter got)) type0)]) (table got)
           put ((setBlocks newBlocks . setTable newTable) castExpr)
         else error ""
       Nothing -> do
-        let newTable = Map.insert (getIdentifier b) [(TableValue (scope got) (IRLabelNumber (counter got)) type0)] (table got)
+        let newTable = Map.insert (getIdentifier b) [(IdentInfo (scope got) (IRLabelNumber (counter got)) type0)] (table got)
         put ((setBlocks newBlocks . setTable newTable) castExpr)
     generateCDeclaration (CDeclaration a (Just (CInitDeclaratorList bs)))
 
@@ -573,7 +582,7 @@ module Generator where
         if Map.notMember name (table got) then do
           let varType = typeFromCSpecifiers a (getPointer b)
           let var = IRVariableGlobal name varType (generateIRConstant (getConstant b) varType)
-          let newTable = Map.insert name [(TableValue (scope got) (IRLabelName name) varType)] (table got)
+          let newTable = Map.insert name [(IdentInfo (scope got) (IRLabelName name) varType)] (table got)
           let newGlobals = globals got ++ [var]
           put ((setTable newTable . setGlobals newGlobals) got)
           declarations bs
