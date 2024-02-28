@@ -183,10 +183,10 @@ module Generator where
     | b == IRFloat || b == IRDouble || b == IRLongDouble = IRFloatingConstant (value a)
     | otherwise = IRIntegerConstant ((floor . value) a)
     where
-      value (CConstant (CConstantToken (CFloatingConstant a _))) = a
-      value (CConstant (CConstantToken (CIntegerConstant a _))) = fromIntegral a
-      value (CConstant (CConstantToken (CCharacterConstant a))) = (fromIntegral . ord) a
-      value (CExpression [a]) = value a
+      value (CConstant (CConstantToken (CFloatingConstant c _))) = c
+      value (CConstant (CConstantToken (CIntegerConstant c _))) = fromIntegral c
+      value (CConstant (CConstantToken (CCharacterConstant c))) = (fromIntegral . ord) c
+      value (CExpression [c]) = value c
       value _ = 0
 
   {-
@@ -313,9 +313,9 @@ module Generator where
     put ((setBlocks newBlocks . setCounter (+2)) expr)
     where
       -- Different comparison instructions are used depending on argument type.
-      comparisonInstruction a
-        | (isIntegral . fst) a = IRIcmp IRINe (fst a) (IRLabelValue (IRLabelNumber (snd a - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
-        | (isFloating . fst) a = IRFcmp IRFOne (fst a) (IRLabelValue (IRLabelNumber (snd a - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst a)))
+      comparisonInstruction c
+        | (isIntegral . fst) c = IRIcmp IRINe (fst c) (IRLabelValue (IRLabelNumber (snd c - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst c)))
+        | (isFloating . fst) c = IRFcmp IRFOne (fst c) (IRLabelValue (IRLabelNumber (snd c - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst c)))
 
   {-
     newFunctionBody is used for the generation of basic blocks, which are just instruction lists, from a function body,
@@ -334,12 +334,12 @@ module Generator where
       -}
       numberBlocks :: [[(Maybe IRLabel, IRInstruction)]] -> State ([IRBasicBlock], Integer) ()
       numberBlocks [] = return ()
-      numberBlocks (a:as) = do
+      numberBlocks (c:cs) = do
         got <- get
-        let present = (toInteger . length . filter numbered) a
+        let present = (toInteger . length . filter numbered) c
         let past = snd got
-        put (((fst got) ++ [IRBasicBlock (IRLabelNumber past) a], present + past + 1))
-        numberBlocks as
+        put (((fst got) ++ [IRBasicBlock (IRLabelNumber past) c], present + past + 1))
+        numberBlocks cs
         where
           numbered (Nothing, _) = False
           numbered _ = True
@@ -499,15 +499,15 @@ module Generator where
     else error ""
     where
       splitLabeled [] = []
-      splitLabeled (a:as)
-        | isLabeled a = a:as
-        | otherwise = splitLabeled as
+      splitLabeled (c:cs)
+        | isLabeled c = c:cs
+        | otherwise = splitLabeled cs
       isLabeled (CLabeledCase _ _) = True
       isLabeled (CLabeledDefault _) = True
       isLabeled _ = False
       -- Decides whether to use the explicit (a) or implicit (b) default label.
-      labeledDefault [a] = a
-      labeledDefault [a, b] = b
+      labeledDefault [c] = c
+      labeledDefault [c, d] = d
       labeledDefault _ = error ""
 
   generateCStatement (CReturn Nothing) = do
@@ -531,7 +531,7 @@ module Generator where
         let instrs = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (a))))]]
         let newBlocks = appendBlocks (blocks got) instrs
         put (setBlocks newBlocks got)
-      otherwise -> error ""
+      _ -> error ""
 
   switchStatement :: [CStatement] -> State (GeneratorState, ([Integer], [(IRType, IRConstant, IRLabel)])) ()
   switchStatement [] = return ()
@@ -541,15 +541,15 @@ module Generator where
     let stat = execState (generateCStatement a) (fst got)
     let newBlocks = blocks stat
     case a of
-      CLabeledCase a _ -> do
-        let switchConstant = (constant . token) a
+      CLabeledCase b _ -> do
+        let switchConstant = (constant . token) b
         let switchType = typeFromCConstant switchConstant
-        put ((stat, ((fst . snd) got, (snd . snd) got ++ [(switchType, generateIRConstant a switchType, IRLabelNumber ((counter . fst) got - 1))])))
+        put ((stat, ((fst . snd) got, (snd . snd) got ++ [(switchType, generateIRConstant b switchType, IRLabelNumber ((counter . fst) got - 1))])))
         switchStatement as
       CLabeledDefault _ -> do
         put ((stat, ((fst . snd) got ++ [(counter . fst) got - 1], (snd . snd) got)))
         switchStatement as
-      otherwise -> do
+      _ -> do
         put ((stat, ((fst . snd) got, (snd . snd) got)))
         switchStatement as
 
@@ -562,11 +562,11 @@ module Generator where
     put ((setGlobals newGlobals) got)
     where
       functionType = typeFromCSpecifiers a (pointer b)
-      name (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a)))) = a
-      name (CDeclarator _ (CDirectDeclaratorFunctionCall (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken a))) _)) = a
-      pointer (CDeclarator a _) = a
-      argumentList (CDeclarator _ (CDirectDeclaratorFunctionCall _ [CParameterList a])) = a
-      argument (CParameterDeclaration c d) = IRArgument (typeFromCSpecifiers c Nothing) (Just (name d))
+      name (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken e)))) = e
+      name (CDeclarator _ (CDirectDeclaratorFunctionCall (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken e))) _)) = e
+      pointer (CDeclarator e _) = e
+      argumentList (CDeclarator _ (CDirectDeclaratorFunctionCall _ [CParameterList e])) = e
+      argument (CParameterDeclaration e f) = IRArgument (typeFromCSpecifiers e Nothing) (Just (name f))
 
   generateCExternalDefinition (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList b)))) = do
     got <- get
@@ -576,16 +576,16 @@ module Generator where
       declarations :: [CDeclaration] -> GeneratorStateMonad ()
       declarations [] = return ()
 
-      declarations (b:bs) = do
+      declarations (c:cs) = do
         got <- get
-        let name = getIdentifier b
+        let name = getIdentifier c
         if Map.notMember name (table got) then do
-          let varType = typeFromCSpecifiers a (getPointer b)
-          let var = IRVariableGlobal name varType (generateIRConstant (getConstant b) varType)
+          let varType = typeFromCSpecifiers a (getPointer c)
+          let var = IRVariableGlobal name varType (generateIRConstant (getConstant c) varType)
           let newTable = Map.insert name [(IdentInfo (scope got) (IRLabelName name) varType)] (table got)
           let newGlobals = globals got ++ [var]
           put ((setTable newTable . setGlobals newGlobals) got)
-          declarations bs
+          declarations cs
         else error ""
 
   generateCExternalDefinitions :: [CExternalDefinition] -> GeneratorStateMonad ()
