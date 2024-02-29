@@ -309,7 +309,7 @@ module Generator where
     let cmp = (Just (IRLabelNumber (counter expr)), comparisonInstruction (exprType, counter expr))
     let stat = execState (generateCStatement b) (setCounter (+1) expr)
     let br0 = (Nothing, IRBrConditional (getInstrType cmp) (IRLabelValue (IRLabelNumber (counter expr))) (IRLabelValue (IRLabelNumber (counter expr + 1))) (IRLabelValue (IRLabelNumber (counter stat + 1))))
-    let newBlocks = appendBlocks (blocks stat) (appendBlocks [[cmp]] [[br0]])
+    let newBlocks = appendBlocks (blocks expr) (appendBlocks [[cmp]] [[br0]])
     put ((setBlocks newBlocks . setCounter (+2)) expr)
     where
       -- Different comparison instructions are used depending on argument type.
