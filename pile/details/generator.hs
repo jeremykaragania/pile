@@ -296,26 +296,33 @@ module Generator where
     let newBlocks = appendBlocks (blocks stat) [switchBr, []]
     put ((setBlocks newBlocks . setCounter (+1)) stat)
 
-  {-
-    All selection statements consist of an expression (a), and at least one body (b) which is a compound statement.
-    Therefore, newSelectionHead generates this selection statement head so it can be used in other selection statement
-    generators.
-  -}
-  newSelectionHead :: CExpression -> CStatement -> GeneratorStateMonad ()
-  newSelectionHead (CExpression a) b = do
+  newHead :: CExpression -> IRValue -> IRValue -> GeneratorStateMonad ()
+  newHead (CExpression a) b c = do
     got <- get
     let expr = execState (generateCExpressions a) got
     let exprType = (getInstrType . last . concat . blocks) expr
     let cmp = (Just (IRLabelNumber (counter expr)), comparisonInstruction (exprType, counter expr))
-    let stat = execState (generateCStatement b) (setCounter (+1) expr)
-    let br0 = (Nothing, IRBrConditional (getInstrType cmp) (IRLabelValue (IRLabelNumber (counter expr))) (IRLabelValue (IRLabelNumber (counter expr + 1))) (IRLabelValue (IRLabelNumber (counter stat + 1))))
+    let br0 = (Nothing, IRBrConditional (getInstrType cmp) (IRLabelValue (IRLabelNumber (counter expr))) b c)
     let newBlocks = appendBlocks (blocks expr) (appendBlocks [[cmp]] [[br0]])
-    put ((setBlocks newBlocks . setCounter (+2)) expr)
+    put ((setBlocks newBlocks . setCounter (+1)) expr)
     where
       -- Different comparison instructions are used depending on argument type.
       comparisonInstruction c
         | (isIntegral . fst) c = IRIcmp IRINe (fst c) (IRLabelValue (IRLabelNumber (snd c - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst c)))
         | (isFloating . fst) c = IRFcmp IRFOne (fst c) (IRLabelValue (IRLabelNumber (snd c - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst c)))
+
+  {-
+    All selection statements consist of an expression ("a"), and at least one body ("b") which is a compound statement.
+    Therefore, newSelectionHead generates this selection statement head so it can be used in other selection statement
+    generators.
+  -}
+  newSelectionHead :: CExpression -> CStatement -> GeneratorStateMonad ()
+  newSelectionHead a@(CExpression b) c = do
+    got <- get
+    let expr = execState (generateCExpressions b) got
+    let stat = execState (generateCStatement c) (setCounter (+1) expr)
+    let head = execState (newHead a (IRLabelValue (IRLabelNumber (counter expr + 1))) (IRLabelValue (IRLabelNumber (counter stat + 1)))) got
+    put head
 
   {-
     newFunctionBody is used for the generation of basic blocks, which are just instruction lists, from a function body,
