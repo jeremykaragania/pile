@@ -517,6 +517,18 @@ module Generator where
       labeledDefault [c, d] = d
       labeledDefault _ = error ""
 
+  generateCStatement(CWhile a@(CExpression b) c) = do
+    got <- get
+    let br0 = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (counter got))))]]
+    let newBlocks0 = appendBlocks (blocks got) br0 ++ [[]]
+    let expr = execState (generateCExpressions b) got
+    let stat = execState (generateCStatement c) (setCounter (+1) expr)
+    let whileHead = execState (newHead a (IRLabelValue (IRLabelNumber (counter whileHead))) (IRLabelValue (IRLabelNumber (counter stat + 2)))) ((setBlocks newBlocks0 . setCounter (+1)) got)
+    let whileBody = execState ((generateCStatement . compound) c) ((setBlocks (blocks whileHead ++ [[]]) . setCounter (+1)) whileHead)
+    let br1 = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (counter got))))]]
+    let newBlocks1 = appendBlocks (blocks whileBody) br1 ++ [[]]
+    put ((setBlocks newBlocks1 . setCounter (+1)) whileBody)
+
   generateCStatement (CReturn Nothing) = do
     got <- get
     let instrs = [[(Nothing, IRRet Nothing)]]
