@@ -98,20 +98,20 @@
     analyzeOperands b as
 
   analyzeOperand :: (Integer -> LiveInterval -> LiveInterval) -> Operand -> AnalyzerStateMonad ()
-  analyzeOperand b a = do
+  analyzeOperand a b = do
     got <- get
-    if Map.notMember a (table got) then do
-      let newTable = Map.insert a (b (counter got) (LiveInterval (-1) (-1))) (table got)
+    if Map.notMember b (table got) then do
+      let newTable = Map.insert b (a (counter got) (LiveInterval (-1) (-1))) (table got)
       put (AnalyzerState (counter got) newTable)
     else do
-      let oldValue = (table got) Map.! a
-      let newValue = (b (counter got) oldValue)
-      let newTable = Map.insert a (whichValue oldValue newValue) (table got)
+      let oldValue = (table got) Map.! b
+      let newValue = (a (counter got) oldValue)
+      let newTable = Map.insert b (whichValue oldValue newValue) (table got)
       put (AnalyzerState (counter got) newTable)
     where
-      whichValue a b
-        | liveFrom a < liveFrom b = a
-        | otherwise = b
+      whichValue c d
+        | liveFrom c < liveFrom d = c
+        | otherwise = d
 
   analyze a = (Map.toList . table) (execState (analyzeOperandsPairs (analyzeMachineCodes a)) (AnalyzerState 0 Map.empty))
 
@@ -179,9 +179,9 @@
       operand b = b
       instruction (MCInstruction b c) = MCInstruction b (map operand c)
       instruction b = b
-      addSub b = [MCInstruction (OpcodeCondition b Nothing) [Register Physical 13, Register Physical 13, Immediate offset]]
+      addSub b = [MCInstruction (OpcodeCondition b Nothing) [Register Physical 13, Register Physical 13, Immediate stackOffset]]
       machineCodes = ((fst . machineCode) operands) ++ addSub ARMSub ++ ((snd . machineCode) operands) ++ addSub ARMAdd
-      offset = ((*4) . fromIntegral . length . filter address . Map.toList) toPhysical
+      stackOffset = ((*4) . fromIntegral . length . filter address . Map.toList) toPhysical
       address (_, Address _) = True
       address _ = False
 
