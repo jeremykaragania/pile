@@ -24,9 +24,9 @@ module Main where
         Right b -> do
           let parsed = parse b
           case parsed of
-            Left b -> print b
-            Right b -> do
-              let generated = generate b
+            Left c -> print b
+            Right c -> do
+              let generated = generate c
               let selected = select generated
               let scheduled = schedule selected
               let allocated = allocate scheduled

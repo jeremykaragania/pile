@@ -10,12 +10,12 @@ module Emitter where
 
   emitMachineCode (MCInstruction a@(OpcodeCondition b c) d) = "  " ++ emitOpcodeCondition a ++ " " ++ emitOperands
     where
-      emitARM a = (drop 3 . map toLower . show) a
-      emitOpcodeCondition (OpcodeCondition a Nothing) = emitARM a
-      emitOpcodeCondition (OpcodeCondition a (Just b)) = emitARM a ++ emitARM b
-      emitOperand (Label a) = "#" ++ a
-      emitOperand (Register _ a) = "r" ++ show a
-      emitOperand (Immediate a) = "#" ++ show a
+      emitARM e = (drop 3 . map toLower . show) e
+      emitOpcodeCondition (OpcodeCondition e Nothing) = emitARM e
+      emitOpcodeCondition (OpcodeCondition e (Just f)) = emitARM e ++ emitARM f
+      emitOperand (Label e) = "#" ++ e
+      emitOperand (Register _ e) = "r" ++ show e
+      emitOperand (Immediate e) = "#" ++ show e
       emitOperands
         | b == ARMLdr || b == ARMStr = ((emitOperand . head) d) ++ ", [" ++ (intercalate ", " ((map emitOperand . tail) d)) ++ "]"
         | otherwise = (intercalate ", " (map emitOperand d))

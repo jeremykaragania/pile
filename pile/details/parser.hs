@@ -154,9 +154,9 @@ module Parser where
 
   parseCRemainder = parseBinaryOperator "%" (CBinary "%")
 
-  parseCMultiplicative = chainl1 parseCCast operator
+  parseCMultiplicative = chainl1 parseCCast op
     where
-      operator =
+      op =
         parseCProduct <|>
         parseCQuotient <|>
         parseCRemainder
@@ -165,9 +165,9 @@ module Parser where
 
   parseCSubtraction = parseBinaryOperator "-" (CBinary "-")
 
-  parseCAdditive = chainl1 parseCMultiplicative operator
+  parseCAdditive = chainl1 parseCMultiplicative op
     where
-      operator =
+      op =
         parseCAddition <|>
         parseCSubtraction
 
@@ -175,9 +175,9 @@ module Parser where
 
   parseCRightShift = parseBinaryOperator ">>" (CBinary ">>")
 
-  parseCShift = chainl1 parseCAdditive operator
+  parseCShift = chainl1 parseCAdditive op
     where
-      operator =
+      op =
         parseCLeftShift <|>
         parseCRightShift
 
@@ -189,9 +189,9 @@ module Parser where
 
   parseCGreaterOrEqual = parseBinaryOperator ">=" (CBinary ">=")
 
-  parseCRelational = chainl1 parseCShift operator
+  parseCRelational = chainl1 parseCShift op
     where
-      operator =
+      op =
         parseCLesser <|>
         parseCGreater <|>
         parseCLesserOrEqual <|>
@@ -201,9 +201,9 @@ module Parser where
 
   parseCNotEqual = parseBinaryOperator "!=" (CBinary "!=")
 
-  parseCEquality = chainl1 parseCRelational operator
+  parseCEquality = chainl1 parseCRelational op
     where
-      operator =
+      op =
         parseCEqual <|>
         parseCNotEqual
 
@@ -435,9 +435,9 @@ module Parser where
 
   parseCGoto = do
     parseToken (Token Nothing (CKeywordToken "goto"))
-    identifier <- parseCIdentifier
+    ident <- parseCIdentifier
     parseToken (Token Nothing (CPunctuatorToken ";"))
-    return (CGoto identifier)
+    return (CGoto ident)
 
   parseCContinue = do
     parseToken (Token Nothing (CKeywordToken "continue"))

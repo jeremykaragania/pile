@@ -45,7 +45,7 @@ module Scheduler where
       toMachineCode (b@(Node _ (Opcode _) _), c) = [MCInstruction (toOpcode b) (map toOperand (filter (isOperandType . nodeType) c))]
       toOpcode b = (opcodeCondition . nodeType) b
       toOperand (Node _ (Selector.Register b) [(_, (Just (IntegerValue c)))]) = Scheduler.Register b c
-      toOperand (Node _ Constant [(_, (Just (IntegerValue a)))]) = Immediate a
+      toOperand (Node _ Constant [(_, (Just (IntegerValue b)))]) = Immediate b
       toOperand (Node _ (Selector.Label b) _) = Scheduler.Label b
 
   schedule = map scheduleGraph

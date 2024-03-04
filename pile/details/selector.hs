@@ -6,14 +6,27 @@ module Selector where
   import Syntax
   import Unsafe.Coerce
 
+  {-
+    OpcodeCondition is a type for an "opcode" (ARMOpcode) and a "condition" (Maybe ARMCondition) which taken together constitue
+    the form of instructions from most instruction set architectures.
+  -}
   data OpcodeCondition = OpcodeCondition {
     opcode :: ARMOpcode,
     condition :: (Maybe ARMCondition)} deriving (Show, Eq)
 
+  {-
+    RegisterType is a type for register types. Abstractly, registers can be "virtual" or "physical". A "virtual" register is
+    used by the selector if the register has no special meaning such that any other general purpose register may be substituted 
+    for it without changing the program's semantics. A "phsysical" register cannot be substituded for another register such as 
+    the stack pointer or calling convention specific registers.
+  -}
   data RegisterType =
     Virtual |
     Physical deriving (Show, Eq, Ord)
 
+  {-
+    NodeType is a type for node types.
+  -}
   data NodeType =
     EntryToken |
     Label String |
@@ -24,6 +37,8 @@ module Selector where
     Constant |
     Opcode OpcodeCondition deriving (Show, Eq)
 
+  {-
+  -}
   data MachineValueType =
     Byte |
     Halfword |

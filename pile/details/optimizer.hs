@@ -22,9 +22,9 @@ module Optimizer where
 
   replaceMachineCodes a (b:bs) = replaceMachineCodes (a ++ [b]) bs
 
-  optimizeStackPointers a = ((fst . machineCode) a) ++ [MCInstruction (OpcodeCondition ARMSub Nothing) [Register Physical 13, Register Physical 13, Immediate offset]] ++ (filter (not . subStackPointer) ((snd . machineCode) a))
+  optimizeStackPointers a = ((fst . machineCode) a) ++ [MCInstruction (OpcodeCondition ARMSub Nothing) [Register Physical 13, Register Physical 13, Immediate stackOffset]] ++ (filter (not . subStackPointer) ((snd . machineCode) a))
     where
-      immediateValue (MCInstruction (OpcodeCondition _ _) [_, _, Immediate a]) = a
-      offset = (sum . map immediateValue . filter subStackPointer) a
+      immediateValue (MCInstruction (OpcodeCondition _ _) [_, _, Immediate b]) = b
+      stackOffset = (sum . map immediateValue . filter subStackPointer) a
 
   optimize = map (replaceMachineCodes [] . optimizeStackPointers)

@@ -1,4 +1,4 @@
-  module Allocator where
+module Allocator where
   import Control.Monad.State
   import Data.List
   import Data.Map (Map)

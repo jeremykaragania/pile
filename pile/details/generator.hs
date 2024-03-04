@@ -307,9 +307,9 @@ module Generator where
     put ((setBlocks newBlocks . setCounter (+1)) expr)
     where
       -- Different comparison instructions are used depending on argument type.
-      comparisonInstruction c
-        | (isIntegral . fst) c = IRIcmp IRINe (fst c) (IRLabelValue (IRLabelNumber (snd c - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst c)))
-        | (isFloating . fst) c = IRFcmp IRFOne (fst c) (IRLabelValue (IRLabelNumber (snd c - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst c)))
+      comparisonInstruction d
+        | (isIntegral . fst) d = IRIcmp IRINe (fst d) (IRLabelValue (IRLabelNumber (snd d - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst d)))
+        | (isFloating . fst) d = IRFcmp IRFOne (fst d) (IRLabelValue (IRLabelNumber (snd d - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst d)))
 
   {-
     All selection statements consist of an expression ("a"), and at least one body ("b") which is a compound statement.
@@ -321,8 +321,8 @@ module Generator where
     got <- get
     let expr = execState (generateCExpressions b) got
     let stat = execState (generateCStatement c) (setCounter (+1) expr)
-    let head = execState (newHead a (IRLabelValue (IRLabelNumber (counter expr + 1))) (IRLabelValue (IRLabelNumber (counter stat + 1)))) got
-    put head
+    let selectionHead = execState (newHead a (IRLabelValue (IRLabelNumber (counter expr + 1))) (IRLabelValue (IRLabelNumber (counter stat + 1)))) got
+    put selectionHead
 
   {-
     newFunctionBody is used for the generation of basic blocks, which are just instruction lists, from a function body,
