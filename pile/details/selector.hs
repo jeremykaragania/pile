@@ -293,7 +293,7 @@ module Selector where
     put branch
     where
       sourceType (IRLabelValue _) = Word
-      soruceType _ = Other
+      sourceType _ = Other
       sourceValue (IRLabelValue _) = Just (toNodeValue a)
       sourceValue _ = Nothing
 

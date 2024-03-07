@@ -494,7 +494,6 @@ module Generator where
 
   generateCStatement (CSwitch (CExpression a) b) = do
     got <- get
-    let splitStat = (CCompound Nothing . Just . CList . splitLabeled . statementList . statementFromCCompound . compound) b
     let expr = execState (generateCExpressions a) got
     let exprType = (getInstrType . last . concat . blocks) expr
     if (isIntegral exprType) then do
@@ -558,7 +557,6 @@ module Generator where
   switchStatement (a:as) = do
     got <- get
     let stat = execState (generateCStatement a) (fst got)
-    let newBlocks = blocks stat
     case a of
       CLabeledCase b _ -> do
         let switchConstant = (constant . token) b
@@ -584,8 +582,6 @@ module Generator where
       name (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken e)))) = e
       name (CDeclarator _ (CDirectDeclaratorFunctionCall (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken e))) _)) = e
       pointer (CDeclarator e _) = e
-      argumentList (CDeclarator _ (CDirectDeclaratorFunctionCall _ [CParameterList e])) = e
-      argument (CParameterDeclaration e f) = IRArgument (typeFromCSpecifiers e Nothing) (Just (name f))
 
   generateCExternalDefinition (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList b)))) = do
     got <- get
