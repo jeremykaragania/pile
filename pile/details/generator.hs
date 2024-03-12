@@ -528,6 +528,14 @@ module Generator where
     let newBlocks1 = appendBlocks (blocks whileBody) br1 ++ [[]]
     put ((setBlocks newBlocks1 . setCounter (+1) . setContext Nothing) whileBody)
 
+  generateCStatement (CDo a b) = do 
+    got <- get
+    let br0 = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (counter got))))]]
+    let newBlocks0 = appendBlocks (blocks got) br0 ++ [[]]
+    let doBody0 = execState ((generateCStatement . compound) a) ((setBlocks newBlocks0 . setCounter (+1) . setContext (Just (counter doBody0 + 2))) got)
+    let doBody1 = execState (newHead b (IRLabelValue (IRLabelNumber (counter got))) (IRLabelValue (IRLabelNumber ((counter doBody0) + 2)))) doBody0
+    put ((setBlocks (blocks doBody1 ++ [[]]) . setCounter (+1) . setContext Nothing) doBody1)
+
   generateCStatement (CReturn Nothing) = do
     got <- get
     let instrs = [[(Nothing, IRRet Nothing)]]
