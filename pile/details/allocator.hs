@@ -171,19 +171,22 @@ module Allocator where
       let newRegisters = Map.insert a (Address (offset got)) (registers got)
       put ((setRegisters newRegisters . setOffset (+4)) got)
 
-  allocateMachineCodes a = machineCodes
+  allocateMachineCodes a = addSubs [] machineCodes
     where
       toPhysical = registers (execState (allocateLiveIntervals ((sortBy compareLiveFrom . analyze) a)) (AllocatorState [8..11] Map.empty Map.empty 0))
-      operands = map instruction a
+      machineCodes = map instruction a
       operand b@(Register _ _) = toPhysical Map.! b
       operand b = b
       instruction (MCInstruction b c) = MCInstruction b (map operand c)
       instruction b = b
       addSub b = [MCInstruction (OpcodeCondition b Nothing) [Register Physical 13, Register Physical 13, Immediate stackOffset]]
-      machineCodes = ((fst . machineCode) operands) ++ addSub ARMSub ++ ((snd . machineCode) operands) ++ addSub ARMAdd
       stackOffset = ((*4) . fromIntegral . length . filter address . Map.toList) toPhysical
       address (_, Address _) = True
       address _ = False
+      addSubs b [] = b
+      addSubs b (c@(MCSymbol MCGlobal _):d) = addSubs (b ++ [c] ++ addSub ARMSub) d
+      addSubs b (c@(MCInstruction (OpcodeCondition ARMBx Nothing) [Register Physical 14]):d) = addSubs (b ++ addSub ARMAdd ++ [c]) d
+      addSubs b (c:d) = addSubs (b ++ [c]) d
 
   resolveMachineCodes a [] = a
   resolveMachineCodes a (b@(MCInstruction c (d:e)):f) = resolveMachineCodes (a ++ (firstMachineCodes (fst operands) b) ++ [MCInstruction c (snd operands)] ++ lastMachineCodes b) f
