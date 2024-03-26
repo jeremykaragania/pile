@@ -528,7 +528,7 @@ module Generator where
     let newBlocks1 = appendBlocks (blocks whileBody) br1 ++ [[]]
     put ((setBlocks newBlocks1 . setCounter (+1) . setContext Nothing) whileBody)
 
-  generateCStatement (CDo a b) = do 
+  generateCStatement (CDo a b) = do
     got <- get
     let br0 = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (counter got))))]]
     let newBlocks0 = appendBlocks (blocks got) br0 ++ [[]]

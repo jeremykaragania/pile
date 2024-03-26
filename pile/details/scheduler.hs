@@ -46,6 +46,7 @@ module Scheduler where
       toOpcode b = (opcodeCondition . nodeType) b
       toOperand (Node _ (Selector.Register b) [(_, (Just (IntegerValue c)))]) = Scheduler.Register b c
       toOperand (Node _ Constant [(_, (Just (IntegerValue b)))]) = Immediate b
+      toOperand (Node _ Constant [(_, (Just (FloatingValue 0.0)))]) = Immediate 0
       toOperand (Node _ (Selector.Label b) _) = Scheduler.Label b
 
   schedule = map scheduleGraph

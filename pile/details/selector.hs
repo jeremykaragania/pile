@@ -360,10 +360,10 @@ module Selector where
     let mov1 = execState (newMov (OpcodeCondition ARMMov (Just (fromIRICondition b))) a Virtual (Constant) [(Word, Just (IntegerValue 1))]) mov0
     put mov1
 
-  selectIRLabeledInstruction ((Just (IRLabelNumber a)), IRFcmp b _ (IRLabelValue (IRLabelNumber c)) (IRLabelValue (IRLabelNumber d))) = do
+  selectIRLabeledInstruction ((Just (IRLabelNumber a)), IRFcmp b _ c d) = do
     got <- get
-    let mov0 = execState (newMov (OpcodeCondition ARMMov Nothing) 0 Physical (Register Virtual) [(Word, Just (IntegerValue c))]) got
-    let mov1 = execState (newMov (OpcodeCondition ARMMov Nothing) 1 Physical (Register Virtual) [(Word, Just (IntegerValue d))]) mov0
+    let mov0 = execState (newMov (OpcodeCondition ARMMov Nothing) 0 Physical (toNodeType c) [(Word, Just (toNodeValue c))]) got
+    let mov1 = execState (newMov (OpcodeCondition ARMMov Nothing) 1 Physical (toNodeType d) [(Word, Just (toNodeValue d))]) mov0
     let bl = execState (newBranch (OpcodeCondition ARMBl Nothing) (Label (nameFromIRFCondition b)) [(Other, Nothing)]) mov1
     if (b == IRFOne) then do
       let mov2 = execState (newMov (OpcodeCondition ARMMvn Nothing) a Virtual (Register Physical) [(Word, Just (IntegerValue 0))]) bl
