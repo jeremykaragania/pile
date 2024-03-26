@@ -8,6 +8,9 @@ module Emitter where
   emitNodeValue (IntegerValue a) = show a
   emitNodeValue (FloatingValue a) = show a
 
+  emitMCSymbolScope MCGlobal a = ".global " ++ a ++ "\n"
+  emitMCSymbolScope MCLocal _ = ""
+
   emitMachineCode (MCInstruction a@(OpcodeCondition b c) d) = "  " ++ emitOpcodeCondition a ++ " " ++ emitOperands
     where
       emitARM e = (drop 3 . map toLower . show) e
@@ -20,7 +23,7 @@ module Emitter where
         | b == ARMLdr || b == ARMStr = ((emitOperand . head) d) ++ ", [" ++ (intercalate ", " ((map emitOperand . tail) d)) ++ "]"
         | otherwise = (intercalate ", " (map emitOperand d))
 
-  emitMachineCode (MCSymbol a) = a ++ ":"
+  emitMachineCode (MCSymbol a b) = emitMCSymbolScope a b ++ b ++ ":"
   emitMachineCode (MCDirective a@(MCConstant _ _)) = "  ." ++ emitMCDirective a
   emitMachineCode (MCDirective a) = "." ++ emitMCDirective a
 
@@ -28,7 +31,6 @@ module Emitter where
 
   emitMCDirective (MCConstant Halfword a) = "hword " ++ emitNodeValue a
   emitMCDirective (MCConstant a b) = (map toLower . show) a ++ " " ++ emitNodeValue b
-  emitMCDirective (Global a) = "global " ++ a
   emitMCDirective a = (map toLower . show) a
 
   emit = (++) "\n" . intercalate "\n" . map (intercalate "\n") . emitMachineCodes
