@@ -332,7 +332,9 @@ module Generator where
   newFunctionBody a b = do
     got <- get
     let stat = execState (generateCStatement a) got
-    return (fst (execState ((numberBlocks . blocks) stat) ([], 0)))
+    let ret = execState (generateCStatement (CReturn Nothing)) got
+    let newBlocks = appendBlocks (blocks stat) (blocks ret)
+    return (fst (execState (numberBlocks newBlocks) ([], 0)))
     where
       {-
         It is hard to number blocks as they are being generated because there is not enough context. Therefore, block

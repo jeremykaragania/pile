@@ -16,8 +16,8 @@ module Selector where
 
   {-
     RegisterType is a type for register types. Abstractly, registers can be "virtual" or "physical". A "virtual" register is
-    used by the selector if the register has no special meaning such that any other general purpose register may be substituted 
-    for it without changing the program's semantics. A "phsysical" register cannot be substituded for another register such as 
+    used by the selector if the register has no special meaning such that any other general purpose register may be substituted
+    for it without changing the program's semantics. A "phsysical" register cannot be substituded for another register such as
     the stack pointer or calling convention specific registers.
   -}
   data RegisterType =
@@ -25,7 +25,9 @@ module Selector where
     Physical deriving (Show, Eq, Ord)
 
   {-
-    NodeType is a type for node types.
+    NodeType is a type for node types. Each node is interpreted differently depending on its type. Some types contain
+    information about the node within themselves. This is done when it makes less sense for the information to be part of the
+    node's data.
   -}
   data NodeType =
     EntryToken |
@@ -38,6 +40,7 @@ module Selector where
     Opcode OpcodeCondition deriving (Show, Eq)
 
   {-
+    MachineValueType is a type for the machine types. It represents the types that a machine innately supports.
   -}
   data MachineValueType =
     Byte |
