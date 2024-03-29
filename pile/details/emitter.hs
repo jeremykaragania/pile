@@ -8,7 +8,7 @@ module Emitter where
   emitNodeValue (IntegerValue a) = show a
   emitNodeValue (FloatingValue a) = show a
 
-  emitMCSymbolScope MCGlobal a = ".global " ++ a ++ "\n"
+  emitMCSymbolScope (MCGlobal _) a = ".global " ++ a ++ "\n"
   emitMCSymbolScope MCLocal _ = ""
 
   emitMachineCode (MCInstruction a@(OpcodeCondition b c) d) = "  " ++ emitOpcodeCondition a ++ " " ++ emitOperands

@@ -184,7 +184,7 @@ module Allocator where
       address (_, Address _) = True
       address _ = False
       addSubs b [] = b
-      addSubs b (c@(MCSymbol MCGlobal _):d) = addSubs (b ++ [c] ++ addSub ARMSub) d
+      addSubs b (c@(MCSymbol (MCGlobal MCFunction) _):d) = addSubs (b ++ [c] ++ addSub ARMSub) d
       addSubs b (c@(MCInstruction (OpcodeCondition ARMBx Nothing) [Register Physical 14]):d) = addSubs (b ++ addSub ARMAdd ++ [c]) d
       addSubs b (c:d) = addSubs (b ++ [c]) d
 

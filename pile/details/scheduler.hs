@@ -13,8 +13,12 @@ module Scheduler where
     Data |
     Text deriving (Show, Eq)
 
+  data MCGlobalType =
+    MCVariable |
+    MCFunction deriving (Show, Eq)
+
   data MCSymbolScope =
-    MCGlobal |
+    MCGlobal MCGlobalType |
     MCLocal deriving (Show, Eq)
 
   data MachineCode =
@@ -42,8 +46,8 @@ module Scheduler where
       isOperandType (Selector.Label _) = True
       isOperandType _ = False
       zipInstructions = zip opcodeNodes (map nodeOperands opcodeNodes)
-      toMachineCode ((Node _ (FunctionGlobal b) _), _) = [MCDirective Text, MCSymbol MCGlobal b]
-      toMachineCode ((Node _ (VariableGlobal b) c), _) = [MCDirective Text, MCDirective Data, MCSymbol MCGlobal b] ++ map (\(d, Just e) -> MCDirective (MCConstant d e)) c
+      toMachineCode ((Node _ (FunctionGlobal b) _), _) = [MCDirective Text, MCSymbol (MCGlobal MCFunction) b]
+      toMachineCode ((Node _ (VariableGlobal b) c), _) = [MCDirective Data, MCSymbol (MCGlobal MCVariable) b] ++ map (\(d, Just e) -> MCDirective (MCConstant d e)) c
       toMachineCode ((Node _ (BasicBlock b) _), _) = [MCSymbol MCLocal b]
       toMachineCode (b@(Node _ (Opcode _) _), c) = [MCInstruction (toOpcode b) (map toOperand (filter (isOperandType . nodeType) c))]
       toOpcode b = (opcodeCondition . nodeType) b
