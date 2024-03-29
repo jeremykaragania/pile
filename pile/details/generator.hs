@@ -63,7 +63,9 @@ module Generator where
 
   getIdentifier (CInitDeclarator a _) = getIdentifier a
   getIdentifier (CDirectDeclaratorIdentifier a) = (identifier . token) a
+  getIdentifier (CDirectDeclaratorFunctionCall a _) = getIdentifier a
   getIdentifier (CDeclarator _ a) = getIdentifier a
+  getIdentifier (CParameterDeclaration _ a) = getIdentifier a
 
   getPointer (CInitDeclarator a _) = getPointer a
   getPointer (CDeclarator a _) = a
@@ -311,6 +313,17 @@ module Generator where
         | (isIntegral . fst) d = IRIcmp IRINe (fst d) (IRLabelValue (IRLabelNumber (snd d - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst d)))
         | (isFloating . fst) d = IRFcmp IRFOne (fst d) (IRLabelValue (IRLabelNumber (snd d - 1))) (IRConstantValue (generateIRConstant (CConstant (CConstantToken (CIntegerConstant 0 Nothing))) (fst d)))
 
+  addIdentInfo :: CDeclaration -> CDeclaration -> GeneratorStateMonad ()
+  addIdentInfo a b = do
+    got <- get
+    let name = getIdentifier b
+    if Map.notMember name (table got) then do
+      let varType = typeFromCSpecifiers a (getPointer b)
+      let var = IRVariableGlobal name varType (generateIRConstant (getConstant b) varType)
+      let newTable = Map.insert name [(IdentInfo (scope got) (IRLabelNumber (counter got)) varType)] (table got)
+      put (setTable newTable got)
+    else error ""
+
   {-
     All selection statements consist of an expression ("a"), and at least one body ("b") which is a compound statement.
     Therefore, newSelectionHead generates this selection statement head so it can be used in other selection statement
@@ -324,6 +337,25 @@ module Generator where
     let selectionHead = execState (newHead a (IRLabelValue (IRLabelNumber (counter expr + 1))) (IRLabelValue (IRLabelNumber (counter stat + 1)))) got
     put selectionHead
 
+  newFunctionHead :: CDeclaration -> State (GeneratorState, [IRArgument]) ()
+  newFunctionHead a = do
+    got <- get
+    let params = execState (parameters (getParameters a)) got
+    put params
+    where
+      getParameters (CDeclarator _ (CDirectDeclaratorFunctionCall _ [CParameterList b])) = b
+
+      parameters :: [CDeclaration] -> State (GeneratorState, [IRArgument]) ()
+      parameters [] = return ()
+
+      parameters ((CParameterDeclaration a b):es) = do
+        got <- get
+        let varType = typeFromCSpecifiers a (getPointer b)
+        let arg = IRArgument varType Nothing
+        let newTable = execState (addIdentInfo a b) (fst got)
+        put (setCounter (+1) newTable, (snd got) ++ [arg])
+        parameters es
+
   {-
     newFunctionBody is used for the generation of basic blocks, which are just instruction lists, from a function body,
     which is just a compound statement. It receives a compound statement (a), and the return type of the function (b).
@@ -334,7 +366,7 @@ module Generator where
     let stat = execState (generateCStatement a) got
     let ret = execState (generateCStatement (CReturn Nothing)) got
     let newBlocks = appendBlocks (blocks stat) (blocks ret)
-    return (fst (execState (numberBlocks newBlocks) ([], 0)))
+    return (fst (execState (numberBlocks newBlocks) ([], ((counter got) - 1))))
     where
       {-
         It is hard to number blocks as they are being generated because there is not enough context. Therefore, block
@@ -480,7 +512,7 @@ module Generator where
   generateCStatement (CIf a@(CExpression _) b) = do
     got <- get
     let ifHead = execState (newSelectionHead a (compound b)) got
-    let ifBody = execState ((generateCStatement . compound) b) (setBlocks ((blocks ifHead) ++ [[]]) ifHead)
+    let ifBody = execState ((generateCStatement . compound) b) ((setCounter (+1) . setBlocks ((blocks ifHead) ++ [[]])) ifHead)
     let ifBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter ifBody)))))]
     let newBlocks = appendBlocks (blocks ifBody) [ifBr, []]
     put ((setBlocks newBlocks . setCounter (+1)) ifBody)
@@ -488,8 +520,8 @@ module Generator where
   generateCStatement (CIfElse a@(CExpression _) b c) = do
     got <- get
     let ifHead = execState (newSelectionHead a (compound b)) got
-    let ifBody = execState ((generateCStatement . compound) b) (setBlocks ((blocks ifHead) ++ [[]]) ifHead)
-    let elseBody = execState ((generateCStatement . compound) c) ((setBlocks ((blocks ifBody) ++ [[]]) . setCounter (+1)) ifBody)
+    let ifBody = execState ((generateCStatement . compound) b) ((setCounter (+1) . setBlocks ((blocks ifHead) ++ [[]])) ifHead)
+    let elseBody = execState ((generateCStatement . compound) c) ((setCounter (+1) . setBlocks ((blocks ifBody) ++ [[]])) ifBody)
     let elseBr = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter elseBody)))))]]
     let newBlocks = appendBlocks (blocks elseBody) elseBr
     put ((setBlocks newBlocks . setCounter (+1)) elseBody)
@@ -583,14 +615,13 @@ module Generator where
   generateCExternalDefinition :: CExternalDefinition -> GeneratorStateMonad ()
   generateCExternalDefinition (CFunction (Just a) b c d) = do
     got <- get
-    let basicBlocks = evalState (newFunctionBody d functionType) (GeneratorState [[]] 1 (table got) Nothing [] 0)
-    let functionGlobal = IRFunctionGlobal functionType (name b) [] basicBlocks
+    let functionHead = execState (newFunctionHead b) (GeneratorState [[]] 0 (table got) Nothing [] 0, [])
+    let functionBody = evalState (newFunctionBody d functionType) ((setCounter (+1) . setLevel (+ (-1))) (fst functionHead)) -- The level needs to match that of functionHead.
+    let functionGlobal = IRFunctionGlobal functionType (getIdentifier b) (snd functionHead) functionBody
     let newGlobals = (globals got) ++ [functionGlobal]
     put ((setGlobals newGlobals) got)
     where
       functionType = typeFromCSpecifiers a (pointer b)
-      name (CDeclarator _ (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken e)))) = e
-      name (CDeclarator _ (CDirectDeclaratorFunctionCall (CDirectDeclaratorIdentifier (CIdentifier (CIdentifierToken e))) _)) = e
       pointer (CDeclarator e _) = e
 
   generateCExternalDefinition (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList b)))) = do
@@ -604,14 +635,11 @@ module Generator where
       declarations (c:cs) = do
         got <- get
         let name = getIdentifier c
-        if Map.notMember name (table got) then do
-          let varType = typeFromCSpecifiers a (getPointer c)
-          let var = IRVariableGlobal name varType (generateIRConstant (getConstant c) varType)
-          let newTable = Map.insert name [(IdentInfo (scope got) (IRLabelName name) varType)] (table got)
-          let newGlobals = globals got ++ [var]
-          put ((setTable newTable . setGlobals newGlobals) got)
-          declarations cs
-        else error ""
+        let varType = typeFromCSpecifiers a (getPointer c)
+        let var = IRVariableGlobal name varType (generateIRConstant (getConstant c) varType)
+        let newTable = execState (addIdentInfo a c) got
+        let newGlobals = globals got ++ [var]
+        put (setGlobals newGlobals newTable)
 
   generateCExternalDefinitions :: [CExternalDefinition] -> GeneratorStateMonad ()
   generateCExternalDefinitions [] = return ()
@@ -628,4 +656,4 @@ module Generator where
     let globalValues = (globals . execState (generateCExternalDefinitions a)) got
     return (IRModule globalValues)
 
-  generate a = evalState (generateCTranslationUnit a) (GeneratorState [[]] 1 Map.empty Nothing [] 0)
+  generate a = evalState (generateCTranslationUnit a) (GeneratorState [[]] 0 Map.empty Nothing [] 0)

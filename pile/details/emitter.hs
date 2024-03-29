@@ -33,4 +33,4 @@ module Emitter where
   emitMCDirective (MCConstant a b) = (map toLower . show) a ++ " " ++ emitNodeValue b
   emitMCDirective a = (map toLower . show) a
 
-  emit = (++) "\n" . intercalate "\n" . map (intercalate "\n") . emitMachineCodes
+  emit = intercalate "\n" . map (intercalate "\n") . emitMachineCodes
