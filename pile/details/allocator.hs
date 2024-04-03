@@ -173,7 +173,7 @@ module Allocator where
 
   allocateMachineCodes a = addSubs [] machineCodes
     where
-      toPhysical = registers (execState (allocateLiveIntervals ((sortBy compareLiveFrom . analyze) a)) (AllocatorState [8..11] Map.empty Map.empty 0))
+      toPhysical = registers (execState (allocateLiveIntervals ((sortBy compareLiveFrom . analyze) a)) (AllocatorState [2, 3, 9, 10, 11] Map.empty Map.empty 0))
       machineCodes = map instruction a
       operand b@(Register _ _) = toPhysical Map.! b
       operand b = b

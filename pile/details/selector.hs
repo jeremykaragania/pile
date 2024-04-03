@@ -73,24 +73,29 @@ module Selector where
   {-
     SelectorState carries state between selectors. A SelectorState carries a directed acyclic graphs (graph) which is a graph
     representation of the intermediate representation, an accumulator (counter) for the numbering of graph nodes, the most
-    recent side-effecting node (chain), the stack pointer offset (offset), and the global value name (global).
+    recent side-effecting node (chain), the stack pointer offset (offset), the global value name (global), and the number of
+    arguments to the current function (args).
   -}
   data SelectorState = SelectorState {
     graphs :: [Graph],
     counter :: Integer,
     chain :: Integer,
     offset :: Integer,
-    global :: String}
+    global :: String,
+    args :: Integer
+    }
 
-  setGraph a (SelectorState _ b c d e) = SelectorState a b c d e
+  setGraph a (SelectorState _ b c d e f) = SelectorState a b c d e f
 
-  setCounter a (SelectorState b c d e f) = SelectorState b (a c) d e f
+  setCounter a (SelectorState b c d e f g) = SelectorState b (a c) d e f g
 
-  setChain a (SelectorState b c _ d e) = SelectorState b c a d e
+  setChain a (SelectorState b c _ d e f) = SelectorState b c a d e f
 
-  setOffset a (SelectorState b c d e f) = SelectorState b c d (a e) f
+  setOffset a (SelectorState b c d e f g) = SelectorState b c d (a e) f g
 
-  setGlobal a (SelectorState b c d e _) = SelectorState b c d e a
+  setGlobal a (SelectorState b c d e _ f) = SelectorState b c d e a f
+
+  setArgs a (SelectorState b c d e f _) = SelectorState b c d e f a
 
   type SelectorStateMonad = State SelectorState
 
@@ -353,8 +358,12 @@ module Selector where
 
   selectIRLabeledInstruction (Nothing, IRStore b (IRLabelValue (IRLabelNumber c)) (IRLabelNumber d)) = do
     got <- get
-    let mov = execState (newMov (OpcodeCondition ARMMov Nothing) d Virtual (Register Virtual) [(Word, Just (IntegerValue c))]) got
+    let mov = execState (newMov (OpcodeCondition ARMMov Nothing) d Virtual (register c (args got)) [(Word, Just (IntegerValue c))]) got
     put mov
+    where
+      register e f
+        | e < f = Register Physical
+        | otherwise = Register Virtual
 
   selectIRLabeledInstruction (Just (IRLabelNumber a), IRIcmp b _ c d) = do
     got <- get
@@ -396,8 +405,8 @@ module Selector where
           Node (counter got) (EntryToken) [(Other, Nothing)],
           Node (counter got + 1) (FunctionGlobal b) [(Other, Nothing)]]
     let newGraph = appendGraph [Graph newNodes []] (graphs got)
-    let basicBlocks = execState (selectIRBasicBlocks d) ((setGraph newGraph . setCounter (+2) . setGlobal b) got)
-    put (SelectorState (graphs basicBlocks ++ [Graph [] []]) 0 0 0 "")
+    let basicBlocks = execState (selectIRBasicBlocks d) ((setGraph newGraph . setCounter (+2) . setGlobal b . setArgs ((fromIntegral . length) c)) got)
+    put (SelectorState (graphs basicBlocks ++ [Graph [] []]) 0 0 0 "" 0)
 
   selectIRGlobalValue (IRVariableGlobal a b c) = do
     got <- get
@@ -413,4 +422,4 @@ module Selector where
     return ((init . graphs) newGraph)
 
   select :: IRModule -> [Graph]
-  select a = evalState (selectIRModule a) (SelectorState ([Graph [] []]) 0 0 0 "")
+  select a = evalState (selectIRModule a) (SelectorState ([Graph [] []]) 0 0 0 "" 0)
