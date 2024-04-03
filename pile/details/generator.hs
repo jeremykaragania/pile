@@ -337,36 +337,39 @@ module Generator where
     let selectionHead = execState (newHead a (IRLabelValue (IRLabelNumber (counter expr + 1))) (IRLabelValue (IRLabelNumber (counter stat + 1)))) got
     put selectionHead
 
-  newFunctionHead :: CDeclaration -> State (GeneratorState, [IRArgument]) ()
-  newFunctionHead a = do
+  newFunctionHead :: [CDeclaration] -> Integer -> State (GeneratorState, [IRArgument]) ()
+  newFunctionHead a b = do
     got <- get
-    let params = execState (parameters (getParameters a)) got
+    let params = execState (parameters a) (fst got, snd got)
     put params
     where
-      getParameters (CDeclarator _ (CDirectDeclaratorFunctionCall _ [CParameterList b])) = b
-
       parameters :: [CDeclaration] -> State (GeneratorState, [IRArgument]) ()
       parameters [] = return ()
 
-      parameters ((CParameterDeclaration a b):es) = do
+      parameters ((CParameterDeclaration c d):es) = do
         got <- get
-        let varType = typeFromCSpecifiers a (getPointer b)
+        let varType = typeFromCSpecifiers c (getPointer d)
         let arg = IRArgument varType Nothing
-        let newTable = execState (addIdentInfo a b) (fst got)
-        put (setCounter (+1) newTable, (snd got) ++ [arg])
+        let num = ((counter . fst) got) - b
+        let newTable = execState (addIdentInfo c d) (fst got)
+        let type0 = typeFromCSpecifiers c (getPointer d)
+        let alloca = execState (newAlloca type0) newTable
+        let store = [[(Nothing, IRStore type0 (IRLabelValue (IRLabelNumber num)) (IRLabelNumber (counter alloca - 1)))]]
+        let newBlocks = appendBlocks (blocks alloca) store
+        put (setBlocks newBlocks alloca, (snd got) ++ [arg])
         parameters es
 
   {-
     newFunctionBody is used for the generation of basic blocks, which are just instruction lists, from a function body,
     which is just a compound statement. It receives a compound statement (a), and the return type of the function (b).
   -}
-  newFunctionBody :: CStatement -> IRType -> GeneratorStateMonad [IRBasicBlock]
-  newFunctionBody a b = do
+  newFunctionBody :: CStatement -> IRType -> Integer -> GeneratorStateMonad [IRBasicBlock]
+  newFunctionBody a b c = do
     got <- get
     let stat = execState (generateCStatement a) got
-    let ret = execState (generateCStatement (CReturn Nothing)) got
-    let newBlocks = appendBlocks (blocks stat) (blocks ret)
-    return (fst (execState (numberBlocks newBlocks) ([], ((counter got) - 1))))
+    let ret = [[(Nothing, IRRet Nothing)]]
+    let newBlocks = appendBlocks (blocks stat) ret
+    return (fst (execState (numberBlocks newBlocks) ([], (c {-OFFSET-}))))
     where
       {-
         It is hard to number blocks as they are being generated because there is not enough context. Therefore, block
@@ -615,14 +618,16 @@ module Generator where
   generateCExternalDefinition :: CExternalDefinition -> GeneratorStateMonad ()
   generateCExternalDefinition (CFunction (Just a) b c d) = do
     got <- get
-    let functionHead = execState (newFunctionHead b) (GeneratorState [[]] 0 (table got) Nothing [] 0, [])
-    let functionBody = evalState (newFunctionBody d functionType) ((setCounter (+1) . setLevel (+ (-1))) (fst functionHead)) -- The level needs to match that of functionHead.
+    let parameterLength = (fromIntegral . length . parameterList) b
+    let functionHead = execState (newFunctionHead (parameterList b) (parameterLength + 1)) (GeneratorState [[]] (parameterLength + 1) (table got) Nothing [] 0, [])
+    let functionBody = evalState (newFunctionBody d functionType parameterLength) ((setLevel (+ (-1))) (fst functionHead)) -- The level needs to match that of functionHead.
     let functionGlobal = IRFunctionGlobal functionType (getIdentifier b) (snd functionHead) functionBody
     let newGlobals = (globals got) ++ [functionGlobal]
     put ((setGlobals newGlobals) got)
     where
       functionType = typeFromCSpecifiers a (pointer b)
       pointer (CDeclarator e _) = e
+      parameterList (CDeclarator _ (CDirectDeclaratorFunctionCall _ [CParameterList b])) = b
 
   generateCExternalDefinition (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList b)))) = do
     got <- get
