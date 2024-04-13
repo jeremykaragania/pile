@@ -16,7 +16,7 @@ module Emitter where
       emitARM e = (drop 3 . map toLower . show) e
       emitOpcodeCondition (OpcodeCondition e Nothing) = emitARM e
       emitOpcodeCondition (OpcodeCondition e (Just f)) = emitARM e ++ emitARM f
-      emitOperand (Label e) = "#" ++ e
+      emitOperand (Label e) = e
       emitOperand (Register _ e) = "r" ++ show e
       emitOperand (Immediate e) = "#" ++ show e
       emitOperands
@@ -33,4 +33,4 @@ module Emitter where
   emitMCDirective (MCConstant a b) = (map toLower . show) a ++ " " ++ emitNodeValue b
   emitMCDirective a = (map toLower . show) a
 
-  emit = intercalate "\n" . map (intercalate "\n") . emitMachineCodes
+  emit = flip (++) "\n" . intercalate "\n" . map (intercalate "\n") . emitMachineCodes
