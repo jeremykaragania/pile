@@ -7,9 +7,10 @@ module Main where
   import Parser
   import Scheduler
   import Selector
+  import System.FilePath
   import System.Environment
 
-  parseOutFile a = take (length a - 2) a ++ ".s"
+  parseOutFile a = takeFileName (take (length a - 2) a ++ ".s")
 
   isInFile a = drop (length a - 2) a == ".c"
 
