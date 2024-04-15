@@ -11,6 +11,10 @@ module Emitter where
   emitMCSymbolScope (MCGlobal _) a = ".global " ++ a ++ "\n"
   emitMCSymbolScope MCLocal _ = ""
 
+  emitMCSymbolType (MCGlobal MCFunction) = "function"
+  emitMCSymbolType (MCGlobal MCVariable) = "object"
+  emitMCSymbolType _ = "notype"
+
   emitMachineCode (MCInstruction a@(OpcodeCondition b c) d) = "  " ++ emitOpcodeCondition a ++ " " ++ emitOperands
     where
       emitARM e = (drop 3 . map toLower . show) e
@@ -23,7 +27,7 @@ module Emitter where
         | b == ARMLdr || b == ARMStr = ((emitOperand . head) d) ++ ", [" ++ (intercalate ", " ((map emitOperand . tail) d)) ++ "]"
         | otherwise = (intercalate ", " (map emitOperand d))
 
-  emitMachineCode (MCSymbol a b) = emitMCSymbolScope a b ++ b ++ ":"
+  emitMachineCode (MCSymbol a b) = ".type " ++ b ++ ", %" ++ emitMCSymbolType a ++ "\n" ++ emitMCSymbolScope a b ++ b ++ ":"
   emitMachineCode (MCDirective a@(MCConstant _ _)) = "  ." ++ emitMCDirective a
   emitMachineCode (MCDirective a) = "." ++ emitMCDirective a
 
