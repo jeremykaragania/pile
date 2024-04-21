@@ -12,7 +12,7 @@ Compile compiler.
 ```bash
 ghc -i pile/details/*.hs -o compiler pile/main.hs
 ```
-Compile `examples/factorial.c`.
+Compile [`examples/factorial.c`](examples/factorial.c).
 ```bash
 ./compiler examples/factorial.c
 ```
