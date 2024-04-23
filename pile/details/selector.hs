@@ -238,9 +238,11 @@ module Selector where
     got <- get
     let mov0 = execState (newMov (OpcodeCondition ARMMov Nothing) 0 Physical (Register Virtual) [(Word, Just (IntegerValue c))]) got
     let mov1 = execState (newMov (OpcodeCondition ARMMov Nothing) 1 Physical (Register Virtual) [(Word, Just (IntegerValue d))]) mov0
-    let bl = execState (newBranch (OpcodeCondition ARMBl Nothing) (Label a) [(Other, Nothing)]) mov1
-    let mov2 = execState (newMov (OpcodeCondition ARMMov Nothing) b Virtual (Register Physical) [(Word, Just (IntegerValue 0))]) bl
-    put mov2
+    let mov2 = execState (newMov (OpcodeCondition ARMMov Nothing) 4 Physical (Register Physical) [(Word, Just (IntegerValue 14))]) mov1
+    let bl = execState (newBranch (OpcodeCondition ARMBl Nothing) (Label a) [(Other, Nothing)]) mov2
+    let mov3 = execState (newMov (OpcodeCondition ARMMov Nothing) 14 Physical (Register Physical) [(Word, Just (IntegerValue 4))]) bl
+    let mov4 = execState (newMov (OpcodeCondition ARMMov Nothing) b Virtual (Register Physical) [(Word, Just (IntegerValue 0))]) mov3
+    put mov4
 
   newIntegerCompare :: IRValue -> IRValue -> SelectorStateMonad ()
   newIntegerCompare a b = do
@@ -264,7 +266,6 @@ module Selector where
     put mov1
 
   selectIRLabeledInstruction :: (Maybe IRLabel, IRInstruction) -> SelectorStateMonad ()
-
   selectIRLabeledInstruction (Nothing, IRBrConditional _ _ (IRLabelValue a) (IRLabelValue b)) = do
     got <- get
     let branch0 = execState (newBranch (OpcodeCondition ARMB (Just ARMNe)) (Label (toLabel (global got) a)) [(Other, Nothing)]) got
