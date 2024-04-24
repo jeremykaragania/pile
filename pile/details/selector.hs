@@ -194,13 +194,26 @@ module Selector where
   newBranch :: OpcodeCondition -> NodeType -> [(MachineValueType, Maybe NodeValue)] -> SelectorStateMonad ()
   newBranch a b c = do
     got <- get
-    let newNodes = [
-          Node (counter got) b c,
-          Node (counter got + 1) (Opcode a) [(Word, Nothing)]]
-    let newEdges = [
-          Edge (counter got) (counter got + 1) 0]
-    let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
-    put ((setGraph newGraph . setCounter (+2)) got)
+    case a of
+      (OpcodeCondition ARMBl _) -> do
+        let mov1 = execState (newMov (OpcodeCondition ARMMov Nothing) 4 Physical (Register Physical) [(Word, Just (IntegerValue 14))]) got
+        let newNodes = [
+              Node (counter mov1) b c,
+              Node (counter mov1 + 1) (Opcode a) [(Word, Nothing)]]
+        let newEdges = [
+              Edge (counter mov1) (counter mov1 + 1) 0]
+        let newGraph = appendGraph [Graph newNodes newEdges] (graphs mov1)
+        let bl = ((setGraph newGraph . setCounter (+2)) mov1)
+        let mov2 = execState (newMov (OpcodeCondition ARMMov Nothing) 14 Physical (Register Physical) [(Word, Just (IntegerValue 4))]) bl
+        put mov2
+      (OpcodeCondition _ _) -> do
+        let newNodes = [
+              Node (counter got) b c,
+              Node (counter got + 1) (Opcode a) [(Word, Nothing)]]
+        let newEdges = [
+              Edge (counter got) (counter got + 1) 0]
+        let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
+        put ((setGraph newGraph . setCounter (+2)) got)
 
   newMemory :: ARMOpcode -> Integer -> Integer -> Integer -> SelectorStateMonad ()
   newMemory a b c d = do
@@ -238,11 +251,9 @@ module Selector where
     got <- get
     let mov0 = execState (newMov (OpcodeCondition ARMMov Nothing) 0 Physical (Register Virtual) [(Word, Just (IntegerValue c))]) got
     let mov1 = execState (newMov (OpcodeCondition ARMMov Nothing) 1 Physical (Register Virtual) [(Word, Just (IntegerValue d))]) mov0
-    let mov2 = execState (newMov (OpcodeCondition ARMMov Nothing) 4 Physical (Register Physical) [(Word, Just (IntegerValue 14))]) mov1
-    let bl = execState (newBranch (OpcodeCondition ARMBl Nothing) (Label a) [(Other, Nothing)]) mov2
-    let mov3 = execState (newMov (OpcodeCondition ARMMov Nothing) 14 Physical (Register Physical) [(Word, Just (IntegerValue 4))]) bl
-    let mov4 = execState (newMov (OpcodeCondition ARMMov Nothing) b Virtual (Register Physical) [(Word, Just (IntegerValue 0))]) mov3
-    put mov4
+    let bl = execState (newBranch (OpcodeCondition ARMBl Nothing) (Label a) [(Other, Nothing)]) mov1
+    let mov2 = execState (newMov (OpcodeCondition ARMMov Nothing) b Virtual (Register Physical) [(Word, Just (IntegerValue 0))]) bl
+    put mov2
 
   newIntegerCompare :: IRValue -> IRValue -> SelectorStateMonad ()
   newIntegerCompare a b = do
