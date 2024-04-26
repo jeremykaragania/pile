@@ -24,6 +24,10 @@ module Selector where
     Virtual |
     Physical deriving (Show, Eq, Ord)
 
+  data RegisterValueType =
+    IntegerRegister |
+    SingleRegister |
+    DoubleRegister deriving (Show, Eq)
   {-
     NodeType is a type for node types. Each node is interpreted differently depending on its type. Some types contain
     information about the node within themselves. This is done when it makes less sense for the information to be part of the
