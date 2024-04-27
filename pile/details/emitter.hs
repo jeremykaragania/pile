@@ -2,7 +2,7 @@ module Emitter where
   import Data.Char (toLower)
   import Data.List (intercalate)
   import Scheduler
-  import Selector hiding (Label, Register)
+  import Selector hiding (Label, Reg)
   import Syntax
 
   emitNodeValue (IntegerValue a) = show a
@@ -21,7 +21,7 @@ module Emitter where
       emitOpcodeCondition (OpcodeCondition e Nothing) = emitARM e
       emitOpcodeCondition (OpcodeCondition e (Just f)) = emitARM e ++ emitARM f
       emitOperand (Label e) = e
-      emitOperand (Register _ e) = "r" ++ show e
+      emitOperand (Reg (RegType PhysicalReg IntegerReg) e) = "r" ++ show e
       emitOperand (Immediate e) = "#" ++ show e
       emitOperands
         | b == ARMLdr || b == ARMStr = ((emitOperand . head) d) ++ ", [" ++ (intercalate ", " ((map emitOperand . tail) d)) ++ "]"

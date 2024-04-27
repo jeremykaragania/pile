@@ -1,9 +1,9 @@
 module Optimizer where
   import Scheduler
-  import Selector hiding (Register)
+  import Selector hiding (Reg)
   import Syntax
 
-  subStackPointer (MCInstruction (OpcodeCondition ARMSub _) [_, Register Physical 13, _]) = True
+  subStackPointer (MCInstruction (OpcodeCondition ARMSub _) [_, Reg (RegType PhysicalReg IntegerReg) 13, _]) = True
   subStackPointer _ = False
 
   replaceMachineCodes a [] = a
@@ -22,7 +22,7 @@ module Optimizer where
 
   replaceMachineCodes a (b:bs) = replaceMachineCodes (a ++ [b]) bs
 
-  optimizeStackPointers a = ((fst . machineCode) a) ++ [MCInstruction (OpcodeCondition ARMSub Nothing) [Register Physical 13, Register Physical 13, Immediate stackOffset]] ++ (filter (not . subStackPointer) ((snd . machineCode) a))
+  optimizeStackPointers a = ((fst . machineCode) a) ++ [MCInstruction (OpcodeCondition ARMSub Nothing) [Reg (RegType PhysicalReg IntegerReg) 13, Reg (RegType PhysicalReg IntegerReg) 13, Immediate stackOffset]] ++ (filter (not . subStackPointer) ((snd . machineCode) a))
     where
       immediateValue (MCInstruction (OpcodeCondition _ _) [_, _, Immediate b]) = b
       stackOffset = (sum . map immediateValue . filter subStackPointer) a
