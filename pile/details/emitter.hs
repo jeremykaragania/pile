@@ -22,6 +22,8 @@ module Emitter where
       emitOpcodeCondition (OpcodeCondition e (Just f)) = emitARM e ++ emitARM f
       emitOperand (Label e) = e
       emitOperand (Reg (RegType PhysicalReg IntegerReg) e) = "r" ++ show e
+      emitOperand (Reg (RegType PhysicalReg SingleReg) e) = "s" ++ show e
+      emitOperand (Reg (RegType PhysicalReg DoubleReg) e) = "d" ++ show e
       emitOperand (Immediate e) = "#" ++ show e
       emitOperands
         | b == ARMLdr || b == ARMStr = ((emitOperand . head) d) ++ ", [" ++ (intercalate ", " ((map emitOperand . tail) d)) ++ "]"
