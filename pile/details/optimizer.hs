@@ -12,6 +12,10 @@ module Optimizer where
     | (c == g && d == h && e == i) = replaceMachineCodes (a ++ [b]) j
     | otherwise = replaceMachineCodes (a ++ [b]) (f:j)
 
+  replaceMachineCodes a (b@(MCInstruction (OpcodeCondition ARMMov _) [c, d]):e@(MCInstruction (OpcodeCondition ARMMov _) [f, g]):h)
+    | c == g && d == f = replaceMachineCodes (a ++ [b]) h
+    | otherwise = replaceMachineCodes (a ++ [b]) (e:h)
+
   replaceMachineCodes a (b@(MCInstruction (OpcodeCondition ARMMov _) [c, d]):j)
     | c == d = replaceMachineCodes a j
     | otherwise = replaceMachineCodes (a ++ [b]) j
