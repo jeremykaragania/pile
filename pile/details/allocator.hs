@@ -57,7 +57,7 @@ module Allocator where
   readWrote (MCInstruction (OpcodeCondition ARMOrr _) [a, b, c]) = ([b, c], [a])
   readWrote (MCInstruction (OpcodeCondition ARMEor _) [a, b, c]) = ([b, c], [a])
   readWrote (MCInstruction (OpcodeCondition ARMB _) [a]) = ([a], [])
-  readWrote (MCInstruction (OpcodeCondition ARMBl _) [a]) = ([a], [Reg (RegType PhysicalReg IntegerReg) 0])
+  readWrote (MCInstruction (OpcodeCondition ARMBl _) [a]) = ([a], [Reg (RegType IntegerReg PhysicalReg) 0])
   readWrote (MCInstruction (OpcodeCondition ARMBx _) [a]) = ([a], [])
   readWrote (MCInstruction (OpcodeCondition ARMLdr _) [a, b, _]) = ([b], [a])
   readWrote (MCInstruction (OpcodeCondition ARMStr _) [a, b, _]) = ([a], [b])
@@ -125,17 +125,17 @@ module Allocator where
     allocateLiveIntervals as
 
   allocateLiveInterval :: (Operand, LiveInterval) -> AllocatorStateMonad ()
-  allocateLiveInterval a@(b@(Reg (RegType VirtualReg IntegerReg) _), c) = do
+  allocateLiveInterval a@(b@(Reg (RegType IntegerReg VirtualReg) _), c) = do
     got <- get
     let expired = execState (expireIntervals a ((sortBy compareLiveTo . Map.toList . active) got)) got
     if ((length . available) expired) == 0 then spillInterval a
     else do
       let newAvailable = (tail . available) expired
       let newActive = Map.insert b c (active expired)
-      let newRegs = Map.insert b (Reg (RegType PhysicalReg IntegerReg) ((head . available) expired)) (regs expired)
+      let newRegs = Map.insert b (Reg (RegType IntegerReg PhysicalReg) ((head . available) expired)) (regs expired)
       put ((setAvailable newAvailable . setActive newActive . setRegs newRegs) expired)
 
-  allocateLiveInterval a@(b@(Reg (RegType PhysicalReg IntegerReg) _), c) = do
+  allocateLiveInterval a@(b@(Reg (RegType IntegerReg PhysicalReg) _), c) = do
     got <- get
     let newRegs = Map.insert b b (regs got)
     put ((setRegs newRegs) got)
@@ -179,13 +179,13 @@ module Allocator where
       operand b = b
       instruction (MCInstruction b c) = MCInstruction b (map operand c)
       instruction b = b
-      addSub b = [MCInstruction (OpcodeCondition b Nothing) [Reg (RegType PhysicalReg IntegerReg) 13, Reg (RegType PhysicalReg IntegerReg) 13, Immediate stackOffset]]
+      addSub b = [MCInstruction (OpcodeCondition b Nothing) [Reg (RegType IntegerReg PhysicalReg) 13, Reg (RegType IntegerReg PhysicalReg) 13, Immediate stackOffset]]
       stackOffset = ((*4) . fromIntegral . length . filter address . Map.toList) toPhysicalReg
       address (_, Address _) = True
       address _ = False
       addSubs b [] = b
       addSubs b (c@(MCSymbol (MCGlobal MCFunction) _):d) = addSubs (b ++ [c] ++ addSub ARMSub) d
-      addSubs b (c@(MCInstruction (OpcodeCondition ARMBx Nothing) [Reg (RegType PhysicalReg IntegerReg) 14]):d) = addSubs (b ++ addSub ARMAdd ++ [c]) d
+      addSubs b (c@(MCInstruction (OpcodeCondition ARMBx Nothing) [Reg (RegType IntegerReg PhysicalReg) 14]):d) = addSubs (b ++ addSub ARMAdd ++ [c]) d
       addSubs b (c:d) = addSubs (b ++ [c]) d
 
   resolveMachineCodes a [] = a
@@ -196,7 +196,7 @@ module Allocator where
   resolveMachineCodes a (b:c) = resolveMachineCodes (a ++ [b]) c
 
   resolveOperands a b [] = a
-  resolveOperands a b (Address c:d) = resolveOperands (fst a ++ [MCInstruction (OpcodeCondition ARMLdr Nothing) [Reg (RegType PhysicalReg IntegerReg) b, Reg (RegType PhysicalReg IntegerReg) 13, Immediate c]], (snd a ++ [Reg (RegType PhysicalReg IntegerReg) b])) (b + 1) d
+  resolveOperands a b (Address c:d) = resolveOperands (fst a ++ [MCInstruction (OpcodeCondition ARMLdr Nothing) [Reg (RegType IntegerReg PhysicalReg) b, Reg (RegType IntegerReg PhysicalReg) 13, Immediate c]], (snd a ++ [Reg (RegType IntegerReg PhysicalReg) b])) (b + 1) d
   resolveOperands a b (c:d) = resolveOperands (fst a, (snd a ++ [c])) b d
 
   firstMachineCodes a (MCInstruction _ (_:b))
@@ -206,7 +206,7 @@ module Allocator where
       address (Address _) = True
       address _ = False
 
-  lastMachineCodes (MCInstruction _ [Address a, b]) = [MCInstruction (OpcodeCondition ARMStr Nothing) [Reg (RegType PhysicalReg IntegerReg) (regNumber b), Reg (RegType PhysicalReg IntegerReg) 13, Immediate a]]
+  lastMachineCodes (MCInstruction _ [Address a, b]) = [MCInstruction (OpcodeCondition ARMStr Nothing) [Reg (RegType IntegerReg PhysicalReg) (regNumber b), Reg (RegType IntegerReg PhysicalReg) 13, Immediate a]]
   lastMachineCodes _ = []
 
   allocate = map (resolveMachineCodes [] . allocateMachineCodes)
