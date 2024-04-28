@@ -206,7 +206,7 @@ module Allocator where
       address (Address _) = True
       address _ = False
 
-  lastMachineCodes (MCInstruction _ (Address a:_)) = [MCInstruction (OpcodeCondition ARMStr Nothing) [Reg (RegType PhysicalReg IntegerReg) 0, Reg (RegType PhysicalReg IntegerReg) 13, Immediate a]]
+  lastMachineCodes (MCInstruction _ [Address a, b]) = [MCInstruction (OpcodeCondition ARMStr Nothing) [Reg (RegType PhysicalReg IntegerReg) (regNumber b), Reg (RegType PhysicalReg IntegerReg) 13, Immediate a]]
   lastMachineCodes _ = []
 
   allocate = map (resolveMachineCodes [] . allocateMachineCodes)
