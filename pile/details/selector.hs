@@ -326,9 +326,15 @@ module Selector where
 
   selectIRLabeledInstruction (Nothing, IRRet (Just a)) = do
     got <- get
-    let mov = execState (newMov (OpcodeCondition ARMMov Nothing) 0 (integerReg physReg) (toNodeType a) [(sourceType a, sourceValue a)]) got
-    let branch = execState (newBranch (OpcodeCondition ARMBx Nothing) (Reg (integerReg physReg)) [(Word, Just (IntegerValue 14))]) mov
-    put branch
+    if ((ret . func) got) == IRFloat then do
+      let mov1 = execState (newMov (OpcodeCondition ARMMov Nothing) 0 (integerReg physReg) (toNodeType a) [(sourceType a, sourceValue a)]) got
+      let mov2 = execState (newMov (OpcodeCondition ARMVmov Nothing) 0 (singleReg physReg) (Reg (integerReg physReg)) [(Word, Just (IntegerValue 0))]) mov1
+      let branch = execState (newBranch (OpcodeCondition ARMBx Nothing) (Reg (integerReg physReg)) [(Word, Just (IntegerValue 14))]) mov2
+      put branch
+    else do
+      let mov1 = execState (newMov (OpcodeCondition ARMMov Nothing) 0 (integerReg physReg) (toNodeType a) [(sourceType a, sourceValue a)]) got
+      let branch = execState (newBranch (OpcodeCondition ARMBx Nothing) (Reg (integerReg physReg)) [(Word, Just (IntegerValue 14))]) mov1
+      put branch
     where
       sourceType (IRLabelValue _) = Word
       sourceType _ = Other

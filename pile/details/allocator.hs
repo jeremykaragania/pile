@@ -48,6 +48,7 @@ module Allocator where
   readWrote (MCInstruction (OpcodeCondition ARMMov _) [a, b]) = ([b], [a])
   readWrote (MCInstruction (OpcodeCondition ARMMvn _) [a, b]) = ([b], [a])
   readWrote (MCInstruction (OpcodeCondition ARMMovt _) [a, b]) = ([b], [a])
+  readWrote (MCInstruction (OpcodeCondition ARMVmov _) [a, b]) = ([b], [a])
   readWrote (MCInstruction (OpcodeCondition ARMAdd _) [a, b, c]) = ([b, c], [a])
   readWrote (MCInstruction (OpcodeCondition ARMSub _) [a, b, c]) = ([b, c], [a])
   readWrote (MCInstruction (OpcodeCondition ARMCmp _) [a, b]) = ([a, b], [])
@@ -135,7 +136,7 @@ module Allocator where
       let newRegs = Map.insert b (Reg (integerReg physReg) ((head . available) expired)) (regs expired)
       put ((setAvailable newAvailable . setActive newActive . setRegs newRegs) expired)
 
-  allocateLiveInterval a@(b@(Reg (RegType IntegerReg PhysicalReg) _), c) = do
+  allocateLiveInterval a@(b@(Reg (RegType _ PhysicalReg) _), c) = do
     got <- get
     let newRegs = Map.insert b b (regs got)
     put ((setRegs newRegs) got)

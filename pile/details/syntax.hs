@@ -239,6 +239,7 @@ module Syntax where
     ARMMov |
     ARMMvn |
     ARMMovt |
+    ARMVmov |
     ARMAdd |
     ARMAdc |
     ARMSub |
