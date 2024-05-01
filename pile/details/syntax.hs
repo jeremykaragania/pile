@@ -267,4 +267,6 @@ module Syntax where
     ARMLdrb |
     ARMStr |
     ARMStrb |
+    ARMPush |
+    ARMPop |
     ARMNop deriving (Show, Eq)

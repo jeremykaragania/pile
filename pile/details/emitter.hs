@@ -27,6 +27,7 @@ module Emitter where
       emitOperand (Immediate e) = "#" ++ show e
       emitOperands
         | b == ARMLdr || b == ARMStr = ((emitOperand . head) d) ++ ", [" ++ (intercalate ", " ((map emitOperand . tail) d)) ++ "]"
+        | b == ARMPush || b == ARMPop = "{" ++ (intercalate ", " (map emitOperand d)) ++ "}"
         | otherwise = (intercalate ", " (map emitOperand d))
 
   emitMachineCode (MCSymbol a b) = ".type " ++ b ++ ", %" ++ emitMCSymbolType a ++ "\n" ++ emitMCSymbolScope a b ++ b ++ ":"

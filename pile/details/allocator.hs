@@ -62,6 +62,8 @@ module Allocator where
   readWrote (MCInstruction (OpcodeCondition ARMBx _) [a]) = ([a], [])
   readWrote (MCInstruction (OpcodeCondition ARMLdr _) [a, b, _]) = ([b], [a])
   readWrote (MCInstruction (OpcodeCondition ARMStr _) [a, b, _]) = ([a], [b])
+  readWrote (MCInstruction (OpcodeCondition ARMPush _) a) = (a, [])
+  readWrote (MCInstruction (OpcodeCondition ARMPop _) a) = ([], a)
 
   analyzeMachineCode a = ((filter isReg ((fst . readWrote) a)), (filter isReg ((snd . readWrote) a)))
     where

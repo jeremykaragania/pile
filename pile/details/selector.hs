@@ -214,16 +214,16 @@ module Selector where
     got <- get
     case a of
       (OpcodeCondition ARMBl _) -> do
-        let mov1 = execState (newMov (OpcodeCondition ARMMov Nothing) 4 (integerReg physReg) (Reg (integerReg physReg)) [(Word, Just (IntegerValue 14))]) got
+        let push = execState (newPushPop ARMPush (integerReg physReg) 14) got
         let newNodes = [
-              Node (counter mov1) b c,
-              Node (counter mov1 + 1) (Opcode a) [(Word, Nothing)]]
+              Node (counter push) b c,
+              Node (counter push + 1) (Opcode a) [(Word, Nothing)]]
         let newEdges = [
-              Edge (counter mov1) (counter mov1 + 1) 0]
-        let newGraph = appendGraph [Graph newNodes newEdges] (graphs mov1)
-        let bl = ((setGraph newGraph . setCounter (+2)) mov1)
-        let mov2 = execState (newMov (OpcodeCondition ARMMov Nothing) 14 (integerReg physReg) (Reg (integerReg physReg)) [(Word, Just (IntegerValue 4))]) bl
-        put mov2
+              Edge (counter push) (counter push + 1) 0]
+        let newGraph = appendGraph [Graph newNodes newEdges] (graphs push)
+        let bl = ((setGraph newGraph . setCounter (+2)) push)
+        let pop = execState (newPushPop ARMPop (integerReg physReg) 14) bl
+        put pop
       (OpcodeCondition _ _) -> do
         let newNodes = [
               Node (counter got) b c,
@@ -293,6 +293,17 @@ module Selector where
     let bl = execState (newBranch (OpcodeCondition ARMBl Nothing) (Label a) [(Other, Nothing)]) mov0
     let mov1 = execState (newMov (OpcodeCondition ARMMov Nothing) b (integerReg virtReg) (Reg (integerReg physReg)) [(Word, Just (IntegerValue 0))]) bl
     put mov1
+
+  newPushPop :: ARMOpcode -> RegType -> Integer -> SelectorStateMonad ()
+  newPushPop a b c = do
+    got <- get
+    let newNodes = [
+          Node (counter got) (Reg b) [(Word, Just (IntegerValue c))],
+          Node (counter got + 1) (Opcode (OpcodeCondition a Nothing)) [(Word, Nothing)]]
+    let newEdges = [
+          Edge (counter got) (counter got + 1) 0]
+    let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
+    put ((setGraph newGraph . setCounter (+2)) got)
 
   selectIRLabeledInstruction :: (Maybe IRLabel, IRInstruction) -> SelectorStateMonad ()
   selectIRLabeledInstruction (Nothing, IRBrConditional _ _ (IRLabelValue a) (IRLabelValue b)) = do
