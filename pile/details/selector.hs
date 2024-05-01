@@ -214,16 +214,16 @@ module Selector where
     got <- get
     case a of
       (OpcodeCondition ARMBl _) -> do
-        let push = execState (newPushPop ARMPush (integerReg physReg) 14) got
+        let prologue = execState newPrologue got
         let newNodes = [
-              Node (counter push) b c,
-              Node (counter push + 1) (Opcode a) [(Word, Nothing)]]
+              Node (counter prologue) b c,
+              Node (counter prologue + 1) (Opcode a) [(Word, Nothing)]]
         let newEdges = [
-              Edge (counter push) (counter push + 1) 0]
-        let newGraph = appendGraph [Graph newNodes newEdges] (graphs push)
-        let bl = ((setGraph newGraph . setCounter (+2)) push)
-        let pop = execState (newPushPop ARMPop (integerReg physReg) 14) bl
-        put pop
+              Edge (counter prologue) (counter prologue + 1) 0]
+        let newGraph = appendGraph [Graph newNodes newEdges] (graphs prologue)
+        let bl = ((setGraph newGraph . setCounter (+2)) prologue)
+        let epilogue = execState newEpilogue bl
+        put epilogue
       (OpcodeCondition _ _) -> do
         let newNodes = [
               Node (counter got) b c,
@@ -304,6 +304,26 @@ module Selector where
           Edge (counter got) (counter got + 1) 0]
     let newGraph = appendGraph [Graph newNodes newEdges] (graphs got)
     put ((setGraph newGraph . setCounter (+2)) got)
+
+  newPrologue :: SelectorStateMonad ()
+  newPrologue = do
+    got <- get
+    let push1 = execState (newPushPop ARMPush (integerReg physReg) 1) got
+    let push2 = execState (newPushPop ARMPush (integerReg physReg) 2) push1
+    let push3 = execState (newPushPop ARMPush (integerReg physReg) 3) push2
+    let push4 = execState (newPushPop ARMPush (integerReg physReg) 12) push3
+    let push5 = execState (newPushPop ARMPush (integerReg physReg) 14) push4
+    put push5
+
+  newEpilogue :: SelectorStateMonad ()
+  newEpilogue = do
+    got <- get
+    let pop1 = execState (newPushPop ARMPop (integerReg physReg) 14) got
+    let pop2 = execState (newPushPop ARMPop (integerReg physReg) 12) pop1
+    let pop3 = execState (newPushPop ARMPop (integerReg physReg) 3) pop2
+    let pop4 = execState (newPushPop ARMPop (integerReg physReg) 2) pop3
+    let pop5 = execState (newPushPop ARMPop (integerReg physReg) 1) pop4
+    put pop5
 
   selectIRLabeledInstruction :: (Maybe IRLabel, IRInstruction) -> SelectorStateMonad ()
   selectIRLabeledInstruction (Nothing, IRBrConditional _ _ (IRLabelValue a) (IRLabelValue b)) = do
