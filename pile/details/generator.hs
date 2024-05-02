@@ -8,9 +8,11 @@ module Generator where
   import Syntax
 
   {-
-    GeneratorState carries state between generators. A GeneratorState carries past basic blocks ("blocks"), an accumulator
-    ("counter") for unnamed temporaries, a lookup table ("table") which associates an identifier key with an IdentInfo, and a
-    context for break and continue statements ("context") which carries the integer label number for the branch.
+    GeneratorState carries state between generators. A GeneratorState carries
+    past basic blocks ("blocks"), an accumulator ("counter") for unnamed
+    temporaries, a lookup table ("table") which associates an identifier key
+    with an IdentInfo, and a context for break and continue statements
+    ("context") which carries the integer label number for the branch.
   -}
   data GeneratorState = GeneratorState {
     blocks :: [[(Maybe IRLabel, IRInstruction)]],
@@ -21,8 +23,9 @@ module Generator where
     scope :: Integer}
 
   {-
-    IdentInfo carries identifier information which provides context when performing a lookup. Since identifiers can have the
-    same name, this is just a way to differentiate between them when scopes are nested.
+    IdentInfo carries identifier information which provides context when
+    performing a lookup. Since identifiers can have the same name, this is just
+    a way to differentiate between them when scopes are nested.
   -}
   data IdentInfo = IdentInfo {
     identScope :: Integer,
@@ -30,9 +33,11 @@ module Generator where
     identType :: IRType} deriving (Show)
 
   {-
-    InstrInfo carries instruction information which is useful for querying past generated instructions. Most instructions
-    (the items of the list in a basic block) contain a type and a destination in their actual syntax. When we speak of a
-    destination, we mean the label which the instruction stores its result to.
+    InstrInfo carries instruction information which is useful for querying past
+    generated instructions. Most instructions (the items of the list in a basic
+    block) contain a type and a destination in their actual syntax. When we
+    speak of a destination, we mean the label which the instruction stores its
+    result to.
   -}
   data InstrInfo = InstrInfo {
     instrType :: IRType,
@@ -192,16 +197,19 @@ module Generator where
       value _ = 0
 
   {-
-    appendBlocks receives two lists of basic blocks (a, and b) to appended together. the first block of b is appended to
-    the last block of a and the remaining blocks of b are appended to the end which results in the modification of the last
-    block of a. When modification is not desired and a new block should be started, append an empty block to a beforehand.
+    appendBlocks receives two lists of basic blocks (a, and b) to appended
+    together. the first block of b is appended to the last block of a and the
+    remaining blocks of b are appended to the end which results in the
+    modification of the last block of a. When modification is not desired and a
+    new block should be started, append an empty block to a beforehand.
   -}
   appendBlocks a b = init a ++ [last a ++ head b] ++ tail b
 
   {-
-    getCastInstr receives two type-value pairs (a, and b), with different types and cast specifier (c). It will perform
-    a cast operation to either a or b according to c such that a, and b both have the same type. If c is False, the cast is
-    a downcast, and if c is True, the cast is an upcast.
+    getCastInstr receives two type-value pairs (a, and b), with different types
+    and cast specifier (c). It will perform a cast operation to either a or b
+    according to c such that a, and b both have the same type. If c is False,
+    the cast is a downcast, and if c is True, the cast is an upcast.
   -}
   getCastInstr (a, b) (c, d) e
     | isIRShortInteger a && isIRInteger c && e = IRSext a b c
@@ -235,8 +243,9 @@ module Generator where
     | otherwise = error ""
 
   {-
-    getBinaryInstr receives a binary operation symbol as a string (a), and the types of the two arguments for the
-    operation (a, and b) to ensure that they are the same type.
+    getBinaryInstr receives a binary operation symbol as a string (a), and the
+    types of the two arguments for the operation (a, and b) to ensure that they
+    are the same type.
   -}
   getBinaryInstr a b
     | a == "*" && isIntegral b = IRMul
@@ -325,9 +334,10 @@ module Generator where
     else error ""
 
   {-
-    All selection statements consist of an expression ("a"), and at least one body ("b") which is a compound statement.
-    Therefore, newSelectionHead generates this selection statement head so it can be used in other selection statement
-    generators.
+    All selection statements consist of an expression ("a"), and at least one
+    body ("b") which is a compound statement. Therefore, newSelectionHead
+    generates this selection statement head so it can be used in other
+    selection statement generators.
   -}
   newSelectionHead :: CExpression -> CStatement -> GeneratorStateMonad ()
   newSelectionHead a@(CExpression b) c = do
@@ -360,8 +370,10 @@ module Generator where
         parameters es
 
   {-
-    newFunctionBody is used for the generation of basic blocks, which are just instruction lists, from a function body,
-    which is just a compound statement. It receives a compound statement (a), and the return type of the function (b).
+    newFunctionBody is used for the generation of basic blocks, which are just
+    instruction lists, from a function body, which is just a compound
+    statement. It receives a compound statement (a), and the return type of the
+    function (b).
   -}
   newFunctionBody :: CStatement -> IRType -> Integer -> GeneratorStateMonad [IRBasicBlock]
   newFunctionBody a b c = do
@@ -372,9 +384,11 @@ module Generator where
     return (fst (execState (numberBlocks newBlocks) ([], (c {-OFFSET-}))))
     where
       {-
-        It is hard to number blocks as they are being generated because there is not enough context. Therefore, block
-        numbering is the last step. A block number can be calculated by counting the past numbered instructions in past blocks.
-        The state tracks the list of blocks which have been numbered and the count of past numbered instructions.
+        It is hard to number blocks as they are being generated because there
+        is not enough context. Therefore, block numbering is the last step. A
+        block number can be calculated by counting the past numbered
+        instructions in past blocks. The state tracks the list of blocks which
+        have been numbered and the count of past numbered instructions.
       -}
       numberBlocks :: [[(Maybe IRLabel, IRInstruction)]] -> State ([IRBasicBlock], Integer) ()
       numberBlocks [] = return ()
@@ -389,8 +403,9 @@ module Generator where
           numbered _ = True
 
   {-
-    The last instruction of a generated expression will contain the resulting value of that expression. This makes it
-    easier to get the resulting type of an expression after generation.
+    The last instruction of a generated expression will contain the resulting
+    value of that expression. This makes it easier to get the resulting type of
+    an expression after generation.
   -}
   generateCExpressions :: [CExpression] -> GeneratorStateMonad ()
   generateCExpressions [] = return ()
@@ -432,8 +447,9 @@ module Generator where
       put ((setBlocks newBlocks . setCounter (+1)) castExpr)
     where
       {-
-        Selects the expression which was not casted and uses it to generate the binary instruction. Ensures that the binary
-        instruction is not generated with duplicate arguments.
+        Selects the expression which was not casted and uses it to generate the
+        binary instruction. Ensures that the binary instruction is not
+        generated with duplicate arguments.
       -}
       binary d e f
         | fst d == fst f = (getBinaryInstr a (fst f)) (fst f) (IRLabelValue (IRLabelNumber (snd d - 1))) (IRLabelValue (IRLabelNumber (snd f - 1)))

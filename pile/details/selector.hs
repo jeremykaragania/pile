@@ -7,18 +7,22 @@ module Selector where
   import Unsafe.Coerce
 
   {-
-    OpcodeCondition is a type for an "opcode" (ARMOpcode) and a "condition" (Maybe ARMCondition) which taken together constitue
-    the form of instructions from most instruction set architectures.
+    OpcodeCondition is a type for an "opcode" (ARMOpcode) and a "condition"
+    (Maybe ARMCondition) which taken together constitue the form of
+    instructions from most instruction set architectures.
   -}
   data OpcodeCondition = OpcodeCondition {
     opcode :: ARMOpcode,
     condition :: (Maybe ARMCondition)} deriving (Show, Eq)
 
   {-
-    RegType is a type for register types. Abstractly, registers can be "virtual" or "physical". A "virtual" register is
-    used by the selector if the register has no special meaning such that any other general purpose register may be substituted
-    for it without changing the program's semantics. A "phsysical" register cannot be substituded for another register such as
-    the stack pointer or calling convention specific registers.
+    RegType is a type for register types. Abstractly, registers can be
+    "virtual" or "physical". A "virtual" register is used by the selector if
+    the register has no special meaning such that any other general purpose
+    register may be substituted for it without changing the program's
+    semantics. A "phsysical" register cannot be substituded for another
+    register such as the stack pointer or calling convention specific
+    registers.
   -}
   data RegType = RegType RegValueType RegLocationType deriving (Show, Eq, Ord)
 
@@ -31,9 +35,10 @@ module Selector where
     SingleReg |
     DoubleReg deriving (Show, Eq, Ord)
   {-
-    NodeType is a type for node types. Each node is interpreted differently depending on its type. Some types contain
-    information about the node within themselves. This is done when it makes less sense for the information to be part of the
-    node's data.
+    NodeType is a type for node types. Each node is interpreted differently
+    depending on its type. Some types contain information about the node within
+    themselves. This is done when it makes less sense for the information to be
+    part of the node's data.
   -}
   data NodeType =
     EntryToken |
@@ -46,7 +51,8 @@ module Selector where
     Opcode OpcodeCondition deriving (Show, Eq)
 
   {-
-    MachineValueType is a type for the machine types. It represents the types that a machine innately supports.
+    MachineValueType is a type for the machine types. It represents the types
+    that a machine innately supports.
   -}
   data MachineValueType =
     Byte |
@@ -82,9 +88,11 @@ module Selector where
   }
 
   {-
-    SelectorState carries state between selectors. A SelectorState carries a directed acyclic graphs (graph) which is a graph
-    representation of the intermediate representation, an accumulator (counter) for the numbering of graph nodes, the most
-    recent side-effecting node (chain), the stack pointer offset (offset), the global value name (global), and the the current
+    SelectorState carries state between selectors. A SelectorState carries a
+    directed acyclic graphs (graph) which is a graph representation of the
+    intermediate representation, an accumulator (counter) for the numbering of
+    graph nodes, the most recent side-effecting node (chain), the stack pointer
+    offset (offset), the global value name (global), and the the current
     function information (func).
   -}
   data SelectorState = SelectorState {
