@@ -20,9 +20,11 @@ module Optimizer where
     | c == d = replaceMachineCodes a j
     | otherwise = replaceMachineCodes (a ++ [b]) j
 
-  replaceMachineCodes a (b@(MCInstruction (OpcodeCondition c d) [e, f, g]):h)
-    | (c == ARMAdd || c == ARMSub) && g == Immediate 0 = replaceMachineCodes (a ++ replaceMachineCodes [] [MCInstruction (OpcodeCondition ARMMov d) [e, f]]) h
-    | otherwise = replaceMachineCodes (a ++ [b]) h
+  replaceMachineCodes a (b@(MCInstruction (OpcodeCondition c d) e):f@(MCInstruction (OpcodeCondition g h) i):j)
+    | (c == ARMPush && g == ARMPush) || (c == ARMPop && g == ARMPop) && d == h = replaceMachineCodes a (merged:j)
+    | otherwise = replaceMachineCodes (a ++ [b]) (f:j)
+    where
+      merged = (MCInstruction (OpcodeCondition c d) (e ++ i))
 
   replaceMachineCodes a (b:bs) = replaceMachineCodes (a ++ [b]) bs
 
