@@ -7,6 +7,12 @@ module Allocator where
   import Selector hiding (counter, offset, Reg, setOffset)
   import Syntax
 
+  {-
+    LiveInterval is a type for the liveness of a variable. A variable is live
+    if it stores a value that may be needed in the future. Here, "liveFrom" is
+    the point when the variable begins being live; and "liveEnd" is the point
+    where the variable ends being live.
+  -}
   data LiveInterval = LiveInterval {
     liveFrom :: Integer,
     liveTo :: Integer} deriving (Show, Eq, Ord)
@@ -21,12 +27,25 @@ module Allocator where
 
   setLiveTo a (LiveInterval b _) = LiveInterval b a
 
+  {-
+    AnalyzerState is a type for the analyzer it keeps track of the current line
+    number "counter"; and a lookup table "table" which associates an operand
+    with its live interval information.
+  -}
   data AnalyzerState = AnalyzerState {
     counter :: Integer,
     table :: Map Operand LiveInterval}
 
   type AnalyzerStateMonad = State AnalyzerState
 
+  {-
+    AllocatorState is a type for the allocator which is a linear scan register
+    allocator. It keeps track of the registers available be allocated
+    "available"; a lookup table "active" which associates an operand with its
+    live interval information; a lookup table "regs" which associates an
+    unallocated operand and an allocated operand; and the current stack offset
+    "offset".
+  -}
   data AllocatorState = AllocatorState {
     available :: [Integer],
     active :: Map Operand LiveInterval,
