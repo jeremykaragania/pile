@@ -2,25 +2,46 @@ module Scheduler where
   import Selector
   import Syntax
 
+  {-
+    Operand is a type for the operand of an instruction. An Operand can either
+    be a register with a type and a number; an integer immediate; an address;
+    or a string label.
+  -}
   data Operand =
     Reg RegType Integer |
     Immediate Integer |
     Address Integer |
     Label String deriving (Show, Eq, Ord)
 
+  {-
+    Directive is a type for an assembler directive. The directives here are
+    part of the GNU assembler.
+  -}
   data Directive =
     MCConstant MachineValueType NodeValue |
     Data |
     Text deriving (Show, Eq)
 
+  {-
+    MCGlobalType is a type for global machine codes types. An global machine
+    code can either be a variable or a function.
+  -}
   data MCGlobalType =
     MCVariable |
     MCFunction deriving (Show, Eq)
 
+  {-
+    MCSymbolScope is a type for the scope of machine code symbols. A machine
+    code symbol can either be global or local.
+  -}
   data MCSymbolScope =
     MCGlobal MCGlobalType |
     MCLocal deriving (Show, Eq)
 
+  {-
+    MachineCode is a type for an abstract machine code. A machine code can
+    either be an instruction; a symbol; or a directive.
+  -}
   data MachineCode =
     MCInstruction OpcodeCondition [Operand] |
     MCSymbol MCSymbolScope String |
