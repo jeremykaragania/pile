@@ -62,7 +62,8 @@ module Allocator where
 
   setOffset a (AllocatorState b c d e) = AllocatorState b c d (a e)
 
-  regNumber (Reg _ a) = a
+  opcodeNumber (Reg _ a) = a
+  opcodeNumber (Address a) = a
 
   readWrote (MCInstruction (OpcodeCondition ARMMov _) [a, b]) = ([b], [a])
   readWrote (MCInstruction (OpcodeCondition ARMMvn _) [a, b]) = ([b], [a])
@@ -176,7 +177,7 @@ module Allocator where
     got <- get
     if (liveTo d) >= (liveFrom b) || ((liveTo d) == (-1) && (liveFrom d) >= (liveFrom b)) then return ()
     else do
-      let newAvailable = [regNumber ((regs got) Map.! c)] ++ (available got)
+      let newAvailable = [opcodeNumber ((regs got) Map.! c)] ++ (available got)
       let newActive = Map.delete c (active got)
       put ((setAvailable newAvailable . setActive newActive) got)
 
@@ -228,7 +229,7 @@ module Allocator where
       address (Address _) = True
       address _ = False
 
-  lastMachineCodes (MCInstruction _ [Address a, b]) = [MCInstruction (OpcodeCondition ARMStr Nothing) [Reg (integerReg physReg) (regNumber b), Reg (integerReg physReg) 13, Immediate a]]
+  lastMachineCodes (MCInstruction _ [Address a, b]) = [MCInstruction (OpcodeCondition ARMStr Nothing) [Reg (integerReg physReg) (opcodeNumber b), Reg (integerReg physReg) 13, Immediate a]]
   lastMachineCodes _ = []
 
   allocate = map (resolveMachineCodes [] . allocateMachineCodes)
