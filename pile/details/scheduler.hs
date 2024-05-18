@@ -49,9 +49,6 @@ module Scheduler where
 
   opcodeCondition (Opcode a) = a
 
-  machineCode a@(MCSymbol _ _:MCSymbol _ _:_) = (take 2 a, drop 2 a)
-  machineCode a = ([head a], tail a)
-
   scheduleGraph a = (concat . map toMachineCode) zipInstructions
     where
       opcodeNodes = filter isMachineCode (nodes a)
