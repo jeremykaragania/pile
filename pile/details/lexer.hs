@@ -120,13 +120,13 @@ module Lexer where
       fractionalConstant =
         do
           first <- many1 digit
-          char '.'
+          _ <- char '.'
           second <- many digit
           return (read ((value first) ++ "." ++ (value second)) :: Double)
           <|>
         do
           first <- many digit
-          char '.'
+          _ <- char '.'
           second <- many1 digit
           return (read ((value first) ++ "." ++ (value second)) :: Double)
         where
