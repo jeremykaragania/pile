@@ -17,36 +17,36 @@ module Parser where
 
   parseCIdentifierToken = parseCToken testTok
     where
-      testTok (Token pos (CIdentifierToken x)) = Just (CIdentifierToken x)
+      testTok (Token pos (CIdentifierToken x)) = Just $ CIdentifierToken x
       testTok x = Nothing
 
   parseCConstantToken = parseCToken testTok
     where
-      testTok (Token pos (CConstantToken x)) = Just (CConstantToken x)
+      testTok (Token pos (CConstantToken x)) = Just $ CConstantToken x
       testTok x = Nothing
 
   parseCStringLiteralToken = parseCToken testTok
     where
-      testTok (Token pos (CStringLiteralToken x)) = Just (CStringLiteralToken x)
+      testTok (Token pos (CStringLiteralToken x)) = Just $ CStringLiteralToken x
       testTok x = Nothing
 
   parseCIdentifier = do
     expr <- parseCIdentifierToken
-    return (CIdentifier expr)
+    return $ CIdentifier expr
 
   parseCConstant = do
     expr <- parseCConstantToken
-    return (CConstant expr)
+    return $ CConstant expr
 
   parseCStringLiteral = do
     expr <- parseCStringLiteralToken
-    return (CStringLiteral expr)
+    return $ CStringLiteral expr
 
   parseCParens = do
-    _ <- parseToken (Token Nothing (COperatorToken "("))
+    _ <- parseToken $ Token Nothing $ COperatorToken "("
     expr <- parseCPrimary
-    _ <- parseToken (Token Nothing (COperatorToken ")"))
-    return (CParens expr)
+    _ <- parseToken $ Token Nothing $ COperatorToken ")"
+    return $ CParens expr
 
   parseCPrimary =
       parseCIdentifier <|>
@@ -58,42 +58,42 @@ module Parser where
     left <- parseLeft
     try (
       do
-        right <- many1 (parseRight)
-        return (a left right)) <|>
+        right <- many1 parseRight
+        return $ a left right) <|>
       return left
 
   parseBinaryOperator :: String -> (CExpression -> CExpression -> CExpression) -> ParsecT [Token] u Identity (CExpression -> CExpression -> CExpression)
   parseBinaryOperator a b = do
-    _ <- parseToken (Token Nothing (COperatorToken a))
+    _ <- parseToken $ Token Nothing $ COperatorToken a
     return b
 
   parseCArraySubscript = parseLeftRecursion parseLeft parseRight CArraySubscript
     where
       parseLeft = parseCPrimary
-      parseRight = between (parseToken (Token Nothing (COperatorToken "["))) (parseToken (Token Nothing (COperatorToken "]"))) parseCExpression
+      parseRight = between (parseToken $ Token Nothing $ COperatorToken "[") (parseToken $ Token Nothing $ COperatorToken "]") parseCExpression
 
   parseCFunctionCall = parseLeftRecursion parseLeft parseRight CFunctionCall
     where
       parseLeft = parseCPrimary
-      parseRight = between (parseToken (Token Nothing (COperatorToken "("))) (parseToken (Token Nothing (COperatorToken ")"))) (optionMaybe parseCArgumentList)
+      parseRight = between (parseToken $ Token Nothing $ COperatorToken "(") (parseToken $ Token Nothing $ COperatorToken ")") $ optionMaybe parseCArgumentList
 
   parseCStructOrUnionMember = parseLeftRecursion parseLeft parseRight CStructOrUnionMember
     where
       parseLeft = parseCPrimary
       parseRight = do
-        _ <- (parseToken (Token Nothing (COperatorToken ".")) <|> parseToken (Token Nothing (COperatorToken "->")))
+        _ <- parseToken (Token Nothing $ COperatorToken ".") <|> parseToken (Token Nothing $ COperatorToken "->")
         expr <- parseLeft
         return expr
 
   parseCPostfixIncrement = do
     expr <- parseCPrimary
-    _ <- parseToken (Token Nothing (COperatorToken "++"))
-    return (CPostfixIncrement expr)
+    _ <- parseToken $ Token Nothing $ COperatorToken "++"
+    return $ CPostfixIncrement expr
 
   parseCPostfixDecrement = do
     expr <- parseCPrimary
-    _ <- parseToken (Token Nothing (COperatorToken "--"))
-    return (CPostfixDecrement expr)
+    _ <- parseToken $ Token Nothing $ COperatorToken "--"
+    return $ CPostfixDecrement expr
 
   parseCPostfix =
     try parseCArraySubscript <|>
@@ -105,38 +105,38 @@ module Parser where
 
   parseCArgumentList =
     do
-      list <- sepBy1 parseCAssignment (parseToken (Token Nothing (COperatorToken ",")))
-      return (CArgumentList list)
+      list <- sepBy1 parseCAssignment $ parseToken $ Token Nothing $ COperatorToken ","
+      return $ CArgumentList list
       <|>
     parseCAssignment
 
   parseCPrefixIncrement = do
-    _ <- parseToken (Token Nothing (COperatorToken "++"))
+    _ <- parseToken $ Token Nothing $ COperatorToken "++"
     expr <- parseCPostfix
-    return (CPrefixIncrement expr)
+    return $ CPrefixIncrement expr
 
   parseCPrefixDecrement = do
-    _ <- parseToken (Token Nothing (COperatorToken "--"))
+    _ <- parseToken $ Token Nothing $ COperatorToken "--"
     expr <- parseCPostfix
-    return (CPrefixDecrement expr)
+    return $ CPrefixDecrement expr
 
   parseCAddressOperator = do
-    _ <- parseToken (Token Nothing (COperatorToken "&"))
+    _ <- parseToken $ Token Nothing $ COperatorToken "&"
     expr <- parseCPostfix
-    return (CAddressOperator expr)
+    return $ CAddressOperator expr
 
   parseCIndirectionOperator = do
-    _ <- parseToken (Token Nothing (COperatorToken "*"))
+    _ <- parseToken $ Token Nothing $ COperatorToken "*"
     expr <- parseCPostfix
-    return (CIndirectionOperator expr)
+    return $ CIndirectionOperator expr
 
   parseCArithmeticOperator = do
-    op <- parseToken (Token Nothing (COperatorToken "+")) <|>
-      parseToken (Token Nothing (COperatorToken "-")) <|>
-      parseToken (Token Nothing (COperatorToken "~")) <|>
-      parseToken (Token Nothing (COperatorToken "!"))
+    op <- parseToken (Token Nothing $ COperatorToken "+") <|>
+      parseToken (Token Nothing $ COperatorToken "-") <|>
+      parseToken (Token Nothing $ COperatorToken "~") <|>
+      parseToken (Token Nothing $ COperatorToken "!")
     expr <- parseCPostfix
-    return (CArithmeticOperator (tValue op, expr))
+    return $ CArithmeticOperator (tValue op, expr)
 
   parseCUnary =
     try parseCPrefixIncrement <|>
@@ -148,11 +148,11 @@ module Parser where
 
   parseCCast = parseCUnary
 
-  parseCProduct = parseBinaryOperator "*" (CBinary "*")
+  parseCProduct = parseBinaryOperator "*" $ CBinary "*"
 
-  parseCQuotient = parseBinaryOperator "/" (CBinary "/")
+  parseCQuotient = parseBinaryOperator "/" $ CBinary "/"
 
-  parseCRemainder = parseBinaryOperator "%" (CBinary "%")
+  parseCRemainder = parseBinaryOperator "%" $ CBinary "%"
 
   parseCMultiplicative = chainl1 parseCCast op
     where
@@ -161,9 +161,9 @@ module Parser where
         parseCQuotient <|>
         parseCRemainder
 
-  parseCAddition = parseBinaryOperator "+" (CBinary "+")
+  parseCAddition = parseBinaryOperator "+" $ CBinary "+"
 
-  parseCSubtraction = parseBinaryOperator "-" (CBinary "-")
+  parseCSubtraction = parseBinaryOperator "-" $ CBinary "-"
 
   parseCAdditive = chainl1 parseCMultiplicative op
     where
@@ -171,9 +171,9 @@ module Parser where
         parseCAddition <|>
         parseCSubtraction
 
-  parseCLeftShift = parseBinaryOperator "<<" (CBinary "<<")
+  parseCLeftShift = parseBinaryOperator "<<" $ CBinary "<<"
 
-  parseCRightShift = parseBinaryOperator ">>" (CBinary ">>")
+  parseCRightShift = parseBinaryOperator ">>" $ CBinary ">>"
 
   parseCShift = chainl1 parseCAdditive op
     where
@@ -181,13 +181,13 @@ module Parser where
         parseCLeftShift <|>
         parseCRightShift
 
-  parseCLesser = parseBinaryOperator "<" (CBinary "<")
+  parseCLesser = parseBinaryOperator "<" $ CBinary "<"
 
-  parseCGreater = parseBinaryOperator ">" (CBinary ">")
+  parseCGreater = parseBinaryOperator ">" $ CBinary ">"
 
-  parseCLesserOrEqual = parseBinaryOperator "<=" (CBinary "<=")
+  parseCLesserOrEqual = parseBinaryOperator "<=" $ CBinary "<="
 
-  parseCGreaterOrEqual = parseBinaryOperator ">=" (CBinary ">=")
+  parseCGreaterOrEqual = parseBinaryOperator ">=" $ CBinary ">="
 
   parseCRelational = chainl1 parseCShift op
     where
@@ -197,9 +197,9 @@ module Parser where
         parseCLesserOrEqual <|>
         parseCGreaterOrEqual
 
-  parseCEqual = parseBinaryOperator "==" (CBinary "==")
+  parseCEqual = parseBinaryOperator "==" $ CBinary "=="
 
-  parseCNotEqual = parseBinaryOperator "!=" (CBinary "!=")
+  parseCNotEqual = parseBinaryOperator "!=" $ CBinary "!="
 
   parseCEquality = chainl1 parseCRelational op
     where
@@ -207,15 +207,15 @@ module Parser where
         parseCEqual <|>
         parseCNotEqual
 
-  parseCBitwiseAnd = chainl1 parseCEquality (parseBinaryOperator "&" (CBinary "&"))
+  parseCBitwiseAnd = chainl1 parseCEquality $ parseBinaryOperator "&" $ CBinary "&"
 
-  parseCBitwiseExclusiveOr = chainl1 parseCBitwiseAnd (parseBinaryOperator "^" (CBinary "^"))
+  parseCBitwiseExclusiveOr = chainl1 parseCBitwiseAnd $ parseBinaryOperator "^" $ CBinary "^"
 
-  parseCBitwiseInclusiveOr = chainl1 parseCBitwiseExclusiveOr (parseBinaryOperator "|" (CBinary "|"))
+  parseCBitwiseInclusiveOr = chainl1 parseCBitwiseExclusiveOr $ parseBinaryOperator "|" $ CBinary "|"
 
-  parseCLogicalAnd = chainl1 parseCBitwiseInclusiveOr (parseBinaryOperator "&&" (CBinary "&&"))
+  parseCLogicalAnd = chainl1 parseCBitwiseInclusiveOr $ parseBinaryOperator "&&" $ CBinary "&&"
 
-  parseCLogicalOr = chainl1 parseCLogicalAnd (parseBinaryOperator "||" (CBinary "||"))
+  parseCLogicalOr = chainl1 parseCLogicalAnd $ parseBinaryOperator "||" $ CBinary "||"
 
   parseCConditional = parseCLogicalOr
 
@@ -223,41 +223,41 @@ module Parser where
     where
       parseRight = do
         op <-
-          parseToken (Token Nothing (COperatorToken "=")) <|>
-          parseToken (Token Nothing (COperatorToken "*=")) <|>
-          parseToken (Token Nothing (COperatorToken "/=")) <|>
-          parseToken (Token Nothing (COperatorToken "%=")) <|>
-          parseToken (Token Nothing (COperatorToken "+=")) <|>
-          parseToken (Token Nothing (COperatorToken "-=")) <|>
-          parseToken (Token Nothing (COperatorToken "<<=")) <|>
-          parseToken (Token Nothing (COperatorToken ">>=")) <|>
-          parseToken (Token Nothing (COperatorToken "&=")) <|>
-          parseToken (Token Nothing (COperatorToken "^=")) <|>
-          parseToken (Token Nothing (COperatorToken "|="))
-        return (CAssignment ((operator . tValue) op))
+          parseToken (Token Nothing $ COperatorToken "=") <|>
+          parseToken (Token Nothing $ COperatorToken "*=") <|>
+          parseToken (Token Nothing $ COperatorToken "/=") <|>
+          parseToken (Token Nothing $ COperatorToken "%=") <|>
+          parseToken (Token Nothing $ COperatorToken "+=") <|>
+          parseToken (Token Nothing $ COperatorToken "-=") <|>
+          parseToken (Token Nothing $ COperatorToken "<<=") <|>
+          parseToken (Token Nothing $ COperatorToken ">>=") <|>
+          parseToken (Token Nothing $ COperatorToken "&=") <|>
+          parseToken (Token Nothing $ COperatorToken "^=") <|>
+          parseToken (Token Nothing $ COperatorToken "|=")
+        return $ CAssignment $ operator $ tValue op
 
   parseCExpression = do
-      list <- sepBy1 parseCAssignment (parseToken (Token Nothing (COperatorToken ",")))
-      return (CExpression list)
+      list <- sepBy1 parseCAssignment $ parseToken $ Token Nothing $ COperatorToken ","
+      return $ CExpression list
 
   parseCDeclaration = do
     spec <- parseCSpecifiers
     dec <- optionMaybe parseCInitDeclaratorList
-    _ <- parseToken (Token Nothing (CPunctuatorToken ";"))
-    return (CDeclaration spec dec)
+    _ <- parseToken $ Token Nothing $ CPunctuatorToken ";"
+    return $ CDeclaration spec dec
 
   parseCSpecifiers = do
     specifiers <-
-      many1 (
+      many1 $
         parseCStorageClassSpecifier <|>
         parseCTypeCpecifier <|>
-        parseCTypeQualifier)
-    return (CSpecifiers specifiers)
+        parseCTypeQualifier
+    return $ CSpecifiers specifiers
 
   parseCInitDeclaratorList =
     do
-      list <- sepBy1 parseCInitDeclarator (parseToken (Token Nothing (COperatorToken ",")))
-      return (CInitDeclaratorList list)
+      list <- sepBy1 parseCInitDeclarator $ parseToken $ Token Nothing $ COperatorToken ","
+      return $ CInitDeclaratorList list
       <|>
     parseCDeclarator
 
@@ -265,195 +265,195 @@ module Parser where
     try (
       do
         dec <- parseCDeclarator
-        _ <- parseToken (Token Nothing (COperatorToken "="))
+        _ <- parseToken $ Token Nothing $ COperatorToken "="
         expr <- parseCAssignment
-        return (CInitDeclarator dec expr)) <|>
+        return $ CInitDeclarator dec expr) <|>
       parseCDeclarator
 
   parseCStorageClassSpecifier = do
     specifier <-
-      parseToken (Token Nothing (CKeywordToken "typedef")) <|>
-      parseToken (Token Nothing (CKeywordToken "extern")) <|>
-      parseToken (Token Nothing (CKeywordToken "static")) <|>
-      parseToken (Token Nothing (CKeywordToken "auto")) <|>
-      parseToken (Token Nothing (CKeywordToken "register"))
-    return (CStorageClassSpecifier (tValue specifier))
+      parseToken (Token Nothing $ CKeywordToken "typedef") <|>
+      parseToken (Token Nothing $ CKeywordToken "extern") <|>
+      parseToken (Token Nothing $ CKeywordToken "static") <|>
+      parseToken (Token Nothing $ CKeywordToken "auto") <|>
+      parseToken (Token Nothing $ CKeywordToken "register")
+    return $ CStorageClassSpecifier $ tValue specifier
 
   parseCTypeCpecifier = do
     specifier <-
-      parseToken (Token Nothing (CKeywordToken "void")) <|>
-      parseToken (Token Nothing (CKeywordToken "char")) <|>
-      parseToken (Token Nothing (CKeywordToken "short")) <|>
-      parseToken (Token Nothing (CKeywordToken "int")) <|>
-      parseToken (Token Nothing (CKeywordToken "long")) <|>
-      parseToken (Token Nothing (CKeywordToken "float")) <|>
-      parseToken (Token Nothing (CKeywordToken "double")) <|>
-      parseToken (Token Nothing (CKeywordToken "signed")) <|>
-      parseToken (Token Nothing (CKeywordToken "unsigned"))
-    return (CTypeSpecifier (tValue specifier))
+      parseToken (Token Nothing $ CKeywordToken "void") <|>
+      parseToken (Token Nothing $ CKeywordToken "char") <|>
+      parseToken (Token Nothing $ CKeywordToken "short") <|>
+      parseToken (Token Nothing $ CKeywordToken "int") <|>
+      parseToken (Token Nothing $ CKeywordToken "long") <|>
+      parseToken (Token Nothing $ CKeywordToken "float") <|>
+      parseToken (Token Nothing $ CKeywordToken "double") <|>
+      parseToken (Token Nothing $ CKeywordToken "signed") <|>
+      parseToken (Token Nothing $ CKeywordToken "unsigned")
+    return $ CTypeSpecifier $ tValue specifier
 
   parseCTypeQualifier = do
     qualifier <-
-      parseToken (Token Nothing (CKeywordToken "const")) <|>
-      parseToken (Token Nothing (CKeywordToken "volatile"))
-    return (CTypeQualifier (tValue qualifier))
+      parseToken (Token Nothing $ CKeywordToken "const") <|>
+      parseToken (Token Nothing $ CKeywordToken "volatile")
+    return $ CTypeQualifier $ tValue qualifier
 
   parseCDeclarator = do
     pointer <- optionMaybe parseCPointer
     dec <- parseCDirectDeclarator
-    return (CDeclarator pointer dec)
+    return $ CDeclarator pointer dec
 
   parseCDirectDeclarator = parseCDirectDeclaratorFunctionCall
 
   parseCDirectDeclaratorIdentifier = do
     expr <- parseCIdentifier
-    return (CDirectDeclaratorIdentifier expr)
+    return $ CDirectDeclaratorIdentifier expr
 
   parseCDirectDeclaratorFunctionCall = parseLeftRecursion parseLeft parseRight CDirectDeclaratorFunctionCall
     where
       parseLeft = parseCDirectDeclaratorIdentifier
-      parseRight = between (parseToken (Token Nothing (COperatorToken "("))) (parseToken (Token Nothing (COperatorToken ")"))) parseCParameterTypeList
+      parseRight = between (parseToken $ Token Nothing $ COperatorToken "(") (parseToken $ Token Nothing $ COperatorToken ")") parseCParameterTypeList
 
   parseCPointer = do
-    _ <- many1 (parseToken (Token Nothing (COperatorToken "*")))
-    list <- optionMaybe (parseCTypeQualifierList)
-    return (CPointer list)
+    _ <- many1 $ parseToken $ Token Nothing $ COperatorToken "*"
+    list <- optionMaybe $ parseCTypeQualifierList
+    return $ CPointer list
 
   parseCTypeQualifierList = do
-    list <- many1 (parseCTypeQualifier)
-    return (CTypeQualifierList list)
+    list <- many1 parseCTypeQualifier
+    return $ CTypeQualifierList list
 
   parseCParameterTypeList = parseCParameterList
 
   parseCParameterList = do
-    list <- sepBy parseCParameterDeclaration (parseToken (Token Nothing (COperatorToken ",")))
-    return (CParameterList list)
+    list <- sepBy parseCParameterDeclaration $ parseToken $ Token Nothing $ COperatorToken ","
+    return $ CParameterList list
 
   parseCParameterDeclaration = do
     spec <- parseCSpecifiers
     dec <- parseCDeclarator
-    return (CParameterDeclaration spec dec)
+    return $ CParameterDeclaration spec dec
 
   parseCIdentifierList = do
-    list <- sepBy1 parseCIdentifier (parseToken (Token Nothing (COperatorToken ",")))
-    return (CIdentifierList list)
+    list <- sepBy1 parseCIdentifier $ parseToken $ Token Nothing $ COperatorToken ","
+    return $ CIdentifierList list
 
   parseCLabeledIdentifier = do
     expr <- parseCIdentifier
-    _ <- parseToken (Token Nothing (COperatorToken ":"))
+    _ <- parseToken $ Token Nothing $ COperatorToken ":"
     stat <- parseCStatement
-    return (CLabeledIdentifier expr stat)
+    return $ CLabeledIdentifier expr stat
 
   parseCLabeledCase = do
-    _ <- parseToken (Token Nothing (CKeywordToken "case"))
+    _ <- parseToken $ Token Nothing $ CKeywordToken "case"
     expr <- parseCConditional
-    _ <- parseToken (Token Nothing (COperatorToken ":"))
+    _ <- parseToken $ Token Nothing $ COperatorToken ":"
     statement <- parseCStatement
-    return (CLabeledCase expr statement)
+    return $ CLabeledCase expr statement
 
   parseCLabeledDefault = do
-    _ <- parseToken (Token Nothing (CKeywordToken "default"))
-    _ <- parseToken (Token Nothing (COperatorToken ":"))
+    _ <- parseToken $ Token Nothing $ CKeywordToken "default"
+    _ <- parseToken $ Token Nothing $ COperatorToken ":"
     statement <- parseCStatement
-    return (CLabeledDefault statement)
+    return $ CLabeledDefault statement
 
   parseCDeclarationList = do
     list <- many1 parseCDeclaration
-    return (CDeclarationList list)
+    return $ CDeclarationList list
 
   parseCList = do
     list <- many1 parseCStatement
-    return (CList list)
+    return $ CList list
 
   parseCCompound = do
-    _ <- parseToken (Token Nothing (CPunctuatorToken "{"))
+    _ <- parseToken $ Token Nothing $ CPunctuatorToken "{"
     firstList <- optionMaybe parseCDeclarationList
     secondList <- optionMaybe parseCList
-    _ <- parseToken (Token Nothing (CPunctuatorToken "}"))
-    return (CCompound firstList secondList)
+    _ <- parseToken $ Token Nothing $ CPunctuatorToken "}"
+    return $ CCompound firstList secondList
 
   parseCCExpression = do
     expr <- optionMaybe parseCExpression
-    _ <- parseToken (Token Nothing (CPunctuatorToken ";"))
-    return (CCExpression expr)
+    _ <- parseToken $ Token Nothing $ CPunctuatorToken ";"
+    return $ CCExpression expr
 
   parseCIf = do
-    _ <- parseToken (Token Nothing (CKeywordToken "if"))
-    _ <- parseToken (Token Nothing (COperatorToken "("))
+    _ <- parseToken $ Token Nothing $ CKeywordToken "if"
+    _ <- parseToken $ Token Nothing $ COperatorToken "("
     expr <- parseCExpression
-    _ <- parseToken (Token Nothing (COperatorToken ")"))
+    _ <- parseToken $ Token Nothing $ COperatorToken ")"
     statement <- parseCStatement
-    return (CIf expr statement)
+    return $ CIf expr statement
 
   parseCIfClse = do
-    _ <- parseToken (Token Nothing (CKeywordToken "if"))
-    _ <- parseToken (Token Nothing (COperatorToken "("))
+    _ <- parseToken $ Token Nothing $ CKeywordToken "if"
+    _ <- parseToken $ Token Nothing $ COperatorToken "("
     expr <- parseCExpression
-    _ <- parseToken (Token Nothing (COperatorToken ")"))
+    _ <- parseToken $ Token Nothing $ COperatorToken ")"
     firstCStatement <- parseCStatement
-    _ <- parseToken (Token Nothing (CKeywordToken "else"))
+    _ <- parseToken $ Token Nothing $ CKeywordToken "else"
     secondCStatement <- parseCStatement
-    return (CIfElse expr firstCStatement secondCStatement)
+    return $ CIfElse expr firstCStatement secondCStatement
 
   parseCSwitch = do
-    _ <- parseToken (Token Nothing (CKeywordToken "switch"))
-    _ <- parseToken (Token Nothing (COperatorToken "("))
+    _ <- parseToken $ Token Nothing $ CKeywordToken "switch"
+    _ <- parseToken $ Token Nothing $ COperatorToken "("
     expr <- parseCExpression
-    _ <- parseToken (Token Nothing (COperatorToken ")"))
+    _ <- parseToken $ Token Nothing $ COperatorToken ")"
     statement <- parseCStatement
-    return (CSwitch expr statement)
+    return $ CSwitch expr statement
 
   parseCWhile = do
-    _ <- parseToken (Token Nothing (CKeywordToken "while"))
-    _ <- parseToken (Token Nothing (COperatorToken "("))
+    _ <- parseToken $ Token Nothing $ CKeywordToken "while"
+    _ <- parseToken $ Token Nothing $ COperatorToken "("
     expr <- parseCExpression
-    _ <- parseToken (Token Nothing (COperatorToken ")"))
+    _ <- parseToken $ Token Nothing $ COperatorToken ")"
     statement <- parseCStatement
-    return (CWhile expr statement)
+    return $ CWhile expr statement
 
   parseCDo = do
-    _ <- parseToken (Token Nothing (CKeywordToken "do"))
+    _ <- parseToken $ Token Nothing $ CKeywordToken "do"
     statement <- parseCStatement
-    _ <- parseToken (Token Nothing (CKeywordToken "while"))
-    _ <- parseToken (Token Nothing (COperatorToken "("))
+    _ <- parseToken $ Token Nothing $ CKeywordToken "while"
+    _ <- parseToken $ Token Nothing $ COperatorToken "("
     expr <- parseCExpression
-    _ <- parseToken (Token Nothing (COperatorToken ")"))
-    _ <- parseToken (Token Nothing (CPunctuatorToken ";"))
-    return (CDo statement expr)
+    _ <- parseToken $ Token Nothing $ COperatorToken ")"
+    _ <- parseToken $ Token Nothing $ CPunctuatorToken ";"
+    return $ CDo statement expr
 
   parseCFor = do
-    _ <- parseToken (Token Nothing (CKeywordToken "for"))
-    _ <- parseToken (Token Nothing (COperatorToken "("))
+    _ <- parseToken $ Token Nothing $ CKeywordToken "for"
+    _ <- parseToken $ Token Nothing $ COperatorToken "("
     firstCxpr <- optionMaybe parseCExpression
-    _ <- parseToken (Token Nothing (CPunctuatorToken ";"))
+    _ <- parseToken $ Token Nothing $ CPunctuatorToken ";"
     secondCxpr <- optionMaybe parseCExpression
-    _ <- parseToken (Token Nothing (CPunctuatorToken ";"))
+    _ <- parseToken $ Token Nothing $ CPunctuatorToken ";"
     thirdCxpr <- optionMaybe parseCExpression
-    _ <- parseToken (Token Nothing (COperatorToken ")"))
+    _ <- parseToken $ Token Nothing $ COperatorToken ")"
     statement <- parseCStatement
-    return (CFor firstCxpr secondCxpr thirdCxpr statement)
+    return $ CFor firstCxpr secondCxpr thirdCxpr statement
 
   parseCGoto = do
-    _ <- parseToken (Token Nothing (CKeywordToken "goto"))
+    _ <- parseToken $ Token Nothing $ CKeywordToken "goto"
     ident <- parseCIdentifier
-    _ <- parseToken (Token Nothing (CPunctuatorToken ";"))
-    return (CGoto ident)
+    _ <- parseToken $ Token Nothing $ CPunctuatorToken ";"
+    return $ CGoto ident
 
   parseCContinue = do
-    _ <- parseToken (Token Nothing (CKeywordToken "continue"))
-    _ <- parseToken (Token Nothing (CPunctuatorToken ";"))
+    _ <- parseToken $ Token Nothing $ CKeywordToken "continue"
+    _ <- parseToken $ Token Nothing $ CPunctuatorToken ";"
     return CContinue
 
   parseCBreak = do
-    _ <- parseToken (Token Nothing (CKeywordToken "break"))
-    _ <- parseToken (Token Nothing (CPunctuatorToken ";"))
+    _ <- parseToken $ Token Nothing $ CKeywordToken "break"
+    _ <- parseToken $ Token Nothing $ CPunctuatorToken ";"
     return CBreak
 
   parseCReturn = do
-    _ <- parseToken (Token Nothing (CKeywordToken "return"))
+    _ <- parseToken $ Token Nothing $ CKeywordToken "return"
     expr <- optionMaybe parseCExpression
-    _ <- parseToken (Token Nothing (CPunctuatorToken ";"))
-    return (CReturn expr)
+    _ <- parseToken $ Token Nothing $ CPunctuatorToken ";"
+    return $ CReturn expr
 
   parseCStatement =
     try parseCLabeledIdentifier <|>
@@ -473,18 +473,18 @@ module Parser where
     parseCReturn
 
   parseCTranslationUnit = do
-    list <- many1 (try parseCExternalDeclaration <|> parseCFunction)
-    return (CTranslationUnit list)
+    list <- many1 $ try parseCExternalDeclaration <|> parseCFunction
+    return $ CTranslationUnit list
 
   parseCExternalDeclaration = do
     dec <- parseCDeclaration
-    return (CExternalDeclaration dec)
+    return $ CExternalDeclaration dec
 
   parseCFunction = do
     firstDec <- optionMaybe parseCSpecifiers
     secondDec <- parseCDeclarator
     firstStat <- optionMaybe parseCDeclarationList
     secondStat <- parseCCompound
-    return (CFunction firstDec secondDec firstStat secondStat)
+    return $ CFunction firstDec secondDec firstStat secondStat
 
-  parse = Text.Parsec.parse (parseCTranslationUnit) ""
+  parse = Text.Parsec.parse parseCTranslationUnit ""
