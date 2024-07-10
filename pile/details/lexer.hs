@@ -1,3 +1,4 @@
+--
 module Lexer where
   import Text.Parsec
   import qualified Text.Parsec.Token as P
@@ -8,7 +9,7 @@ module Lexer where
 
   instance Eq Token
     where
-      (Token lhsPos lhsVal) == (Token rhsPos rhsVal) = if lhsVal == rhsVal then True else False
+      (Token _ lhsVal) == (Token _ rhsVal) = if lhsVal == rhsVal then True else False
 
   languageDef = emptyDef {
     P.commentStart = "/*",
