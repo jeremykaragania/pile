@@ -1,4 +1,3 @@
---
 module Lexer where
   import Text.Parsec
   import qualified Text.Parsec.Token as P
