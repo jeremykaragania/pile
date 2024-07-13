@@ -7,28 +7,28 @@ module Parser where
   parseToken t = tokenPrim showTok nextPos testTok
     where
       showTok x = show x
-      nextPos pos x xs = pos
+      nextPos pos _ _ = pos
       testTok x = if x == t then Just x else Nothing
 
   parseCToken testTok = tokenPrim showTok nextPos testTok
     where
       showTok x = show x
-      nextPos pos x xs = pos
+      nextPos pos _ _ = pos
 
   parseCIdentifierToken = parseCToken testTok
     where
-      testTok (Token pos (CIdentifierToken x)) = Just $ CIdentifierToken x
-      testTok x = Nothing
+      testTok (Token _ (CIdentifierToken x)) = Just $ CIdentifierToken x
+      testTok _ = Nothing
 
   parseCConstantToken = parseCToken testTok
     where
-      testTok (Token pos (CConstantToken x)) = Just $ CConstantToken x
-      testTok x = Nothing
+      testTok (Token _ (CConstantToken x)) = Just $ CConstantToken x
+      testTok _ = Nothing
 
   parseCStringLiteralToken = parseCToken testTok
     where
-      testTok (Token pos (CStringLiteralToken x)) = Just $ CStringLiteralToken x
-      testTok x = Nothing
+      testTok (Token _ (CStringLiteralToken x)) = Just $ CStringLiteralToken x
+      testTok _ = Nothing
 
   parseCIdentifier = do
     expr <- parseCIdentifierToken
