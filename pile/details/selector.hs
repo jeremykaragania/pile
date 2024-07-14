@@ -1,3 +1,4 @@
+--
 module Selector where
   import Control.Monad.State
   import Data.Bits
@@ -380,38 +381,38 @@ module Selector where
       sourceValue (IRLabelValue _) = Just (toNodeValue a)
       sourceValue _ = Nothing
 
-  selectIRLabeledInstruction (a, IRAdd b c d) = newBinary ARMAdd a c d
-  selectIRLabeledInstruction (a, IRFadd b c d) = newBinaryFunction "__aeabi_fadd" a c d
-  selectIRLabeledInstruction (a, IRSub b c d) = newBinary ARMSub a c d
-  selectIRLabeledInstruction (a, IRFsub b c d) = newBinaryFunction "__aeabi_fsub" a c d
-  selectIRLabeledInstruction (a, IRMul b c d) = newBinary ARMMul a c d
-  selectIRLabeledInstruction (a, IRFmul b c d) = newBinaryFunction "__aeabi_fmul" a c d
-  selectIRLabeledInstruction (a, IRUdiv b c d) = newBinaryFunction "__aeabi_uidiv" a c d
-  selectIRLabeledInstruction (a, IRSdiv b c d) = newBinaryFunction "__aeabi_idiv" a c d
-  selectIRLabeledInstruction (a, IRFdiv b c d) = newBinaryFunction "__aeabi_fdiv" a c d
-  selectIRLabeledInstruction (a, IRUrem b c d) = newBinaryFunction "__aeabi_uidivmod" a c d
-  selectIRLabeledInstruction (a, IRSrem b c d) = newBinaryFunction "__aeabi_idivmod" a c d
-  selectIRLabeledInstruction (a, IRShl b c d) = newBinaryFunction "__aeabi_llsl" a c d
-  selectIRLabeledInstruction (a, IRLshr b c d) = newBinaryFunction "__aeabi_lasr" a c d
-  selectIRLabeledInstruction (a, IRAshr b c d) = newBinaryFunction "__aeabi_lasr" a c d
-  selectIRLabeledInstruction (a, IRAnd b c d) = newBinary ARMAnd a c d
-  selectIRLabeledInstruction (a, IROr b c d) = newBinary ARMOrr a c d
-  selectIRLabeledInstruction (a, IRXor b c d) = newBinary ARMEor a c d
+  selectIRLabeledInstruction (a, IRAdd _ c d) = newBinary ARMAdd a c d
+  selectIRLabeledInstruction (a, IRFadd _ c d) = newBinaryFunction "__aeabi_fadd" a c d
+  selectIRLabeledInstruction (a, IRSub _ c d) = newBinary ARMSub a c d
+  selectIRLabeledInstruction (a, IRFsub _ c d) = newBinaryFunction "__aeabi_fsub" a c d
+  selectIRLabeledInstruction (a, IRMul _ c d) = newBinary ARMMul a c d
+  selectIRLabeledInstruction (a, IRFmul _ c d) = newBinaryFunction "__aeabi_fmul" a c d
+  selectIRLabeledInstruction (a, IRUdiv _ c d) = newBinaryFunction "__aeabi_uidiv" a c d
+  selectIRLabeledInstruction (a, IRSdiv _ c d) = newBinaryFunction "__aeabi_idiv" a c d
+  selectIRLabeledInstruction (a, IRFdiv _ c d) = newBinaryFunction "__aeabi_fdiv" a c d
+  selectIRLabeledInstruction (a, IRUrem _ c d) = newBinaryFunction "__aeabi_uidivmod" a c d
+  selectIRLabeledInstruction (a, IRSrem _ c d) = newBinaryFunction "__aeabi_idivmod" a c d
+  selectIRLabeledInstruction (a, IRShl _ c d) = newBinaryFunction "__aeabi_llsl" a c d
+  selectIRLabeledInstruction (a, IRLshr _ c d) = newBinaryFunction "__aeabi_lasr" a c d
+  selectIRLabeledInstruction (a, IRAshr _ c d) = newBinaryFunction "__aeabi_lasr" a c d
+  selectIRLabeledInstruction (a, IRAnd _ c d) = newBinary ARMAnd a c d
+  selectIRLabeledInstruction (a, IROr _ c d) = newBinary ARMOrr a c d
+  selectIRLabeledInstruction (a, IRXor _ c d) = newBinary ARMEor a c d
 
-  selectIRLabeledInstruction (Just (IRLabelNumber a), IRAlloca b) = return ()
+  selectIRLabeledInstruction (Just (IRLabelNumber _), IRAlloca _) = return ()
 
-  selectIRLabeledInstruction (a@(Just (IRLabelNumber b)), IRLoad c (IRLabelValue (IRLabelName d))) = do
+  selectIRLabeledInstruction (Just (IRLabelNumber b), IRLoad _ (IRLabelValue (IRLabelName d))) = do
     got <- get
     let mov = execState (newMov (OpcodeCondition ARMMov Nothing) 0 (integerReg physReg) (Label d) [(Other, Nothing)]) got
     let ldr = execState (newMemory ARMLdr b 0 0) mov
     put ldr
 
-  selectIRLabeledInstruction (a@(Just (IRLabelNumber b)), IRLoad c (IRLabelValue (IRLabelNumber d))) = do
+  selectIRLabeledInstruction (Just (IRLabelNumber b), IRLoad _ (IRLabelValue (IRLabelNumber d))) = do
     got <- get
     let mov = execState (newMov (OpcodeCondition ARMMov Nothing) b (integerReg virtReg) (Reg (integerReg virtReg)) [(Word, Just (IntegerValue d))]) got
     put mov
 
-  selectIRLabeledInstruction (Nothing, IRStore b (IRLabelValue (IRLabelNumber c)) (IRLabelName d)) = do
+  selectIRLabeledInstruction (Nothing, IRStore _ (IRLabelValue (IRLabelNumber c)) (IRLabelName d)) = do
     got <- get
     let mov = execState (newMov (OpcodeCondition ARMMov Nothing) 0 (integerReg physReg) (Label d) [(Other, Nothing)]) got
     let str = execState (newMemory ARMStr c 0 0) mov
@@ -431,7 +432,7 @@ module Selector where
     let mov1 = execState (newMov (OpcodeCondition ARMMovt Nothing) d (integerReg virtReg) Constant [(Word, Just (IntegerValue top))]) mov0
     put mov1
 
-  selectIRLabeledInstruction (Nothing, IRStore b (IRLabelValue (IRLabelNumber c)) (IRLabelNumber d)) = do
+  selectIRLabeledInstruction (Nothing, IRStore _ (IRLabelValue (IRLabelNumber c)) (IRLabelNumber d)) = do
     got <- get
     let mov = execState (newMov (OpcodeCondition ARMMov Nothing) d (integerReg virtReg) (reg c ((args . func) got)) [(Word, Just (IntegerValue c))]) got
     put mov
