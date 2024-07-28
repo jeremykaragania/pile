@@ -1,4 +1,3 @@
---
 module Selector where
   import Control.Monad.State
   import Data.Bits
