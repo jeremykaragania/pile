@@ -112,7 +112,7 @@ module Allocator where
     put (AnalyzerState (counter analyzedWrote + 1) (table analyzedWrote))
 
   analyzeOperands :: (Integer -> LiveInterval -> LiveInterval) -> [Operand] -> AnalyzerStateMonad ()
-  analyzeOperands a [] = return ()
+  analyzeOperands _ [] = return ()
 
   analyzeOperands b (a:as) = do
     got <- get
@@ -158,7 +158,7 @@ module Allocator where
       let newRegs = Map.insert b (Reg (integerReg physReg) ((head . available) expired)) (regs expired)
       put ((setAvailable newAvailable . setActive newActive . setRegs newRegs) expired)
 
-  allocateLiveInterval a@(b@(Reg (RegType _ PhysicalReg) _), c) = do
+  allocateLiveInterval (b@(Reg (RegType _ PhysicalReg) _), _) = do
     got <- get
     let newRegs = Map.insert b b (regs got)
     put ((setRegs newRegs) got)
@@ -173,7 +173,7 @@ module Allocator where
     expireIntervals a bs
 
   expireInterval :: (Operand, LiveInterval) -> (Operand, LiveInterval) -> AllocatorStateMonad ()
-  expireInterval (a, b) (c, d) = do
+  expireInterval (_, b) (c, d) = do
     got <- get
     if (liveTo d) >= (liveFrom b) || ((liveTo d) == (-1) && (liveFrom d) >= (liveFrom b)) then return ()
     else do
@@ -218,7 +218,7 @@ module Allocator where
 
   resolveMachineCodes a (b:c) = resolveMachineCodes (a ++ [b]) c
 
-  resolveOperands a b [] = a
+  resolveOperands a _ [] = a
   resolveOperands a b (Address c:d) = resolveOperands (fst a ++ [MCInstruction (OpcodeCondition ARMLdr Nothing) [Reg (integerReg physReg) b, Reg (integerReg physReg) 13, Immediate c]], (snd a ++ [Reg (integerReg physReg) b])) (b + 1) d
   resolveOperands a b (c:d) = resolveOperands (fst a, (snd a ++ [c])) b d
 
