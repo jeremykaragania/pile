@@ -15,7 +15,7 @@ module Emitter where
   emitMCSymbolType (MCGlobal MCVariable) = "object"
   emitMCSymbolType _ = "notype"
 
-  emitMachineCode (MCInstruction a@(OpcodeCondition b c) d) = "  " ++ emitOpcodeCondition a ++ " " ++ emitOperands
+  emitMachineCode (MCInstruction a@(OpcodeCondition b _) d) = "  " ++ emitOpcodeCondition a ++ " " ++ emitOperands
     where
       emitARM e = (drop 3 . map toLower . show) e
       emitOpcodeCondition (OpcodeCondition e Nothing) = emitARM e
