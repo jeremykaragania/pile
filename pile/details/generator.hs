@@ -149,7 +149,7 @@ module Generator where
     | toLower a == 'u' = IRInteger IRUnsigned
     | toLower a == 'l' = IRLongInteger IRSigned
 
-  typeFromCConstant (CIntegerConstant _ (Just (a, Just b))) = IRLongInteger IRUnsigned
+  typeFromCConstant (CIntegerConstant _ (Just (_, Just _))) = IRLongInteger IRUnsigned
 
   typeFromCSpecifiers a (Just (CPointer _)) = IRPointer (typeFromCSpecifiers a Nothing)
 
@@ -184,7 +184,7 @@ module Generator where
         | length a == (length . fromList) a = fromList a == fromList (map (\c -> (CTypeSpecifier (CKeywordToken c))) b)
         | otherwise = error ""
 
-  statementFromCCompound(CCompound a b) = b
+  statementFromCCompound(CCompound _ b) = b
 
   generateIRConstant a b
     | b == IRFloat || b == IRDouble || b == IRLongDouble = IRFloatingConstant (value a)
@@ -376,7 +376,7 @@ module Generator where
     function (b).
   -}
   newFunctionBody :: CStatement -> IRType -> Integer -> GeneratorStateMonad [IRBasicBlock]
-  newFunctionBody a b c = do
+  newFunctionBody a _ c = do
     got <- get
     let stat = execState (generateCStatement a) got
     let ret = [[(Nothing, IRRet Nothing)]]
@@ -477,7 +477,7 @@ module Generator where
     generateCDeclarations as
 
   generateCDeclaration :: CDeclaration -> GeneratorStateMonad ()
-  generateCDeclaration (CDeclaration d (Just (CInitDeclaratorList []))) = return ()
+  generateCDeclaration (CDeclaration _ (Just (CInitDeclaratorList []))) = return ()
 
   generateCDeclaration (CDeclaration a (Just (CInitDeclaratorList (b:bs)))) = do
     got <- get
@@ -501,18 +501,17 @@ module Generator where
 
   generateCDeclaration (CInitDeclarator _ b) = generateCExpression b
 
-  generateCDeclaration (CDeclarator _ b) = return ()
+  generateCDeclaration (CDeclarator _ _) = return ()
 
   generateCStatements :: [CStatement] -> GeneratorStateMonad ()
   generateCStatements [] = return ()
 
   generateCStatements (a:as) = do
-    got <- get
     generateCStatement a
     generateCStatements as
 
   generateCStatement :: CStatement -> GeneratorStateMonad ()
-  generateCStatement (CLabeledCase a b) = newLabeled b
+  generateCStatement (CLabeledCase _ b) = newLabeled b
 
   generateCStatement (CLabeledDefault a) = newLabeled a
 
@@ -566,7 +565,7 @@ module Generator where
       isLabeled _ = False
       -- Decides whether to use the explicit (a) or implicit (b) default label.
       labeledDefault [c] = c
-      labeledDefault [c, d] = d
+      labeledDefault [_, d] = d
       labeledDefault _ = error ""
 
   generateCStatement(CWhile a@(CExpression b) c) = do
@@ -632,7 +631,7 @@ module Generator where
         switchStatement as
 
   generateCExternalDefinition :: CExternalDefinition -> GeneratorStateMonad ()
-  generateCExternalDefinition (CFunction (Just a) b c d) = do
+  generateCExternalDefinition (CFunction (Just a) b _ d) = do
     got <- get
     let parameterLength = (fromIntegral . length . parameterList) b
     let functionHead = execState (newFunctionHead (parameterList b) (parameterLength + 1)) (GeneratorState [[]] (parameterLength + 1) (table got) Nothing [] 0, [])
@@ -653,7 +652,7 @@ module Generator where
       declarations :: [CDeclaration] -> GeneratorStateMonad ()
       declarations [] = return ()
 
-      declarations (c:cs) = do
+      declarations (c:_) = do
         got <- get
         let name = getIdentifier c
         let varType = typeFromCSpecifiers a (getPointer c)
