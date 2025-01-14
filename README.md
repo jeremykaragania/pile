@@ -4,14 +4,19 @@ An ANSI C compiler.
 ## Installation
 ```bash
 git clone https://github.com/jeremykaragania/pile.git
-cd pile
-ghc -i pile/details/*.hs -o compiler pile/main.hs
+cd pile/pile
+ghc -i details/*.hs -o pile main.hs
 ```
 
 ## Usage
-Compile [`examples/factorial.c`](examples/factorial.c).
 ```bash
-./compiler examples/factorial.c
+./pile filename...
+```
+
+## Examples
+Compile [`factorial.c`](examples/factorial.c).
+```bash
+./pile ../examples/factorial.c
 ```
 Create a file `main.c`.
 ```c
