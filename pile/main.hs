@@ -10,6 +10,8 @@ module Main where
   import System.FilePath
   import System.Environment
 
+  usage = "filename..."
+
   parseOutFile a = takeFileName (take (length a - 2) a ++ ".s")
 
   isInFile a = drop (length a - 2) a == ".c"
@@ -25,7 +27,7 @@ module Main where
         Right b -> do
           let parsed = parse b
           case parsed of
-            Left c -> print b
+            Left _ -> print b
             Right c -> do
               let generated = generate c
               let selected = select generated
@@ -39,4 +41,7 @@ module Main where
 
   main = do
     args <- getArgs
-    compile args
+    prog <- getProgName
+    case args of
+      [] -> putStrLn ("Usage: " ++ prog ++ " " ++ usage)
+      _ -> compile args
