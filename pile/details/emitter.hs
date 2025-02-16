@@ -21,6 +21,11 @@ module Emitter where
       emitOpcodeCondition (OpcodeCondition e Nothing) = emitARM e
       emitOpcodeCondition (OpcodeCondition e (Just f)) = emitARM e ++ emitARM f
       emitOperand (Label e) = e
+      emitOperand (Reg (RegType IntegerReg PhysicalReg) 15) = "pc"
+      emitOperand (Reg (RegType IntegerReg PhysicalReg) 14) = "lr"
+      emitOperand (Reg (RegType IntegerReg PhysicalReg) 13) = "sp"
+      emitOperand (Reg (RegType IntegerReg PhysicalReg) 12) = "ip"
+      emitOperand (Reg (RegType IntegerReg PhysicalReg) 11) = "fp"
       emitOperand (Reg (RegType IntegerReg PhysicalReg) e) = "r" ++ show e
       emitOperand (Reg (RegType SingleReg PhysicalReg) e) = "s" ++ show e
       emitOperand (Reg (RegType DoubleReg PhysicalReg) e) = "d" ++ show e
