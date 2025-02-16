@@ -7,6 +7,7 @@ module Main where
   import Parser
   import Scheduler
   import Selector
+  import System.Exit
   import System.FilePath
   import System.Environment
 
@@ -23,11 +24,15 @@ module Main where
       file <- readFile a
       let scanned = scan file
       case scanned of
-        Left b -> print b
+        Left b -> do
+          print b
+          exitFailure
         Right b -> do
           let parsed = parse b
           case parsed of
-            Left _ -> print b
+            Left _ -> do
+              print b
+              exitFailure
             Right c -> do
               let generated = generate c
               let selected = select generated
@@ -43,5 +48,9 @@ module Main where
     args <- getArgs
     prog <- getProgName
     case args of
-      [] -> putStrLn ("Usage: " ++ prog ++ " " ++ usage)
-      _ -> compile args
+      [] -> do
+        putStrLn ("Usage: " ++ prog ++ " " ++ usage)
+        exitFailure
+      _ -> do
+        compile args
+        exitSuccess
