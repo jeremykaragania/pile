@@ -402,6 +402,15 @@ module Generator where
           numbered (Nothing, _) = False
           numbered _ = True
 
+  generateMaybeCExpression (Just a) = generateCExpression a
+  generateMaybeCExpression Nothing = return ()
+
+  generateMaybeCDeclaration (Just a) = generateCDeclaration a
+  generateMaybeCDeclaration Nothing = return ()
+
+  generateMaybeCStatement (Just a) = generateCStatement a
+  generateMaybeCStatement Nothing = return ()
+
   {-
     The last instruction of a generated expression will contain the resulting
     value of that expression. This makes it easier to get the resulting type of
@@ -469,6 +478,7 @@ module Generator where
     let expr = execState (generateCExpression a) got
     put expr
     generateCExpression (CExpression as)
+
   generateCDeclarations :: [CDeclaration] -> GeneratorStateMonad ()
   generateCDeclarations [] = return ()
 
