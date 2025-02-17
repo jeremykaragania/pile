@@ -598,6 +598,32 @@ module Generator where
     let doBody1 = execState (newHead b (IRLabelValue (IRLabelNumber (counter got))) (IRLabelValue (IRLabelNumber ((counter doBody0) + 2)))) doBody0
     put ((setBlocks (blocks doBody1 ++ [[]]) . setCounter (+1) . setContext Nothing) doBody1)
 
+  generateCStatement (CFor a (Just b) c d) = do
+    got <- get
+    let expr0 = execState (newForExpr0 a) got
+    {-
+      Unfortunately, we have to execute some states twice to know the number of
+      the basic block to branch to if the for loop condition is not met.
+    -}
+    let _expr1 = execState (newHead b (IRLabelValue (IRLabelNumber (counter got))) (IRLabelValue (IRLabelNumber (counter expr0)))) (expr0)
+    let _stat = execState (generateCStatement d) ((setBlocks ((blocks _expr1) ++ [[]]) . setCounter (+1)) _expr1)
+    let _expr2 = execState (generateMaybeCExpression c) ((setBlocks ((blocks _stat ++ [[]])) . setCounter (+1)) _stat)
+
+    let expr1 = execState (newHead b (IRLabelValue (IRLabelNumber (counter _expr1))) (IRLabelValue (IRLabelNumber (counter _expr2)))) (expr0)
+    let stat = execState (generateCStatement d) ((setBlocks ((blocks expr1) ++ [[]]) . setCounter (+1)) expr1)
+    let expr2 = execState (generateMaybeCExpression c) ((setBlocks ((blocks stat ++ [[]])) . setCounter (+1)) stat)
+    let br = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter expr0 - 1)))))]
+    let newBlocks = appendBlocks (blocks expr2) [br, []]
+    put ((setBlocks newBlocks . setCounter (+1)) expr2)
+    where
+      newForExpr0 :: (Maybe CExpression) -> GeneratorStateMonad ()
+      newForExpr0 e = do
+        got <- get
+        let expr = execState (generateMaybeCExpression e) got
+        let br = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (counter expr))))]]
+        let newBlocks = appendBlocks (blocks expr) br ++ [[]]
+        put ((setBlocks newBlocks . setCounter (+1)) expr)
+
   generateCStatement (CReturn Nothing) = do
     got <- get
     let instrs = [[(Nothing, IRRet Nothing)]]
