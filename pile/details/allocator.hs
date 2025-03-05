@@ -85,6 +85,16 @@ module Allocator where
   readWrote (MCInstruction (OpcodeCondition ARMPush _) a) = (a, [])
   readWrote (MCInstruction (OpcodeCondition ARMPop _) a) = ([], a)
 
+  {-
+    machineCodeToBlocks groups instructions by their block to be analyzed
+    later.
+  -}
+  machineCodeToBlocks :: Map String [MachineCode] -> String -> [MachineCode] -> Map String [MachineCode]
+  machineCodeToBlocks m s (MCSymbol _ a:as) = machineCodeToBlocks (Map.insert a [] m) a as
+  machineCodeToBlocks m s (a@(MCInstruction _ _):as) = machineCodeToBlocks (Map.insert s ((m Map.! s) ++ [a]) m) s as
+  machineCodeToBlocks m s (_:as) = machineCodeToBlocks m s as
+  machineCodeToBlocks m _ [] = m
+
   analyzeMachineCode a = ((filter isReg ((fst . readWrote) a)), (filter isReg ((snd . readWrote) a)))
     where
       isReg (Reg _ _) = True
