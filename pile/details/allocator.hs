@@ -28,6 +28,16 @@ module Allocator where
   setLiveTo a (LiveInterval b _) = LiveInterval b a
 
   {-
+    OperandAccessInfo represents which operands are read from and written to in
+    an instruction.
+  -}
+  data OperandAccessInfo = OperandAccessInfo {
+    code :: MachineCode,
+    read :: [Operand],
+    wrote :: [Operand]
+  }
+
+  {-
     AnalyzerState is a type for the analyzer it keeps track of the current line
     number "counter"; and a lookup table "table" which associates an operand
     with its live interval information.
