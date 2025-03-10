@@ -75,6 +75,10 @@ module Allocator where
   opcodeNumber (Reg _ a) = a
   opcodeNumber (Address a) = a
 
+  {-
+    readWrote determines which operands are read and written to in an
+    instruction for use in live interval calculation.
+  -}
   readWrote (MCInstruction (OpcodeCondition ARMMov _) [a, b]) = ([b], [a])
   readWrote (MCInstruction (OpcodeCondition ARMMvn _) [a, b]) = ([b], [a])
   readWrote (MCInstruction (OpcodeCondition ARMMovt _) [a, b]) = ([b], [a])
