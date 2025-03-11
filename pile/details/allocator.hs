@@ -33,9 +33,11 @@ module Allocator where
   -}
   data OperandAccessInfo = OperandAccessInfo {
     code :: MachineCode,
-    read :: [Operand],
-    wrote :: [Operand]
+    readOps :: [Operand],
+    wroteOps :: [Operand]
   }
+
+  toOpsPair a = (readOps a, wroteOps a)
 
   {-
     AnalyzerState is a type for the analyzer it keeps track of the current line
@@ -109,9 +111,7 @@ module Allocator where
   machineCodeToBlocks m s (_:as) = machineCodeToBlocks m s as
   machineCodeToBlocks m _ [] = m
 
-  operandAccessInfo a = OperandAccessInfo a ((fst . readWrote) a) ((snd . readWrote) a)
-
-  analyzeMachineCode a = ((filter isReg ((fst . readWrote) a)), (filter isReg ((snd . readWrote) a)))
+  analyzeMachineCode a = OperandAccessInfo a (filter isReg ((fst . readWrote) a)) (filter isReg ((snd . readWrote) a))
     where
       isReg (Reg _ _) = True
       isReg _ = False
@@ -121,12 +121,12 @@ module Allocator where
       isInstruction (MCInstruction _ _) = True
       isInstruction _ = False
 
-  analyzeOperandsPairs :: [([Operand], [Operand])] -> AnalyzerStateMonad ()
+  analyzeOperandsPairs :: [OperandAccessInfo] -> AnalyzerStateMonad ()
   analyzeOperandsPairs [] = return ()
 
   analyzeOperandsPairs (a:as) = do
     got <- get
-    let analyzed = execState (analyzeOperandsPair a) got
+    let analyzed = execState ((analyzeOperandsPair . toOpsPair) a) got
     put analyzed
     analyzeOperandsPairs as
 
