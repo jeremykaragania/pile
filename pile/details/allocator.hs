@@ -121,33 +121,33 @@ module Allocator where
       isInstruction (MCInstruction _ _) = True
       isInstruction _ = False
 
-  analyzeOperandsPairs :: [OperandAccessInfo] -> AnalyzerStateMonad ()
-  analyzeOperandsPairs [] = return ()
+  analyzeOpsPairs :: [OperandAccessInfo] -> AnalyzerStateMonad ()
+  analyzeOpsPairs [] = return ()
 
-  analyzeOperandsPairs (a:as) = do
+  analyzeOpsPairs (a:as) = do
     got <- get
-    let analyzed = execState ((analyzeOperandsPair . toOpsPair) a) got
+    let analyzed = execState ((analyzeOpsPair . toOpsPair) a) got
     put analyzed
-    analyzeOperandsPairs as
+    analyzeOpsPairs as
 
-  analyzeOperandsPair :: ([Operand], [Operand]) -> AnalyzerStateMonad ()
-  analyzeOperandsPair (a, b) = do
+  analyzeOpsPair :: ([Operand], [Operand]) -> AnalyzerStateMonad ()
+  analyzeOpsPair (a, b) = do
     got <- get
-    let analyzedRead = execState (analyzeOperands setLiveTo a) got
-    let analyzedWrote = execState (analyzeOperands setLiveFrom b) analyzedRead
+    let analyzedRead = execState (analyzeOps setLiveTo a) got
+    let analyzedWrote = execState (analyzeOps setLiveFrom b) analyzedRead
     put (AnalyzerState (counter analyzedWrote + 1) (table analyzedWrote))
 
-  analyzeOperands :: (Integer -> LiveInterval -> LiveInterval) -> [Operand] -> AnalyzerStateMonad ()
-  analyzeOperands _ [] = return ()
+  analyzeOps :: (Integer -> LiveInterval -> LiveInterval) -> [Operand] -> AnalyzerStateMonad ()
+  analyzeOps _ [] = return ()
 
-  analyzeOperands b (a:as) = do
+  analyzeOps b (a:as) = do
     got <- get
-    let analyzed = execState (analyzeOperand b a) got
+    let analyzed = execState (analyzeOp b a) got
     put analyzed
-    analyzeOperands b as
+    analyzeOps b as
 
-  analyzeOperand :: (Integer -> LiveInterval -> LiveInterval) -> Operand -> AnalyzerStateMonad ()
-  analyzeOperand a b = do
+  analyzeOp :: (Integer -> LiveInterval -> LiveInterval) -> Operand -> AnalyzerStateMonad ()
+  analyzeOp a b = do
     got <- get
     if Map.notMember b (table got) then do
       let newTable = Map.insert b (a (counter got) (LiveInterval (-1) (-1))) (table got)
@@ -162,7 +162,7 @@ module Allocator where
         | liveFrom c < liveFrom d = c
         | otherwise = d
 
-  analyze a = (Map.toList . table) (execState (analyzeOperandsPairs (analyzeMachineCodes a)) (AnalyzerState 0 Map.empty))
+  analyze a = (Map.toList . table) (execState (analyzeOpsPairs (analyzeMachineCodes a)) (AnalyzerState 0 Map.empty))
 
   allocateLiveIntervals :: [(Operand, LiveInterval)] -> AllocatorStateMonad ()
   allocateLiveIntervals [] = return ()
@@ -240,13 +240,13 @@ module Allocator where
   resolveMachineCodes a [] = a
   resolveMachineCodes a (b@(MCInstruction c (d:e)):f) = resolveMachineCodes (a ++ (firstMachineCodes (fst operands) b) ++ [MCInstruction c (snd operands)] ++ lastMachineCodes b) f
     where
-      operands = (resolveOperands ([], []) 4 (d:e))
+      operands = (resolveOps ([], []) 4 (d:e))
 
   resolveMachineCodes a (b:c) = resolveMachineCodes (a ++ [b]) c
 
-  resolveOperands a _ [] = a
-  resolveOperands a b (Address c:d) = resolveOperands (fst a ++ [MCInstruction (OpcodeCondition ARMLdr Nothing) [Reg (integerReg physReg) b, Reg (integerReg physReg) 13, Immediate c]], (snd a ++ [Reg (integerReg physReg) b])) (b + 1) d
-  resolveOperands a b (c:d) = resolveOperands (fst a, (snd a ++ [c])) b d
+  resolveOps a _ [] = a
+  resolveOps a b (Address c:d) = resolveOps (fst a ++ [MCInstruction (OpcodeCondition ARMLdr Nothing) [Reg (integerReg physReg) b, Reg (integerReg physReg) 13, Immediate c]], (snd a ++ [Reg (integerReg physReg) b])) (b + 1) d
+  resolveOps a b (c:d) = resolveOps (fst a, (snd a ++ [c])) b d
 
   firstMachineCodes a (MCInstruction _ (_:b))
     | any address b = a
