@@ -37,8 +37,6 @@ module Allocator where
     wroteOps :: [Operand]
   }
 
-  toOpsPair a = (readOps a, wroteOps a)
-
   {-
     AnalyzerState is a type for the analyzer it keeps track of the current line
     number "counter"; and a lookup table "table" which associates an operand
@@ -126,12 +124,12 @@ module Allocator where
 
   analyzeOpsPairs (a:as) = do
     got <- get
-    let analyzed = execState ((analyzeOpsPair . toOpsPair) a) got
+    let analyzed = execState (analyzeOpsPair a) got
     put analyzed
     analyzeOpsPairs as
 
-  analyzeOpsPair :: ([Operand], [Operand]) -> AnalyzerStateMonad ()
-  analyzeOpsPair (a, b) = do
+  analyzeOpsPair :: OperandAccessInfo -> AnalyzerStateMonad ()
+  analyzeOpsPair o@(OperandAccessInfo _ a b) = do
     got <- get
     let analyzedRead = execState (analyzeOps setLiveTo a) got
     let analyzedWrote = execState (analyzeOps setLiveFrom b) analyzedRead
