@@ -109,7 +109,7 @@ module Allocator where
   machineCodeToBlocks m s (_:as) = machineCodeToBlocks m s as
   machineCodeToBlocks m _ [] = m
 
-  analyzeMachineCode a = OperandAccessInfo a (filter isReg ((fst . readWrote) a)) (filter isReg ((snd . readWrote) a))
+  analyzeMachineCode a@(MCInstruction b c) = OperandAccessInfo a (filter isReg ((fst . readWrote) a)) (filter isReg ((snd . readWrote) a))
     where
       isReg (Reg _ _) = True
       isReg _ = False
