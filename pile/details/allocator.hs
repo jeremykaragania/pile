@@ -79,25 +79,25 @@ module Allocator where
     readWrote determines which operands are read and written to in an
     instruction for use in live interval calculation.
   -}
-  readWrote (MCInstruction (OpcodeCondition ARMMov _) [a, b]) = ([b], [a])
-  readWrote (MCInstruction (OpcodeCondition ARMMvn _) [a, b]) = ([b], [a])
-  readWrote (MCInstruction (OpcodeCondition ARMMovt _) [a, b]) = ([b], [a])
-  readWrote (MCInstruction (OpcodeCondition ARMVmov _) [a, b]) = ([b], [a])
-  readWrote (MCInstruction (OpcodeCondition ARMAdd _) [a, b, c]) = ([b, c], [a])
-  readWrote (MCInstruction (OpcodeCondition ARMSub _) [a, b, c]) = ([b, c], [a])
-  readWrote (MCInstruction (OpcodeCondition ARMCmp _) [a, b]) = ([a, b], [])
-  readWrote (MCInstruction (OpcodeCondition ARMMul _) [a, b, c]) = ([b, c], [a])
-  readWrote (MCInstruction (OpcodeCondition ARMBl _) [a, b, c]) = ([b, c], [a])
-  readWrote (MCInstruction (OpcodeCondition ARMAnd _) [a, b, c]) = ([b, c], [a])
-  readWrote (MCInstruction (OpcodeCondition ARMOrr _) [a, b, c]) = ([b, c], [a])
-  readWrote (MCInstruction (OpcodeCondition ARMEor _) [a, b, c]) = ([b, c], [a])
-  readWrote (MCInstruction (OpcodeCondition ARMB _) [a]) = ([a], [])
-  readWrote (MCInstruction (OpcodeCondition ARMBl _) [a]) = ([a], [Reg (integerReg physReg) 0])
-  readWrote (MCInstruction (OpcodeCondition ARMBx _) [a]) = ([a], [])
-  readWrote (MCInstruction (OpcodeCondition ARMLdr _) [a, b, _]) = ([b], [a])
-  readWrote (MCInstruction (OpcodeCondition ARMStr _) [a, b, _]) = ([a], [b])
-  readWrote (MCInstruction (OpcodeCondition ARMPush _) a) = (a, [])
-  readWrote (MCInstruction (OpcodeCondition ARMPop _) a) = ([], a)
+  readWrote (OpcodeCondition ARMMov _) [a, b] = ([b], [a])
+  readWrote (OpcodeCondition ARMMvn _) [a, b] = ([b], [a])
+  readWrote (OpcodeCondition ARMMovt _) [a, b] = ([b], [a])
+  readWrote (OpcodeCondition ARMVmov _) [a, b] = ([b], [a])
+  readWrote (OpcodeCondition ARMAdd _) [a, b, c] = ([b, c], [a])
+  readWrote (OpcodeCondition ARMSub _) [a, b, c] = ([b, c], [a])
+  readWrote (OpcodeCondition ARMCmp _) [a, b] = ([a, b], [])
+  readWrote (OpcodeCondition ARMMul _) [a, b, c] = ([b, c], [a])
+  readWrote (OpcodeCondition ARMBl _) [a, b, c] = ([b, c], [a])
+  readWrote (OpcodeCondition ARMAnd _) [a, b, c] = ([b, c], [a])
+  readWrote (OpcodeCondition ARMOrr _) [a, b, c] = ([b, c], [a])
+  readWrote (OpcodeCondition ARMEor _) [a, b, c] = ([b, c], [a])
+  readWrote (OpcodeCondition ARMB _) [a] = ([a], [])
+  readWrote (OpcodeCondition ARMBl _) [a] = ([a], [Reg (integerReg physReg) 0])
+  readWrote (OpcodeCondition ARMBx _) [a] = ([a], [])
+  readWrote (OpcodeCondition ARMLdr _) [a, b, _] = ([b], [a])
+  readWrote (OpcodeCondition ARMStr _) [a, b, _] = ([a], [b])
+  readWrote (OpcodeCondition ARMPush _) a = (a, [])
+  readWrote (OpcodeCondition ARMPop _) a = ([], a)
 
   {-
     machineCodeToBlocks groups instructions by their block to be analyzed
@@ -109,7 +109,7 @@ module Allocator where
   machineCodeToBlocks m s (_:as) = machineCodeToBlocks m s as
   machineCodeToBlocks m _ [] = m
 
-  analyzeMachineCode a@(MCInstruction b c) = OperandAccessInfo a (filter isReg ((fst . readWrote) a)) (filter isReg ((snd . readWrote) a))
+  analyzeMachineCode a@(MCInstruction b c) = OperandAccessInfo a (filter isReg (fst (readWrote b c))) (filter isReg (snd (readWrote b c)))
     where
       isReg (Reg _ _) = True
       isReg _ = False
