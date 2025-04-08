@@ -2,21 +2,21 @@
 An ANSI C compiler.
 
 ## Installation
-```sh
-$ git clone https://github.com/jeremykaragania/pile.git
-$ cd pile/pile
-$ ghc -i details/*.hs -o pile main.hs
+```bash
+git clone https://github.com/jeremykaragania/pile.git
+cd pile/pile
+ghc -i details/*.hs -o pile main.hs
 ```
 
 ## Usage
-```sh
-$ ./pile filename...
+```bash
+./pile filename...
 ```
 
 ## Examples
 Compile [`factorial.c`](examples/factorial.c).
-```sh
-$ ./pile ../examples/factorial.c
+```bash
+./pile ../examples/factorial.c
 ```
 Create a file `main.c`.
 ```c
@@ -30,12 +30,12 @@ int main() {
 }
 ```
 Compile `main.c`.
-```sh
-$ arm-none-linux-gnueabihf-gcc -o factorial main.c factorial.s
+```bash
+arm-none-linux-gnueabihf-gcc -o factorial main.c factorial.s
 ```
 Execute `factorial`.
-```sh
-$ qemu-arm factorial
+```bash
+qemu-arm factorial
 ```
 
 ## License
