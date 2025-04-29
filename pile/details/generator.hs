@@ -283,6 +283,11 @@ module Generator where
     | a == "|" && isIntegral b = IROr
     | otherwise = error ""
 
+  incrementCounter :: GeneratorStateMonad ()
+  incrementCounter = modify f
+    where
+      f s = s {counter = counter s + 1}
+
   newAlloca :: IRType -> GeneratorStateMonad ()
   newAlloca a = do
     got <- get
