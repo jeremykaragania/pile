@@ -702,8 +702,8 @@ module Generator where
         let newGlobals = globals got ++ [var]
         put (setGlobals newGlobals newTable)
 
-  generateCExternalDefinitions :: [CExternalDefinition] -> GeneratorStateMonad ()
-  generateCExternalDefinitions [] = return ()
+  generateCExternalDefinitions :: [CExternalDefinition] -> GeneratorStateMonad [IRGlobalValue]
+  generateCExternalDefinitions [] = gets globals
 
   generateCExternalDefinitions (a:as) = do
     got <- get
@@ -713,8 +713,7 @@ module Generator where
 
   generateCTranslationUnit :: CTranslationUnit -> GeneratorStateMonad IRModule
   generateCTranslationUnit (CTranslationUnit a) = do
-    got <- get
-    let globalValues = (globals . execState (generateCExternalDefinitions a)) got
+    globalValues <- generateCExternalDefinitions a
     return (IRModule globalValues)
 
   generate a = evalState (generateCTranslationUnit a) (GeneratorState [[]] 0 Map.empty Nothing [] 0)
