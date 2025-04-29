@@ -283,10 +283,20 @@ module Generator where
     | a == "|" && isIntegral b = IROr
     | otherwise = error ""
 
+  addBlocks :: [[(Maybe IRLabel, IRInstruction)]] -> GeneratorStateMonad ()
+  addBlocks b = modify f
+    where
+      f s = s {blocks = appendBlocks (blocks s) b}
+
   incrementCounter :: GeneratorStateMonad ()
   incrementCounter = modify f
     where
       f s = s {counter = counter s + 1}
+
+  addGlobal :: IRGlobalValue -> GeneratorStateMonad ()
+  addGlobal g = modify f
+    where
+      f s = s {globals = globals s ++ [g]}
 
   newAlloca :: IRType -> GeneratorStateMonad ()
   newAlloca a = do
