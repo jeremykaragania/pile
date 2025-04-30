@@ -367,11 +367,12 @@ module Generator where
     let selectionHead = execState (newHead a (IRLabelValue (IRLabelNumber (counter expr + 1))) (IRLabelValue (IRLabelNumber (counter stat + 1)))) got
     put selectionHead
 
-  newFunctionHead :: [CDeclaration] -> Integer -> State (GeneratorState, [IRArgument]) ()
+  newFunctionHead :: [CDeclaration] -> Integer -> GeneratorStateMonad [IRArgument]
   newFunctionHead a b = do
     got <- get
-    let params = execState (parameters a) (fst got, snd got)
-    put params
+    let params = execState (parameters a) (got, [])
+    put (fst params)
+    return (snd params)
     where
       parameters :: [CDeclaration] -> State (GeneratorState, [IRArgument]) ()
       parameters [] = return ()
@@ -397,10 +398,10 @@ module Generator where
   -}
   newFunctionBody :: CStatement -> IRType -> Integer -> GeneratorStateMonad [IRBasicBlock]
   newFunctionBody a _ c = do
-    got <- get
-    let stat = execState (generateCStatement a) got
     let ret = [[(Nothing, IRRet Nothing)]]
-    let newBlocks = appendBlocks (blocks stat) ret
+    generateCStatement a
+    addBlocks ret
+    newBlocks <- gets blocks
     return (fst (execState (numberBlocks newBlocks) ([], (c {-OFFSET-}))))
     where
       {-
@@ -688,22 +689,18 @@ module Generator where
 
   generateCExternalDefinition :: CExternalDefinition -> GeneratorStateMonad ()
   generateCExternalDefinition (CFunction (Just a) b _ d) = do
-    got <- get
     let parameterLength = (fromIntegral . length . parameterList) b
-    let functionHead = execState (newFunctionHead (parameterList b) (parameterLength + 1)) (GeneratorState [[]] (parameterLength + 1) (table got) Nothing [] 0, [])
-    let functionBody = evalState (newFunctionBody d functionType parameterLength) ((setLevel (+ (-1))) (fst functionHead)) -- The level needs to match that of functionHead.
-    let functionGlobal = IRFunctionGlobal functionType (getIdentifier b) (snd functionHead) functionBody
-    let newGlobals = (globals got) ++ [functionGlobal]
-    put ((setGlobals newGlobals) got)
+    putCounter (parameterLength + 1)
+    args <- (newFunctionHead (parameterList b) (parameterLength + 1))
+    functionBody <- (newFunctionBody d functionType parameterLength)
+    let functionGlobal = IRFunctionGlobal functionType (getIdentifier b) (args) functionBody
+    addGlobal functionGlobal
     where
       functionType = typeFromCSpecifiers a (pointer b)
       pointer (CDeclarator e _) = e
       parameterList (CDeclarator _ (CDirectDeclaratorFunctionCall _ [CParameterList b])) = b
 
-  generateCExternalDefinition (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList b)))) = do
-    got <- get
-    let dec = execState (declarations b) got
-    put dec
+  generateCExternalDefinition (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList b)))) = declarations b
     where
       declarations :: [CDeclaration] -> GeneratorStateMonad ()
       declarations [] = return ()
@@ -713,9 +710,8 @@ module Generator where
         let name = getIdentifier c
         let varType = typeFromCSpecifiers a (getPointer c)
         let var = IRVariableGlobal name varType (generateIRConstant (getConstant c) varType)
-        let newTable = execState (addIdentInfo a c) got
-        let newGlobals = globals got ++ [var]
-        put (setGlobals newGlobals newTable)
+        addIdentInfo a c
+        addGlobal var
 
   generateCExternalDefinitions :: [CExternalDefinition] -> GeneratorStateMonad [IRGlobalValue]
   generateCExternalDefinitions [] = gets globals
