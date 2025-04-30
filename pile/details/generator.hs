@@ -288,6 +288,11 @@ module Generator where
     where
       f s = s {blocks = appendBlocks (blocks s) b}
 
+  putCounter :: Integer -> GeneratorStateMonad ()
+  putCounter a = modify f
+    where
+      f s = s {counter = a}
+
   incrementCounter :: GeneratorStateMonad ()
   incrementCounter = modify f
     where
