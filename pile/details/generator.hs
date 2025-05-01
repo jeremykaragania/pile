@@ -430,7 +430,7 @@ module Generator where
   generateMaybeCDeclaration Nothing = return ()
 
   generateMaybeCStatement (Just a) = generateCStatement a
-  generateMaybeCStatement Nothing = return ()
+  generateMaybeCStatement Nothing = return []
 
   {-
     The last instruction of a generated expression will contain the resulting
@@ -534,29 +534,36 @@ module Generator where
 
   generateCDeclaration (CDeclarator _ _) = return ()
 
-  generateCStatements :: [CStatement] -> GeneratorStateMonad ()
-  generateCStatements [] = return ()
+  generateCStatements :: [CStatement] -> GeneratorStateMonad [[(Maybe IRLabel, IRInstruction)]]
+  generateCStatements [] = return []
 
   generateCStatements (a:as) = do
     generateCStatement a
     generateCStatements as
 
-  generateCStatement :: CStatement -> GeneratorStateMonad ()
-  generateCStatement (CLabeledCase _ b) = newLabeled b
+  generateCStatement :: CStatement -> GeneratorStateMonad [[(Maybe IRLabel, IRInstruction)]]
+  generateCStatement (CLabeledCase _ b) = do
+    newLabeled b
+    return []
 
-  generateCStatement (CLabeledDefault a) = newLabeled a
+  generateCStatement (CLabeledDefault a) = do
+    newLabeled a
+    return []
 
-  generateCStatement (CList a) = generateCStatements a
+  generateCStatement (CList a) = do generateCStatements a
 
   generateCStatement (CCompound a b) = do
     got <- get
     let dec = execState ((generateCDeclarations . declarationList) a) (setLevel (+1) got)
     let stat = execState ((generateCStatements . statementList) b) dec
     put (setLevel (+ (-1)) stat)
+    return []
 
-  generateCStatement (CCExpression (Just (CExpression []))) = return ()
+  generateCStatement (CCExpression (Just (CExpression []))) = return []
 
-  generateCStatement (CCExpression (Just (CExpression a))) = generateCExpressions a
+  generateCStatement (CCExpression (Just (CExpression a))) = do
+    generateCExpressions a
+    return []
 
   generateCStatement (CIf a@(CExpression _) b) = do
     got <- get
@@ -565,6 +572,7 @@ module Generator where
     let ifBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter ifBody)))))]
     let newBlocks = appendBlocks (blocks ifBody) [ifBr, []]
     put ((setBlocks newBlocks . setCounter (+1)) ifBody)
+    return []
 
   generateCStatement (CIfElse a@(CExpression _) b c) = do
     got <- get
@@ -574,6 +582,7 @@ module Generator where
     let elseBr = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter elseBody)))))]]
     let newBlocks = appendBlocks (blocks elseBody) elseBr
     put ((setBlocks newBlocks . setCounter (+1)) elseBody)
+    return []
 
   generateCStatement (CSwitch (CExpression a) b) = do
     got <- get
@@ -585,6 +594,7 @@ module Generator where
       let switchBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (((counter . fst) stat)))))]
       let newBlocks = appendBlocks (blocks expr) (appendBlocks [switch] (appendBlocks ((blocks . fst) stat) [switchBr, []]))
       put ((setBlocks newBlocks . setCounter (+1) . setContext Nothing . fst) stat)
+      return []
     else error ""
     where
       splitLabeled [] = []
@@ -610,6 +620,7 @@ module Generator where
     let br1 = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (counter got))))]]
     let newBlocks1 = appendBlocks (blocks whileBody) br1 ++ [[]]
     put ((setBlocks newBlocks1 . setCounter (+1) . setContext Nothing) whileBody)
+    return []
 
   generateCStatement (CDo a b) = do
     got <- get
@@ -618,6 +629,7 @@ module Generator where
     let doBody0 = execState ((generateCStatement . compound) a) ((setBlocks newBlocks0 . setCounter (+1) . setContext (Just (counter doBody0 + 2))) got)
     let doBody1 = execState (newHead b (IRLabelValue (IRLabelNumber (counter got))) (IRLabelValue (IRLabelNumber ((counter doBody0) + 2)))) doBody0
     put ((setBlocks (blocks doBody1 ++ [[]]) . setCounter (+1) . setContext Nothing) doBody1)
+    return []
 
   generateCStatement (CFor a (Just b) c d) = do
     got <- get
@@ -636,6 +648,7 @@ module Generator where
     let br = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter expr0 - 1)))))]
     let newBlocks = appendBlocks (blocks expr2) [br, []]
     put ((setBlocks newBlocks . setCounter (+1)) expr2)
+    return []
     where
       newForExpr0 :: (Maybe CExpression) -> GeneratorStateMonad ()
       newForExpr0 e = do
@@ -650,6 +663,7 @@ module Generator where
     let instrs = [[(Nothing, IRRet Nothing)]]
     let newBlocks = appendBlocks (blocks got) instrs
     put (setBlocks newBlocks got)
+    return []
 
   generateCStatement (CReturn (Just a)) = do
     got <- get
@@ -658,6 +672,7 @@ module Generator where
     let instrs = [[(Nothing, IRRet (Just (IRLabelValue exprLabel)))]]
     let newBlocks = appendBlocks (blocks expr) instrs
     put (setBlocks newBlocks expr)
+    return []
 
   generateCStatement (CBreak) = do
     got <- get
@@ -666,6 +681,7 @@ module Generator where
         let instrs = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber (a))))]]
         let newBlocks = appendBlocks (blocks got) instrs
         put (setBlocks newBlocks got)
+        return []
       _ -> error ""
 
   switchStatement :: [CStatement] -> State (GeneratorState, ([Integer], [(IRType, IRConstant, IRLabel)])) ()
