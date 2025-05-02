@@ -288,6 +288,11 @@ module Generator where
     where
       f s = s {blocks = appendBlocks (blocks s) b}
 
+  newBlock :: GeneratorStateMonad ()
+  newBlock = modify f
+    where
+      f s = s {blocks = (blocks s) ++ [[]]}
+
   putCounter :: Integer -> GeneratorStateMonad ()
   putCounter a = modify f
     where
@@ -302,6 +307,11 @@ module Generator where
   addGlobal g = modify f
     where
       f s = s {globals = globals s ++ [g]}
+
+  modifyScope :: (Integer -> Integer) -> GeneratorStateMonad ()
+  modifyScope g = modify f
+    where
+      f s = s {scope = g (scope s)}
 
   newAlloca :: IRType -> GeneratorStateMonad ()
   newAlloca a = do
