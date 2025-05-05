@@ -7,6 +7,8 @@ module Generator where
   import Data.Set (fromList)
   import Syntax
 
+  type BasicBlock = [(Maybe IRLabel, IRInstruction)]
+
   {-
     GeneratorState carries state between generators. A GeneratorState carries
     past basic blocks ("blocks"), an accumulator ("counter") for unnamed
@@ -15,7 +17,7 @@ module Generator where
     ("context") which carries the integer label number for the branch.
   -}
   data GeneratorState = GeneratorState {
-    blocks :: [[(Maybe IRLabel, IRInstruction)]],
+    blocks :: [BasicBlock],
     counter :: Integer,
     table :: Map String [IdentInfo],
     context :: (Maybe Integer),
@@ -283,7 +285,7 @@ module Generator where
     | a == "|" && isIntegral b = IROr
     | otherwise = error ""
 
-  addBlocks :: [[(Maybe IRLabel, IRInstruction)]] -> GeneratorStateMonad ()
+  addBlocks :: [BasicBlock] -> GeneratorStateMonad ()
   addBlocks b = modify f
     where
       f s = s {blocks = appendBlocks (blocks s) b}
@@ -421,7 +423,7 @@ module Generator where
         instructions in past blocks. The state tracks the list of blocks which
         have been numbered and the count of past numbered instructions.
       -}
-      numberBlocks :: [[(Maybe IRLabel, IRInstruction)]] -> State ([IRBasicBlock], Integer) ()
+      numberBlocks :: [BasicBlock] -> State ([IRBasicBlock], Integer) ()
       numberBlocks [] = return ()
       numberBlocks (c:cs) = do
         got <- get
@@ -544,14 +546,14 @@ module Generator where
 
   generateCDeclaration (CDeclarator _ _) = return ()
 
-  generateCStatements :: [CStatement] -> GeneratorStateMonad [[(Maybe IRLabel, IRInstruction)]]
+  generateCStatements :: [CStatement] -> GeneratorStateMonad [BasicBlock]
   generateCStatements [] = return []
 
   generateCStatements (a:as) = do
     generateCStatement a
     generateCStatements as
 
-  generateCStatement :: CStatement -> GeneratorStateMonad [[(Maybe IRLabel, IRInstruction)]]
+  generateCStatement :: CStatement -> GeneratorStateMonad [BasicBlock]
   generateCStatement (CLabeledCase _ b) = do
     newLabeled b
     return []
