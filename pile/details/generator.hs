@@ -565,10 +565,10 @@ module Generator where
   generateCStatement (CList a) = do generateCStatements a
 
   generateCStatement (CCompound a b) = do
-    got <- get
-    let dec = execState ((generateCDeclarations . declarationList) a) (setLevel (+1) got)
-    let stat = execState ((generateCStatements . statementList) b) dec
-    put (setLevel (+ (-1)) stat)
+    modifyScope (+1)
+    generateCDeclarations (declarationList a)
+    generateCStatements (statementList b)
+    modifyScope (+ (-1))
     return []
 
   generateCStatement (CCExpression (Just (CExpression []))) = return []
