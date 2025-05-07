@@ -591,7 +591,7 @@ module Generator where
     let ifHead = execState (newSelectionHead a (compound b)) got
     let ifBody = execState ((generateCStatement . compound) b) ((setCounter (+1) . setBlocks ((blocks ifHead) ++ [[]])) ifHead)
     let elseBody = execState ((generateCStatement . compound) c) ((setCounter (+1) . setBlocks ((blocks ifBody) ++ [[]])) ifBody)
-    let elseBr = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter elseBody)))))]]
+    let elseBr = [[(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter elseBody)))))], []]
     let newBlocks = appendBlocks (blocks elseBody) elseBr
     put ((setBlocks newBlocks . setCounter (+1)) elseBody)
     return []
