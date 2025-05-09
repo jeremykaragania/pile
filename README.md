@@ -5,7 +5,7 @@ An ANSI C compiler.
 ```bash
 git clone https://github.com/jeremykaragania/pile.git
 cd pile/pile
-ghc -i details/*.hs -o pile main.hs
+ghc -i details/*.hs -o pile Main.hs
 ```
 
 ## Usage
