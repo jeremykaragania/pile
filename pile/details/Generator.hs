@@ -578,12 +578,14 @@ module Generator where
     return []
 
   generateCStatement (CIf a@(CExpression _) b) = do
-    got <- get
-    let ifHead = execState (newSelectionHead a (compound b)) got
-    let ifBody = execState ((generateCStatement . compound) b) ((setCounter (+1) . setBlocks ((blocks ifHead) ++ [[]])) ifHead)
+    newSelectionHead a (compound b)
+    incrementCounter
+    newBlock
+    generateCStatement (compound b)
+    ifBody <- get
     let ifBr = [(Nothing, IRBrUnconditional (IRLabelValue (IRLabelNumber ((counter ifBody)))))]
-    let newBlocks = appendBlocks (blocks ifBody) [ifBr, []]
-    put ((setBlocks newBlocks . setCounter (+1)) ifBody)
+    incrementCounter
+    addBlocks [ifBr, []]
     return []
 
   generateCStatement (CIfElse a@(CExpression _) b c) = do
