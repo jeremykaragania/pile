@@ -5,6 +5,7 @@ module Main where
   import Lexer
   import Optimizer
   import Parser
+  import Preprocessor
   import Scheduler
   import Selector
   import System.Exit
@@ -22,7 +23,8 @@ module Main where
   compile (a:as) = do
     if isInFile a then do
       file <- readFile a
-      let scanned = scan file
+      let preprocessed = preprocess file
+      let scanned = scan preprocessed
       case scanned of
         Left b -> do
           print b
