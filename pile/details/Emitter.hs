@@ -20,7 +20,8 @@ module Emitter where
       emitARM e = (drop 3 . map toLower . show) e
       emitOpcodeCondition (OpcodeCondition e Nothing) = emitARM e
       emitOpcodeCondition (OpcodeCondition e (Just f)) = emitARM e ++ emitARM f
-      emitOperand (Label e) = e
+      emitOperand (Label name (Just number)) = showLabel name number
+      emitOperand (Label name Nothing) = name
       emitOperand (Reg (RegType IntegerReg PhysicalReg) 15) = "pc"
       emitOperand (Reg (RegType IntegerReg PhysicalReg) 14) = "lr"
       emitOperand (Reg (RegType IntegerReg PhysicalReg) 13) = "sp"

@@ -11,7 +11,7 @@ module Scheduler where
     Reg RegType Integer |
     Immediate Integer |
     Address Integer |
-    Label String deriving (Show, Eq, Ord)
+    Label String (Maybe Integer) deriving (Show, Eq, Ord)
 
   {-
     Directive is a type for an assembler directive. The directives here are
@@ -49,29 +49,31 @@ module Scheduler where
 
   opcodeCondition (Opcode a) = a
 
+  showLabel name number = name ++ "L" ++ (show number)
+
   scheduleGraph a = (concat . map toMachineCode) zipInstructions
     where
       opcodeNodes = filter isMachineCode (nodes a)
       isMachineCode (Node _ (FunctionGlobal _) _) = True
       isMachineCode (Node _ (VariableGlobal _) _) = True
-      isMachineCode (Node _ (BasicBlock _) _) = True
+      isMachineCode (Node _ (BasicBlock _ _) _) = True
       isMachineCode (Node _ (Opcode _) _) = True
       isMachineCode _ = False
       nodeOperands b = map ((nodes a !!) . fromIntegral . fromNode) (filter ((isOperand . nodeID) b) (edges a))
       isOperand b (Edge _ c _) = b == c
       isOperandType (Selector.Reg _) = True
       isOperandType (Constant) = True
-      isOperandType (Selector.Label _) = True
+      isOperandType (Selector.Label _ _) = True
       isOperandType _ = False
       zipInstructions = zip opcodeNodes (map nodeOperands opcodeNodes)
       toMachineCode ((Node _ (FunctionGlobal b) _), _) = [MCDirective Text, MCSymbol (MCGlobal MCFunction) b]
       toMachineCode ((Node _ (VariableGlobal b) c), _) = [MCDirective Data, MCSymbol (MCGlobal MCVariable) b] ++ map (\(d, Just e) -> MCDirective (MCConstant d e)) c
-      toMachineCode ((Node _ (BasicBlock b) _), _) = [MCSymbol MCLocal b]
+      toMachineCode ((Node _ (BasicBlock b c) _), _) = [MCSymbol MCLocal (showLabel b c)]
       toMachineCode (b@(Node _ (Opcode _) _), c) = [MCInstruction (toOpcode b) (map toOperand (filter (isOperandType . nodeType) c))]
       toOpcode b = (opcodeCondition . nodeType) b
       toOperand (Node _ (Selector.Reg b) [(_, (Just (IntegerValue c)))]) = Scheduler.Reg b c
       toOperand (Node _ Constant [(_, (Just (IntegerValue b)))]) = Immediate b
       toOperand (Node _ Constant [(_, (Just (FloatingValue 0.0)))]) = Immediate 0
-      toOperand (Node _ (Selector.Label b) _) = Scheduler.Label b
+      toOperand (Node _ (Selector.Label b c) _) = Scheduler.Label b c
 
   schedule = map scheduleGraph
