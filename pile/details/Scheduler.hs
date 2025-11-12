@@ -45,35 +45,64 @@ module Scheduler where
   data MachineCode =
     MCInstruction OpcodeCondition [Operand] |
     MCSymbol MCSymbolScope String |
-    MCDirective Directive deriving (Show, Eq)
+    MCDirective Directive |
+    MCBasicBlock (String, Integer) [MachineCode]
+    deriving (Show, Eq)
 
   opcodeCondition (Opcode a) = a
 
   showLabel name number = name ++ "L" ++ (show number)
 
-  scheduleGraph a = (concat . map toMachineCode) zipInstructions
+  {-
+    scheduleGraph schedules the selected instructions in the instruction
+    selection graph. Currently it just does a "topological sort" on the nodes.
+    So at this point, the whole graph in the scheduler is kind of useless.
+  -}
+  scheduleGraph (Graph ns es) = go Nothing [] zipInstructions
     where
-      opcodeNodes = filter isMachineCode (nodes a)
+      go Nothing curr [] = curr
+      go (Just blk) curr [] = curr ++ [blk]
+
+      -- Start of new basic block.
+      go block curr (((Node _ (BasicBlock name number) _), _):xs) =
+        case block of
+          Just blk -> go (Just (MCBasicBlock label [])) (curr ++ [blk]) xs
+          Nothing -> go (Just (MCBasicBlock label [])) curr xs
+        where
+          label = (name, number)
+
+      -- Add to existing basic block.
+      go block@(Just (MCBasicBlock name instrs)) curr (x:xs) = go (Just (MCBasicBlock name (instrs ++ toMachineCode x))) curr xs
+      go _ curr (x:xs) = go Nothing (curr ++ toMachineCode x) xs
+
+      opcodeNodes = filter isMachineCode ns
+
       isMachineCode (Node _ (FunctionGlobal _) _) = True
       isMachineCode (Node _ (VariableGlobal _) _) = True
       isMachineCode (Node _ (BasicBlock _ _) _) = True
       isMachineCode (Node _ (Opcode _) _) = True
       isMachineCode _ = False
-      nodeOperands b = map ((nodes a !!) . fromIntegral . fromNode) (filter ((isOperand . nodeID) b) (edges a))
+
+      nodeOperands b = map ((ns !!) . fromIntegral . fromNode) (filter ((isOperand . nodeID) b) es)
+
       isOperand b (Edge _ c _) = b == c
       isOperandType (Selector.Reg _) = True
       isOperandType (Constant) = True
       isOperandType (Selector.Label _ _) = True
       isOperandType _ = False
+
       zipInstructions = zip opcodeNodes (map nodeOperands opcodeNodes)
+
       toMachineCode ((Node _ (FunctionGlobal b) _), _) = [MCDirective Text, MCSymbol (MCGlobal MCFunction) b]
       toMachineCode ((Node _ (VariableGlobal b) c), _) = [MCDirective Data, MCSymbol (MCGlobal MCVariable) b] ++ map (\(d, Just e) -> MCDirective (MCConstant d e)) c
       toMachineCode ((Node _ (BasicBlock b c) _), _) = [MCSymbol MCLocal (showLabel b c)]
       toMachineCode (b@(Node _ (Opcode _) _), c) = [MCInstruction (toOpcode b) (map toOperand (filter (isOperandType . nodeType) c))]
+
       toOpcode b = (opcodeCondition . nodeType) b
+
       toOperand (Node _ (Selector.Reg b) [(_, (Just (IntegerValue c)))]) = Scheduler.Reg b c
       toOperand (Node _ Constant [(_, (Just (IntegerValue b)))]) = Immediate b
       toOperand (Node _ Constant [(_, (Just (FloatingValue 0.0)))]) = Immediate 0
       toOperand (Node _ (Selector.Label b c) _) = Scheduler.Label b c
 
-  schedule = map scheduleGraph
+  schedule = (concat) . map scheduleGraph

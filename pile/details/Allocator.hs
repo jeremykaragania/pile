@@ -3,8 +3,10 @@ module Allocator where
   import Data.List
   import Data.Map (Map)
   import qualified Data.Map as Map
+  import Data.Set (Set)
+  import qualified Data.Set as Set
   import Scheduler
-  import Selector hiding (counter, offset, Reg, setOffset)
+  import Selector hiding (counter, offset, Reg, setOffset, Label)
   import Syntax
 
   {-
@@ -35,16 +37,19 @@ module Allocator where
     code :: MachineCode,
     readOps :: [Operand],
     wroteOps :: [Operand]
-  }
+  } deriving (Show)
 
   {-
     AnalyzerState is a type for the analyzer it keeps track of the current line
-    number "counter"; and a lookup table "table" which associates an operand
-    with its live interval information.
+    number "counter"; a lookup table "blockTable" which associates an block
+    label with the set of operands in that block tracked by the analyzer; and
+    another lookup table "intervalTable" which associates an operand with its
+    live interval information.
   -}
   data AnalyzerState = AnalyzerState {
     counter :: Integer,
-    table :: Map Operand LiveInterval}
+    blockTable :: Map (String, Integer) (Set Operand),
+    intervalTable :: Map Operand LiveInterval}
 
   type AnalyzerStateMonad = State AnalyzerState
 
@@ -99,27 +104,42 @@ module Allocator where
   readWrote (OpcodeCondition ARMPush _) a = (a, [])
   readWrote (OpcodeCondition ARMPop _) a = ([], a)
 
+  filterBasicBlocks = filter isBasicBlock
+
+  isBasicBlock (MCBasicBlock _ _) = True
+  isBasicBlock _ = False
+
+  basicBlockNames mcs = map (\(MCBasicBlock x _) -> x) (filterBasicBlocks mcs)
+
   {-
-    machineCodeToBlocks groups instructions by their block to be analyzed
-    later.
+    createBasicBlockMap turn basic blocks into a map keyed by the basic block
+    name for later use.
   -}
-  machineCodeToBlocks :: Map String [MachineCode] -> String -> [MachineCode] -> Map String [MachineCode]
-  machineCodeToBlocks m s (MCSymbol _ a:as) = machineCodeToBlocks (Map.insert a [] m) a as
-  machineCodeToBlocks m s (a@(MCInstruction _ _):as) = machineCodeToBlocks (Map.insert s ((m Map.! s) ++ [a]) m) s as
-  machineCodeToBlocks m s (_:as) = machineCodeToBlocks m s as
-  machineCodeToBlocks m _ [] = m
+  createBasicBlockMap mcs = go
+    where
+      go = Map.fromList (map toPair (filterBasicBlocks mcs))
+
+      toPair (MCBasicBlock name instrs) = (name, instrs)
 
   analyzeMachineCode a@(MCInstruction b c) = OperandAccessInfo a (filter isReg (fst (readWrote b c))) (filter isReg (snd (readWrote b c)))
     where
       isReg (Reg _ _) = True
       isReg _ = False
 
-  analyzeMachineCodes a = map analyzeMachineCode (filter isInstruction a)
+  {-
+    analyzeMachineCodes analyze which operands each instruction writes to and
+    reads from.
+  -}
+  analyzeMachineCodes mcs = go
     where
-      isInstruction (MCInstruction _ _) = True
-      isInstruction _ = False
+      go = map (map analyzeMachineCode) instrs
+      basicBlocks = filterBasicBlocks mcs
+      instrs = map (\(MCBasicBlock _ x) -> x) basicBlocks
 
-  analyzeOpsPairs :: [OperandAccessInfo] -> AnalyzerStateMonad ()
+  {-
+    analyzeOpsPairs calculates the live intervals for each operand.
+  -}
+  analyzeOpsPairs :: [((String, Integer), OperandAccessInfo)] -> AnalyzerStateMonad ()
   analyzeOpsPairs [] = return ()
 
   analyzeOpsPairs (a:as) = do
@@ -128,39 +148,92 @@ module Allocator where
     put analyzed
     analyzeOpsPairs as
 
-  analyzeOpsPair :: OperandAccessInfo -> AnalyzerStateMonad ()
-  analyzeOpsPair o@(OperandAccessInfo _ a b) = do
-    got <- get
-    let analyzedRead = execState (analyzeOps setLiveTo a) got
-    let analyzedWrote = execState (analyzeOps setLiveFrom b) analyzedRead
-    put (AnalyzerState (counter analyzedWrote + 1) (table analyzedWrote))
+  analyzeOpsPair :: ((String, Integer), OperandAccessInfo) -> AnalyzerStateMonad ()
+  analyzeOpsPair (label@(name, number), o@(OperandAccessInfo instr@(MCInstruction (OpcodeCondition opcode _) operands) r w))
+    -- Every operand's end interval in the branch block has to be extended to
+    -- the current point.
+    | isBackwardsBranch = do
+      got <- get
+      let extended = execState (extendIntervalsTo (branchName, branchNumber) (counter got)) got
+      put (AnalyzerState (counter extended + 1) (blockTable extended) (intervalTable extended))
+    | otherwise = do
+        got <- get
+        let analyzedRead = execState (analyzeOps setLiveTo label instr r) got
+        let analyzedWrote = execState (analyzeOps setLiveFrom label instr w) analyzedRead
+        put (AnalyzerState (counter analyzedWrote + 1) (blockTable analyzedWrote) (intervalTable analyzedWrote))
+    where
+      isBackwardsBranch = isBranch opcode && name == branchName && number > branchNumber
 
-  analyzeOps :: (Integer -> LiveInterval -> LiveInterval) -> [Operand] -> AnalyzerStateMonad ()
-  analyzeOps _ [] = return ()
+      branchName = labelName operands
+      branchNumber = labelNumber operands
 
-  analyzeOps b (a:as) = do
+      labelName [Label x _] = x
+      labelNumber [Label _ (Just x)] = x
+
+      isBranch ARMB = True
+      isBranch _ = False
+
+  analyzeOps :: (Integer -> LiveInterval -> LiveInterval) -> (String, Integer) -> MachineCode -> [Operand] -> AnalyzerStateMonad ()
+  analyzeOps _ _ _ [] = return ()
+
+  analyzeOps f label instr (o:os) = do
     got <- get
-    let analyzed = execState (analyzeOp b a) got
+    let analyzed = execState (analyzeOp f label o) got
     put analyzed
-    analyzeOps b as
+    analyzeOps f label instr os
+    return ()
 
-  analyzeOp :: (Integer -> LiveInterval -> LiveInterval) -> Operand -> AnalyzerStateMonad ()
-  analyzeOp a b = do
+  analyzeOp :: (Integer -> LiveInterval -> LiveInterval) -> (String, Integer) -> Operand -> AnalyzerStateMonad ()
+  analyzeOp f label op = do
     got <- get
-    if Map.notMember b (table got) then do
-      let newTable = Map.insert b (a (counter got) (LiveInterval (-1) (-1))) (table got)
-      put (AnalyzerState (counter got) newTable)
+    let iTbl = intervalTable got
+    let bTbl = blockTable got
+
+    let set = bTbl Map.! label
+    let newSet = Set.insert op set
+    let newBlockTable = Map.insert label newSet bTbl
+
+    if Map.notMember op (intervalTable got) then do
+      let newTable = Map.insert op (f (counter got) (LiveInterval (-1) (-1))) iTbl
+      put (AnalyzerState (counter got) newBlockTable newTable)
     else do
-      let oldValue = (table got) Map.! b
-      let newValue = (a (counter got) oldValue)
-      let newTable = Map.insert b (whichValue oldValue newValue) (table got)
-      put (AnalyzerState (counter got) newTable)
+      let oldValue = iTbl Map.! op
+      let newValue = (f (counter got) oldValue)
+      let newTable = Map.insert op (whichValue oldValue newValue) iTbl
+      put (AnalyzerState (counter got) newBlockTable newTable)
     where
       whichValue c d
         | liveFrom c < liveFrom d = c
         | otherwise = d
 
-  analyze a = (Map.toList . table) (execState (analyzeOpsPairs (analyzeMachineCodes a)) (AnalyzerState 0 Map.empty))
+  analyze mcs = Map.toList $ intervalTable $ (execState (analyzeOpsPairs opsPairsList)) (AnalyzerState 0 initTable Map.empty)
+    where
+      initTable = Map.fromList $ zip names (repeat Set.empty)
+
+      opsPairsList = concat $ map (\(name, ops) -> zip (repeat name) ops) (zip names opsPairs)
+      opsPairs = analyzeMachineCodes mcs
+      names = basicBlockNames mcs
+
+  {-
+    extendIntervalsTo extends the live intervals of operands inside a basic
+    block with the label "label" to end at "to". Sometimes we need to extend a
+    "previous's" block's live intervals as we may be branching back to it.
+  -}
+  extendIntervalsTo :: (String, Integer) -> Integer -> AnalyzerStateMonad()
+  extendIntervalsTo label to = do
+    got <- get
+    let bTbl = blockTable got
+    let iTbl = intervalTable got
+    let operands = Set.toList $ bTbl Map.! label
+    let extended = Map.fromList $ extendOperands iTbl operands
+    let newTable = Map.union extended iTbl
+
+    put (AnalyzerState (counter got) (blockTable got) newTable)
+    where
+      extendOperands table operands = map (extendOperand table) operands
+      extendOperand table operand =
+        let interval = table Map.! operand
+        in (operand, LiveInterval (liveFrom interval) to)
 
   allocateLiveIntervals :: [(Operand, LiveInterval)] -> AllocatorStateMonad ()
   allocateLiveIntervals [] = return ()
@@ -211,49 +284,89 @@ module Allocator where
     let spill = (last . Map.toList . active) got
     if (liveTo . snd) spill > liveTo b then do
       let newActive = Map.insert a b (Map.delete (fst spill) (active got))
-      let firstNewRegs = Map.insert a ((regs got) Map.! (fst spill)) (regs got)
-      let secondNewRegs = Map.insert (fst spill) (Address (offset got)) firstNewRegs
-      put ((setActive newActive . setRegs secondNewRegs . setOffset (+4)) got)
+      let firstRegs = Map.insert a ((regs got) Map.! (fst spill)) (regs got)
+      let secondRegs = Map.insert (fst spill) (Address (offset got)) firstRegs
+      put ((setActive newActive . setRegs secondRegs . setOffset (+4)) got)
     else do
       let newRegs = Map.insert a (Address (offset got)) (regs got)
       put ((setRegs newRegs . setOffset (+4)) got)
 
   allocateMachineCodes a = addSubs [] machineCodes
     where
-      toPhysicalReg = regs (execState (allocateLiveIntervals ((sortBy compareLiveFrom . analyze) a)) (AllocatorState [2, 3, 9, 10, 11] Map.empty Map.empty 0))
-      machineCodes = map instruction a
+      toPhysicalReg = regs (execState (allocateLiveIntervals ((sortBy compareLiveFrom . analyze) a)) (AllocatorState [2, 3, 9, 10, 11] Map.empty Map.empty reserveSize))
+
+      machineCodes = concat $ map instruction a
+
       operand b@(Reg _ _) = toPhysicalReg Map.! b
       operand b = b
-      instruction (MCInstruction b c) = MCInstruction b (map operand c)
-      instruction b = b
+
+      instruction (MCBasicBlock label instrs) = [MCSymbol MCLocal (uncurry showLabel label)] ++ map (\(MCInstruction b c) -> MCInstruction b (map operand c)) instrs
+      instruction b = [b]
+
       addSub b = [MCInstruction (OpcodeCondition b Nothing) [Reg (integerReg physReg) 13, Reg (integerReg physReg) 13, Immediate stackOffset]]
-      stackOffset = ((*4) . fromIntegral . length . filter address . Map.toList) toPhysicalReg
+
+      -- 12 bytes: Enough space for three registers.
+      reserveSize = 12
+
+      stackOffset = ((+reserveSize) . (*4) . fromIntegral . length . filter address . Map.toList) toPhysicalReg
+
       address (_, Address _) = True
       address _ = False
+
       addSubs b [] = b
       addSubs b (c@(MCSymbol (MCGlobal MCFunction) _):d) = addSubs (b ++ [c] ++ addSub ARMSub) d
       addSubs b (c@(MCInstruction (OpcodeCondition ARMBx Nothing) [Reg (RegType IntegerReg PhysicalReg) 14]):d) = addSubs (b ++ addSub ARMAdd ++ [c]) d
       addSubs b (c:d) = addSubs (b ++ [c]) d
 
-  resolveMachineCodes a [] = a
-  resolveMachineCodes a (b@(MCInstruction c (d:e)):f) = resolveMachineCodes (a ++ (firstMachineCodes (fst operands) b) ++ [MCInstruction c (snd operands)] ++ lastMachineCodes b) f
+  {-
+   resolveMachineCodes does a final pass over the machine code and resolves
+   register spilling artifacts. During register allocation when we had to
+   spill, we didn't worry about the semantics of what that looked like. We
+   simply replaced registers with addresses. Since memory can't be an operand,
+   we have to do some loads and stores to get those addresses into registers
+   first.
+  -}
+  resolveMachineCodes list [] = list
+  resolveMachineCodes list (c:cs) = resolveMachineCodes (list ++ (resolveMachineCode c)) cs
+
+  resolveMachineCode code@(MCInstruction opcode operands) = go
     where
-      operands = (resolveOps ([], []) 4 (d:e))
+      go = pushes ++ loads ++ [newCode] ++ stores ++ pops
 
-  resolveMachineCodes a (b:c) = resolveMachineCodes (a ++ [b]) c
+      -- We call them "pushes" and "pops" but we don't actually use push or pop
+      -- instructions. It's really just register preservation and restoration.
+      -- Since at this point we have no physical registers available, we've
+      -- saved some space on the stack for up to three registers. This space is
+      -- used to preserve register r0-r2 so they can be used to resolve our
+      -- address operations.
+      pushes = pushInstrs 0 [] operands
+      pops = popInstrs 0 [] operands
 
-  resolveOps a _ [] = a
-  resolveOps a b (Address c:d) = resolveOps (fst a ++ [MCInstruction (OpcodeCondition ARMLdr Nothing) [Reg (integerReg physReg) b, Reg (integerReg physReg) 13, Immediate c]], (snd a ++ [Reg (integerReg physReg) b])) (b + 1) d
-  resolveOps a b (c:d) = resolveOps (fst a, (snd a ++ [c])) b d
+      loads = loadInstrs 0 [] operands
+      stores = storeInstrs 0 [] operands
+      newCode = MCInstruction opcode newOperands
+      newOperands = replaceOperands 0 [] operands
 
-  firstMachineCodes a (MCInstruction _ (_:b))
-    | any address b = a
-    | otherwise = []
-    where
-      address (Address _) = True
-      address _ = False
+      pushInstrs _ instrs [] = instrs
+      pushInstrs num instrs (Address _:os) = pushInstrs (num + 1) (instrs ++ [MCInstruction (OpcodeCondition ARMStr Nothing) [Reg (integerReg physReg) num, Reg (integerReg physReg) 13, Immediate (4 * num)]]) os
+      pushInstrs num instrs (o:os) = pushInstrs num instrs os
 
-  lastMachineCodes (MCInstruction _ [Address a, b]) = [MCInstruction (OpcodeCondition ARMStr Nothing) [Reg (integerReg physReg) (opcodeNumber b), Reg (integerReg physReg) 13, Immediate a]]
-  lastMachineCodes _ = []
+      popInstrs _ instrs [] = instrs
+      popInstrs num instrs (Address _:os) = popInstrs (num + 1) (instrs ++ [MCInstruction (OpcodeCondition ARMLdr Nothing) [Reg (integerReg physReg) num, Reg (integerReg physReg) 13, Immediate (4 * num)]]) os
+      popInstrs num instrs (o:os) = popInstrs num instrs os
 
-  allocate = map (resolveMachineCodes [] . allocateMachineCodes)
+      loadInstrs _ instrs [] = instrs
+      loadInstrs num instrs (Address offset:os) = loadInstrs (num + 1) (instrs ++ [MCInstruction (OpcodeCondition ARMLdr Nothing) [Reg (integerReg physReg) num, Reg (integerReg physReg) 13, Immediate offset]]) os
+      loadInstrs num instrs (o:os) = loadInstrs num instrs os
+
+      storeInstrs _ instrs [] = instrs
+      storeInstrs num instrs (Address offset:os) = storeInstrs (num + 1) (instrs ++ [MCInstruction (OpcodeCondition ARMStr Nothing) [Reg (integerReg physReg) num, Reg (integerReg physReg) 13, Immediate offset]]) os
+      storeInstrs num instrs (o:os) = storeInstrs num instrs os
+
+      replaceOperands _ new [] = new
+      replaceOperands num new (Address _:os) = replaceOperands (num + 1) (new ++ [Reg (RegType IntegerReg PhysicalReg) num]) os
+      replaceOperands num new (o:os) = replaceOperands num (new ++ [o]) os
+
+  resolveMachineCode code = [code]
+
+  allocate = resolveMachineCodes [] . allocateMachineCodes

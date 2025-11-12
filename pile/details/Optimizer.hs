@@ -28,4 +28,4 @@ module Optimizer where
 
   replaceMachineCodes a (b:bs) = replaceMachineCodes (a ++ [b]) bs
 
-  optimize = map (replaceMachineCodes [])
+  optimize = replaceMachineCodes []

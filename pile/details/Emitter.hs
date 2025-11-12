@@ -36,10 +36,10 @@ module Emitter where
   emitMachineCode (MCDirective a@(MCConstant _ _)) = "  ." ++ emitMCDirective a
   emitMachineCode (MCDirective a) = "." ++ emitMCDirective a
 
-  emitMachineCodes = map (map emitMachineCode)
+  emitMachineCodes = map emitMachineCode
 
   emitMCDirective (MCConstant Halfword a) = "hword " ++ emitNodeValue a
   emitMCDirective (MCConstant a b) = (map toLower . show) a ++ " " ++ emitNodeValue b
   emitMCDirective a = (map toLower . show) a
 
-  emit = flip (++) "\n" . intercalate "\n" . map (intercalate "\n") . emitMachineCodes
+  emit = (intercalate "\n") . emitMachineCodes
