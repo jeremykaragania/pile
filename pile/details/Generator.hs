@@ -360,7 +360,6 @@ module Generator where
     let name = getIdentifier b
     if Map.notMember name (table got) then do
       let varType = typeFromCSpecifiers a (getPointer b)
-      let var = IRVariableGlobal name varType (generateIRConstant (getConstant b) varType)
       let newTable = Map.insert name [(IdentInfo (scope got) (IRLabelNumber (counter got)) varType)] (table got)
       put (setTable newTable got)
     else error ""
