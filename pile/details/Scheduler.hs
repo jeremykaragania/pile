@@ -72,7 +72,7 @@ module Scheduler where
           label = (name, number)
 
       -- Add to existing basic block.
-      go block@(Just (MCBasicBlock name instrs)) curr (x:xs) = go (Just (MCBasicBlock name (instrs ++ toMachineCode x))) curr xs
+      go (Just (MCBasicBlock name instrs)) curr (x:xs) = go (Just (MCBasicBlock name (instrs ++ toMachineCode x))) curr xs
       go _ curr (x:xs) = go Nothing (curr ++ toMachineCode x) xs
 
       opcodeNodes = filter isMachineCode ns

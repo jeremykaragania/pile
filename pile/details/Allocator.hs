@@ -149,7 +149,7 @@ module Allocator where
     analyzeOpsPairs as
 
   analyzeOpsPair :: ((String, Integer), OperandAccessInfo) -> AnalyzerStateMonad ()
-  analyzeOpsPair (label@(name, number), o@(OperandAccessInfo instr@(MCInstruction (OpcodeCondition opcode _) operands) r w))
+  analyzeOpsPair (label@(name, number), (OperandAccessInfo instr@(MCInstruction (OpcodeCondition opcode _) operands) r w))
     -- Every operand's end interval in the branch block has to be extended to
     -- the current point.
     | isBackwardsBranch = do
@@ -329,7 +329,7 @@ module Allocator where
   resolveMachineCodes list [] = list
   resolveMachineCodes list (c:cs) = resolveMachineCodes (list ++ (resolveMachineCode c)) cs
 
-  resolveMachineCode code@(MCInstruction opcode operands) = go
+  resolveMachineCode (MCInstruction opcode operands) = go
     where
       go = pushes ++ loads ++ [newCode] ++ stores ++ pops
 
@@ -349,19 +349,19 @@ module Allocator where
 
       pushInstrs _ instrs [] = instrs
       pushInstrs num instrs (Address _:os) = pushInstrs (num + 1) (instrs ++ [MCInstruction (OpcodeCondition ARMStr Nothing) [Reg (integerReg physReg) num, Reg (integerReg physReg) 13, Immediate (4 * num)]]) os
-      pushInstrs num instrs (o:os) = pushInstrs num instrs os
+      pushInstrs num instrs (_:os) = pushInstrs num instrs os
 
       popInstrs _ instrs [] = instrs
       popInstrs num instrs (Address _:os) = popInstrs (num + 1) (instrs ++ [MCInstruction (OpcodeCondition ARMLdr Nothing) [Reg (integerReg physReg) num, Reg (integerReg physReg) 13, Immediate (4 * num)]]) os
-      popInstrs num instrs (o:os) = popInstrs num instrs os
+      popInstrs num instrs (_:os) = popInstrs num instrs os
 
       loadInstrs _ instrs [] = instrs
       loadInstrs num instrs (Address offset:os) = loadInstrs (num + 1) (instrs ++ [MCInstruction (OpcodeCondition ARMLdr Nothing) [Reg (integerReg physReg) num, Reg (integerReg physReg) 13, Immediate offset]]) os
-      loadInstrs num instrs (o:os) = loadInstrs num instrs os
+      loadInstrs num instrs (_:os) = loadInstrs num instrs os
 
       storeInstrs _ instrs [] = instrs
       storeInstrs num instrs (Address offset:os) = storeInstrs (num + 1) (instrs ++ [MCInstruction (OpcodeCondition ARMStr Nothing) [Reg (integerReg physReg) num, Reg (integerReg physReg) 13, Immediate offset]]) os
-      storeInstrs num instrs (o:os) = storeInstrs num instrs os
+      storeInstrs num instrs (_:os) = storeInstrs num instrs os
 
       replaceOperands _ new [] = new
       replaceOperands num new (Address _:os) = replaceOperands (num + 1) (new ++ [Reg (RegType IntegerReg PhysicalReg) num]) os

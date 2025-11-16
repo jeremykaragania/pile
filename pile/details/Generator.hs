@@ -735,7 +735,6 @@ module Generator where
       declarations [] = return ()
 
       declarations (c:_) = do
-        got <- get
         let name = getIdentifier c
         let varType = typeFromCSpecifiers a (getPointer c)
         let var = IRVariableGlobal name varType (generateIRConstant (getConstant c) varType)
