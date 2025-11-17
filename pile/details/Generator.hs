@@ -424,12 +424,12 @@ module Generator where
       -}
       numberBlocks :: [BasicBlock] -> State ([IRBasicBlock], Integer) ()
       numberBlocks [] = return ()
-      numberBlocks (c:cs) = do
+      numberBlocks (d:ds) = do
         got <- get
-        let present = (toInteger . length . filter numbered) c
+        let present = (toInteger . length . filter numbered) d
         let past = snd got
-        put (((fst got) ++ [IRBasicBlock (IRLabelNumber past) c], present + past + 1))
-        numberBlocks cs
+        put (((fst got) ++ [IRBasicBlock (IRLabelNumber past) d], present + past + 1))
+        numberBlocks ds
         where
           numbered (Nothing, _) = False
           numbered _ = True
@@ -727,7 +727,7 @@ module Generator where
     where
       functionType = typeFromCSpecifiers a (pointer b)
       pointer (CDeclarator e _) = e
-      parameterList (CDeclarator _ (CDirectDeclaratorFunctionCall _ [CParameterList b])) = b
+      parameterList (CDeclarator _ (CDirectDeclaratorFunctionCall _ [CParameterList c])) = c
 
   generateCExternalDefinition (CExternalDeclaration (CDeclaration a (Just (CInitDeclaratorList b)))) = declarations b
     where
